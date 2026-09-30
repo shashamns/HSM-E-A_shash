@@ -1,0 +1,16 @@
+{
+  "name": "HSM E&A",
+  "short_name": "HSM E&A",
+  "description": "HSM Electrical & Automation – shift schedule, check lists, spares, SOP & HIRAC",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#C8102E",
+  "theme_color": "#A50D26",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

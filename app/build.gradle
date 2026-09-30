@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.hsm.ea'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.hsm.ea'
+        minSdk 26
+        targetSdk 34
+        versionCode 7
+        versionName '2.5'
+    }
+
+    signingConfigs {
+        hsm {
+            storeFile file('hsm-ea.keystore')
+            storePassword 'hsmea2026'
+            keyAlias 'hsmea'
+            keyPassword 'hsmea2026'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.hsm
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.hsm
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'androidx.core:core:1.13.1'
+}
