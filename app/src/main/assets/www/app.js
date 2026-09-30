@@ -11,6 +11,10 @@ const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','GE Drive','Power','Crane'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
+const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
+  ['sop','SOP & HIRAC','shield','Numbers, hazards, docs'],['mill',"SOP's of Mill Process",'doc','Operational procedures'],['team','Team','users','E&amp;A directory']];
+const ALL_MODS = MODULES.map(m => m[0]);
+const ROUTE_MOD = { schedule: 'schedule', checklist: 'checklist', cl: 'checklist', clh: 'checklist', cle: 'checklist', spares: 'spares', spare: 'spares', sop: 'sop', hirac: 'sop', mill: 'mill', team: 'team' };
 const MILL_AREAS = [['CB','CB'],['DC','DC'],['FM','FM'],['LEVEL-1','Level 1'],['RHF','RHF'],['RM','RM']];
 const SOP_GROUPS = ['All','Common','Instrument','RM','CB','FM','Coiler','MD Motor','Crane','Power'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -58,6 +62,10 @@ const fromYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Da
 const fmtDay = d => `${pad2(d.getDate())}-${MON3[d.getMonth()]}-${String(d.getFullYear()).slice(2)}, ${DAY3[d.getDay()]}`;
 const fmtShort = d => `${pad2(d.getDate())}-${MON3[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`;
 const fmtStamp = iso => { const d = new Date(iso); return `${fmtShort(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const can = m => !ME || ME.is_admin || !Array.isArray(ME.modules) || ME.modules.includes(m);
+const avHtml = (url, name, style = '') => url
+  ? `<span class="av" style="padding:0;overflow:hidden;${style}"><img src="${esc(url)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover"></span>`
+  : `<span class="av" style="${style}">${esc(initials(name))}</span>`;
 const initials = n => { const p = String(n || '?').replace(/\./g, '').trim().split(/\s+/); return ((p[0] || '?')[0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); };
 const firstName = n => { const p = String(n || '').replace(/^s\.\s*/i, '').split(/\s+/); return p[0] || ''; };
 const curShift = (d = new Date()) => { const h = d.getHours(); return h >= 7 && h < 15 ? 'A' : h >= 15 && h < 23 ? 'B' : 'C'; };
@@ -217,11 +225,40 @@ async function storageSignedUrl(path, bucket = SOP_BUCKET) {
   const j = await r.json(); if (!r.ok) throw new Error(j.message || 'Could not open document');
   return `${SB_URL}/storage/v1${j.signedURL || j.signedUrl}`;
 }
-async function storageUpload(path, file) {
+async function storageUpload(path, file, bucket = SOP_BUCKET, upsert = false) {
   const tok = await accessToken();
-  const r = await fetch(`${SB_URL}/storage/v1/object/${SOP_BUCKET}/${path.split('/').map(encodeURIComponent).join('/')}`, { method: 'POST',
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${tok}`, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file });
-  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.message || 'Upload failed'); }
+  const r = await fetch(`${SB_URL}/storage/v1/object/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`, { method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${tok}`, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': upsert ? 'true' : 'false' }, body: file });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); const ex = /exist|duplicate/i.test((j.message || '') + (j.error || '')); const e = new Error(ex ? 'A file with this name already exists' : (j.message || 'Upload failed')); e.exists = ex; throw e; }
+}
+async function storageDelete(path, bucket) {
+  const tok = await accessToken();
+  const r = await fetch(`${SB_URL}/storage/v1/object/${bucket}`, { method: 'DELETE',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [path] }) });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !Array.isArray(j) || !j.length) throw new Error('Could not delete');
+}
+const myUid = () => { try { return JSON.parse(atob(SESSION.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch (e) { return null; } };
+let AVATARS = null;
+async function avatars() { if (!AVATARS) { try { AVATARS = await rpc('hsm_avatars') || []; } catch (e) { return []; } } return AVATARS; }
+function squarePhoto(file, size = 400) {
+  return new Promise((ok, no) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => { const s = Math.min(im.naturalWidth, im.naturalHeight), c = document.createElement('canvas'); c.width = c.height = size;
+      c.getContext('2d').drawImage(im, (im.naturalWidth - s) / 2, (im.naturalHeight - s) / 2, s, s, 0, 0, size, size);
+      URL.revokeObjectURL(url); c.toBlob(b => b ? ok(b) : no(new Error('Could not read photo')), 'image/jpeg', 0.85); };
+    im.onerror = () => { URL.revokeObjectURL(url); no(new Error('Could not read this photo. Use a JPG or PNG.')); };
+    im.src = url;
+  });
+}
+async function setMyPhoto(file) {
+  const uid = myUid(); if (!uid) throw new Error('AUTH');
+  toast('Saving photo…', 15000);
+  const blob = await squarePhoto(file);
+  await storageUpload(`${uid}.jpg`, new File([blob], 'photo.jpg', { type: 'image/jpeg' }), 'avatars', true);
+  const url = `${SB_URL}/storage/v1/object/public/avatars/${uid}.jpg?v=${Date.now()}`;
+  await rpc('hsm_set_avatar', { p_url: url });
+  ME.avatar = url; store.set('hsm_me', ME); AVATARS = null; toast('Photo updated');
 }
 
 /* Files: save + share (Android) or download (browser) */
@@ -334,19 +371,32 @@ window.hsmBack = () => {
   const h = location.hash.replace(/^#\/?/, ''); if (!h || h === 'home' || !SESSION) return false; history.back(); return true;
 };
 
+let meFresh = false;
+async function refreshMe() {
+  if (meFresh || !SESSION || !ME) return; meFresh = true;
+  try {
+    const me = await rpc('hsm_me'); if (!me) return;
+    const key = () => JSON.stringify([ME.modules, ME.avatar, ME.is_admin, ME.name]), before = key();
+    Object.assign(ME, { name: me.name, username: me.username, is_admin: me.is_admin, role: me.role, modules: me.modules, avatar: me.avatar });
+    store.set('hsm_me', ME);
+    if (key() !== before) render();
+  } catch (e) { meFresh = false; }
+}
 function render() {
   window.scrollTo(0, 0);
   if (!SESSION || !ME) return viewLogin();
+  refreshMe();
   if (ME.need_pin) return viewSetPin(false);
   const h = location.hash.replace(/^#\/?/, '') || 'home';
   const [page, ...rest] = h.split('/'); const arg = decodeURIComponent(rest.join('/'));
   const routes = { home: viewHome, schedule: viewSchedule, checklist: viewChecklist, cl: () => viewChecklistFill(arg), clh: () => viewChecklistHistory(arg),
     cle: () => viewChecklistEntry(arg), spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
-    approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops };
+    approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, admin: viewAdmin };
+  if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
   (routes[page] || viewHome)();
 }
 const bar = (title, backTo, extra = '') => `<header class="bar">${backTo ? `<button class="ib back" aria-label="Back" data-back="${backTo}">${ic('back', 26)}</button>` : ''}<h1>${esc(title)}</h1>${extra}</header>`;
-const nav = on => `<nav class="nav" aria-label="Main">${[['home','home','Home'],['schedule','cal','Schedule'],['checklist','check','Check List'],['spares','box','Spares']]
+const nav = on => `<nav class="nav" aria-label="Main">${[['home','home','Home'],['schedule','cal','Schedule'],['checklist','check','Check List'],['spares','box','Spares']].filter(([k]) => k === 'home' || can(k))
   .map(([k, i, l]) => `<button class="${on === k ? 'on' : ''}" data-go="${k}" ${on === k ? 'aria-current="page"' : ''}><span class="pill">${ic(i, 24)}</span>${l}</button>`).join('')}</nav>`;
 
 /* ================= LOGIN / APPROVAL ================= */
@@ -416,7 +466,7 @@ async function doLogin(user, pass, recheck) {
     const j = await gotrue('token?grant_type=password', { email: r.email, password: r.secret });
     saveSession(j);
     ME = { name: r.name, username: user.toLowerCase(), is_admin: !!r.is_admin, need_pin: !!r.need_pin };
-    try { const me = await rpc('hsm_me'); if (me) Object.assign(ME, { name: me.name, username: me.username, is_admin: me.is_admin, role: me.role }); } catch (e) {}
+    try { const me = await rpc('hsm_me'); if (me) Object.assign(ME, { name: me.name, username: me.username, is_admin: me.is_admin, role: me.role, modules: me.modules, avatar: me.avatar }); } catch (e) {}
     store.set('hsm_me', ME); pendingCreds = null;
     location.hash = 'home'; render();
     if (!ME.need_pin) toast(`Welcome, ${firstName(ME.name)}`);
@@ -456,45 +506,47 @@ function viewSetPin(change) {
 /* ================= HOME ================= */
 async function viewHome() {
   const now = new Date(); const sh = curShift(now);
+  const cS = can('schedule'), cC = can('checklist'), cP = can('spares');
+  const mods = MODULES.filter(m => can(m[0]));
   $('#app').innerHTML = `<main class="scroll">
     <div class="hero"><div class="row"><div><div class="brand">HSM · Electrical &amp; Automation</div>
       <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div>
       <div class="sub">${DAYNAME[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}</div></div>
-      <button class="avatar-btn" data-go="profile" aria-label="My profile">${esc(initials(ME.name))}</button></div></div>
-    <div class="lift card shiftcard" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div><div class="t1">Shift on duty now</div><div class="t2">Shift ${sh} · ${SHIFT_TIME[sh]}</div></div></div>
-      <div class="chips" id="hcrew"><span class="hint">Loading crew…</span></div></div>
+      <button class="avatar-btn" data-go="profile" aria-label="My profile" style="overflow:hidden;padding:0">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc(initials(ME.name))}</button></div></div>
+    ${cS ? `<div class="lift card shiftcard" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div><div class="t1">Shift on duty now</div><div class="t2">Shift ${sh} · ${SHIFT_TIME[sh]}</div></div></div>
+      <div class="chips" id="hcrew"><span class="hint">Loading crew…</span></div></div>` : '<div style="height:16px"></div>'}
     <div id="hadmin"></div>
-    <div class="stats">
-      <button class="card stat" data-go="checklist"><span class="k">Check lists today</span><span class="v" id="hcl">–</span><span class="bar2"><i id="hclb" style="width:0"></i></span></button>
-      <button class="card stat" id="hlow"><span class="k">Spares out of stock</span><span class="v" id="hsp">–</span><span class="hint">Tap to view</span></button>
-    </div>
+    ${cC || cP ? `<div class="stats" style="${cC && cP ? '' : 'grid-template-columns:1fr'}">
+      ${cC ? `<button class="card stat" data-go="checklist"><span class="k">Check lists today</span><span class="v" id="hcl">–</span><span class="bar2"><i id="hclb" style="width:0"></i></span></button>` : ''}
+      ${cP ? `<button class="card stat" id="hlow"><span class="k">Spares out of stock</span><span class="v" id="hsp">–</span><span class="hint">Tap to view</span></button>` : ''}
+    </div>` : ''}
     <div class="sec-h">Apps</div>
-    <div class="grid">
-      ${tile('schedule','cal','Shift Schedule','Monthly roster')}
-      ${tile('checklist','check','Check List','Daily inspection')}
-      ${tile('spares','box','Spares','Stock & location')}
-      ${tile('sop','shield',"SOP & HIRAC",'Numbers, hazards, docs')}
-      ${tile('mill','doc','SOP\'s of Mill Process','Operational procedures')}
-      ${tile('team','users','Team','E&amp;A directory')}
-    </div><div style="height:24px"></div>
+    ${mods.length ? `<div class="grid">${mods.map(([k, t, i, sub]) => tile(k, i, t.replace(/'/g, '&#39;'), sub)).join('')}</div>`
+      : `<div class="empty"><b>No modules yet</b>Ask ${esc(ADMIN_NAME)} to give you access.</div>`}
+    <div style="height:24px"></div>
   </main>${nav('home')}`;
-  $('#hlow').onclick = () => { S.spareLow = true; go('spares'); };
+  if ($('#hlow')) $('#hlow').onclick = () => { S.spareLow = true; go('spares'); };
   const today = ymd(now);
   try {
     const soft = p => p.catch(e => { if (isNet(e)) return null; throw e; });
     let [roster, tpl, done, low] = await Promise.all([
-      soft(api(`shift_roster?select=name,shift,area,ranking&day=eq.${today}&order=ranking,name`)), templates(),
-      soft(api(`checklist_entries?select=template_code&check_date=eq.${today}`)),
-      soft(api('spares?select=id&qty=lte.0'))]);
-    roster = roster || []; done = [...(done || []), ...obxEntries(today)];
-    if (!low) low = { length: '–' };
-    const crew = roster.filter(r => r.shift === sh);
-    const mine = roster.find(r => sameName(r.name, ME.name));
-    $('#hcrew').innerHTML = (crew.length ? crew.map(r => `<span class="chip ${sameName(r.name, ME.name) ? 'me' : ''}">${esc(r.name)}</span>`).join('') : '<span class="hint">No roster uploaded for today</span>')
-      + (mine && mine.shift !== sh ? `<span class="chip me">You today: ${esc(mine.shift === 'WO' ? 'Weekly off' : mine.shift === 'L' ? 'Leave' : mine.shift === 'G' ? 'General' : 'Shift ' + mine.shift)}</span>` : '');
-    const n = new Set(done.map(d => d.template_code)).size;
-    $('#hcl').innerHTML = `${n}<small>/${tpl.length}</small>`; $('#hclb').style.width = (100 * n / tpl.length) + '%';
-    $('#hsp').textContent = low.length;
+      cS ? soft(api(`shift_roster?select=name,shift,area,ranking&day=eq.${today}&order=ranking,name`)) : null,
+      cC ? templates() : [],
+      cC ? soft(api(`checklist_entries?select=template_code&check_date=eq.${today}`)) : null,
+      cP ? soft(api('spares?select=id&qty=lte.0')) : null]);
+    if (cS && $('#hcrew')) {
+      roster = roster || [];
+      const crew = roster.filter(r => r.shift === sh);
+      const mine = roster.find(r => sameName(r.name, ME.name));
+      $('#hcrew').innerHTML = (crew.length ? crew.map(r => `<span class="chip ${sameName(r.name, ME.name) ? 'me' : ''}">${esc(r.name)}</span>`).join('') : '<span class="hint">No roster uploaded for today</span>')
+        + (mine && mine.shift !== sh ? `<span class="chip me">You today: ${esc(mine.shift === 'WO' ? 'Weekly off' : mine.shift === 'L' ? 'Leave' : mine.shift === 'G' ? 'General' : 'Shift ' + mine.shift)}</span>` : '');
+    }
+    if (cC && $('#hcl')) {
+      done = [...(done || []), ...obxEntries(today)];
+      const n = new Set(done.map(d => d.template_code)).size;
+      $('#hcl').innerHTML = `${n}<small>/${tpl.length}</small>`; $('#hclb').style.width = (tpl.length ? 100 * n / tpl.length : 0) + '%';
+    }
+    if (cP && $('#hsp')) $('#hsp').textContent = low ? low.length : '–';
   } catch (e) { netErr(e); }
   if (ME.is_admin) {
     try { const req = await rpc('hsm_requests'); const p = req.filter(r => r.status === 'pending' || (r.status === 'approved' && r.pending_device_name)).length; const bad = req.reduce((n, r) => n + (r.fails_24h || 0), 0);
@@ -507,15 +559,25 @@ const tile = (to, icon, t, s) => `<button class="card tile" data-go="${to}"><spa
 /* ================= PROFILE ================= */
 function viewProfile() {
   $('#app').innerHTML = `${bar('My Profile', 'home')}<main class="scroll"><div class="pad">
-    <div class="card" style="padding:22px;display:flex;align-items:center;gap:16px"><div class="av" style="width:64px;height:64px;border-radius:32px;font-size:22px">${esc(initials(ME.name))}</div>
+    <div class="card" style="padding:22px;display:flex;align-items:center;gap:16px">
+      <label style="position:relative;cursor:pointer;flex-shrink:0" aria-label="Change profile photo">${avHtml(ME.avatar, ME.name, 'width:76px;height:76px;border-radius:38px;font-size:26px')}
+        <span style="position:absolute;right:-2px;bottom:-2px;width:30px;height:30px;border-radius:15px;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;border:2px solid #fff">${ic('plus', 16)}</span>
+        <input type="file" id="pph" accept="image/*" hidden></label>
       <div><div style="font-size:21px;font-weight:700">${esc(ME.name)}</div><div class="hint">${esc(ME.username)}${ME.role ? ' · ' + esc(ME.role) : ''}</div>
-      ${ME.is_admin ? '<span class="tag soft" style="margin-top:6px">App admin</span>' : ''}</div></div>
+      ${ME.is_admin ? '<span class="tag soft" style="margin-top:6px">App admin</span>' : ''}
+      ${ME.avatar ? '<div><button class="linkbtn" id="prm" style="background:none;border:0;padding:6px 0 0;color:var(--ink-2);font-size:14px;text-decoration:underline">Remove photo</button></div>' : '<div class="hint" style="margin-top:4px">Tap the circle to add your photo</div>'}</div></div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-top:18px">
       <button class="btn block" data-go="pin">${ic('key')} Change PIN</button>
       ${ME.is_admin ? `<button class="btn block" data-go="approvals">${ic('users')} App approvals &amp; sign-ins</button>
+        <button class="btn block" data-go="admin">${ic('upload')} Admin uploads</button>
         <button class="btn block" id="pxl">${ic('xls')} Master spares Excel (cloud)</button>` : ''}
       <button class="btn ghost block" id="pout">${ic('logout')} Sign out</button></div>
-    <p class="hint" style="margin-top:22px;text-align:center">HSM E&amp;A App · version 2.4 (build ${esc(window.HSM_APP_VERSION || 0)})</p></div></main>`;
+    <p class="hint" style="margin-top:22px;text-align:center">HSM E&amp;A App · version 2.8 (build ${esc(window.HSM_APP_VERSION || 0)})</p></div></main>`;
+  $('#pph').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    if (f.size > 25 * 1024 * 1024) return toast('Photo is too large');
+    try { await setMyPhoto(f); viewProfile(); } catch (err) { netErr(err); } };
+  if ($('#prm')) $('#prm').onclick = async () => { if (!(await ask('Remove your photo?', '', 'Remove'))) return;
+    try { await rpc('hsm_set_avatar', { p_url: null }); ME.avatar = null; store.set('hsm_me', ME); AVATARS = null; viewProfile(); } catch (err) { netErr(err); } };
   if ($('#pxl')) $('#pxl').onclick = async () => {
     try { const link = await rpc('hsm_excel_link'); if (!link) return toast('Not allowed');
       const m = $('#modal');
@@ -535,6 +597,8 @@ function viewProfile() {
 let REQ = [];
 const RESULT = { ok: ['Signed in', 'green'], first_login: ['First sign-in', 'green'], new_device: ['New phone tried', 'amber'], wrong_password: ['Wrong SAP ID / PIN', 'red'],
   locked: ['Locked (too many tries)', 'red'], not_approved: ['Not approved yet', 'amber'], unknown_user: ['Unknown username', 'red'] };
+const modTicks = (mods, key) => `<div class="mods" data-mk="${key}">${MODULES.map(([k, t, i]) => `<label class="modchk"><input type="checkbox" value="${k}" ${(mods || ALL_MODS).includes(k) ? 'checked' : ''}><span class="mi">${ic(i, 18)}</span><span>${t}</span></label>`).join('')}</div>`;
+const readTicks = key => $$(`[data-mk="${key}"] input:checked`).map(x => x.value);
 async function viewApprovals() {
   if (!ME.is_admin) return go('home');
   $('#app').innerHTML = `${bar('Approvals & Sign-ins', 'home', `<button class="ib" id="arf" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
@@ -550,15 +614,16 @@ async function viewApprovals() {
   const list = groups[S.reqTab] || [];
   const body = S.reqTab === 'pending' ? list.map(r => {
       const phone = r.status === 'approved';
-      return `<div class="lrow" style="flex-wrap:wrap"><span class="av">${esc(initials(r.full_name))}</span>
+      return `<div class="lrow" style="flex-wrap:wrap">${avHtml(r.avatar_url, r.full_name)}
         <span class="tx"><span class="a">${esc(r.full_name)}</span><span class="b">${esc(r.username || '')} · ${esc(r.company_role || '')}</span>
         <span class="b">${phone ? `<b style="color:var(--amber)">New phone:</b> ${esc(r.pending_device_name)}<br>Current: ${esc(r.device_name || '-')}` : `Phone: ${esc(r.pending_device_name || '-')}`}</span>
         <span class="b">${fmtStamp(r.pending_since || r.requested_at)}</span></span>
         <span class="tag ${phone ? 'amber' : 'soft'}">${phone ? 'Phone change' : 'New user'}</span>
+        ${phone ? '' : `<div style="width:100%;margin-top:10px"><div class="label" style="margin:0 0 6px">Modules this person can open</div>${modTicks(r.modules, 'p' + r.id)}</div>`}
         <div class="two" style="width:100%;margin-top:8px"><button class="btn ghost" data-d="${r.id}" data-a="0">${ic('x')} Reject</button><button class="btn green" data-d="${r.id}" data-a="1">${ic('ok')} Approve</button></div></div>`; }).join('')
-    : list.map(r => `<button class="lrow" data-go="user/${r.id}"><span class="av">${esc(initials(r.full_name))}</span>
+    : list.map(r => `<button class="lrow" data-go="user/${r.id}">${avHtml(r.avatar_url, r.full_name)}
         <span class="tx"><span class="a">${esc(r.full_name)}</span><span class="b">${esc(r.username || 'No username / SAP ID in list')}${r.device_name ? ' · ' + esc(r.device_name) : ''}</span>
-        <span class="b">${r.last_login ? 'Last sign-in ' + fmtStamp(r.last_login) : r.status === 'approved' ? 'Not signed in yet' : esc(r.company_role || '')}${r.status === 'approved' && !r.has_pin ? ' · no PIN yet' : ''}</span></span>
+        <span class="b">${r.last_login ? 'Last sign-in ' + fmtStamp(r.last_login) : r.status === 'approved' ? 'Not signed in yet' : esc(r.company_role || '')}${r.status === 'approved' && !r.has_pin ? ' · no PIN yet' : ''}${r.status === 'approved' ? ' · ' + (r.is_admin ? 'all modules (admin)' : `${(r.modules || []).length} of 6 modules`) : ''}</span></span>
         ${r.fails_24h ? `<span class="tag red">${r.fails_24h} wrong</span>` : r.status === 'rejected' ? '<span class="tag red">Rejected</span>' : r.status === 'none' ? '<span class="tag">Not requested</span>' : ''}<span class="chev">${ic('chev', 20)}</span></button>`).join('');
   $('#al').innerHTML = list.length ? `<div class="pad">${S.reqTab === 'users' ? '<div class="label">Tap a person to see their sign-ins and phone</div>' : ''}<div class="list">${body}</div></div>`
     : `<div class="empty"><b>${S.reqTab === 'pending' ? 'Nothing waiting' : 'Nobody here'}</b>${S.reqTab === 'pending' ? 'New users and phone changes appear here.' : ''}</div>`;
@@ -567,15 +632,18 @@ async function viewApprovals() {
     const r = REQ.find(x => String(x.id) === b.dataset.d); const ok = b.dataset.a === '1'; const phone = r.status === 'approved';
     if (!ok && !(await ask(phone ? `Block the new phone for ${r.full_name}?` : `Reject ${r.full_name}?`, phone ? 'They stay signed in on their current phone only.' : 'They will not be able to open the app.', 'Reject'))) return;
     if (ok && phone && !(await ask(`Move ${r.full_name} to the new phone?`, `${r.pending_device_name}\nThe old phone (${r.device_name || '-'}) will be signed out.`, 'Approve'))) return;
+    let mods = null;
+    if (ok && !phone) { mods = readTicks('p' + r.id); if (!mods.length) return toast('Tick at least one module'); }
     b.disabled = true;
-    try { const res = await rpc('hsm_decide', { p_id: r.id, p_approve: ok }); toast({ approved: `${r.full_name} approved`, rejected: `${r.full_name} rejected`, device_changed: 'New phone approved', device_rejected: 'New phone blocked' }[res] || 'Done'); viewApprovals(); }
+    try { if (mods) await rpc('hsm_set_modules', { p_id: r.id, p_modules: mods });
+      const res = await rpc('hsm_decide', { p_id: r.id, p_approve: ok }); toast({ approved: `${r.full_name} approved`, rejected: `${r.full_name} rejected`, device_changed: 'New phone approved', device_rejected: 'New phone blocked' }[res] || 'Done'); viewApprovals(); }
     catch (err) { netErr(err); b.disabled = false; }
   };
 }
 async function drawLog(el, userId) {
   el.innerHTML = '<div class="spin">Loading…</div>';
   let rows = [];
-  try { rows = await rpc('hsm_login_log', { p_user_id: userId, p_limit: userId ? 60 : 150 }); } catch (e) { netErr(e); }
+  try { rows = await rpc('hsm_login_log', { p_user_id: userId, p_limit: userId ? 60 : 150 }) || []; } catch (e) { netErr(e); }
   const warn = rows.filter(r => ['wrong_password','locked','new_device','unknown_user'].includes(r.result) && Date.now() - new Date(r.at) < 7 * 864e5).length;
   el.innerHTML = `<div class="pad">${!userId && warn ? `<div class="alert" style="width:100%;margin:0 0 12px">${ic('warn')}<span>${warn} suspicious sign-in attempt${warn > 1 ? 's' : ''} in the last 7 days</span></div>` : ''}
     <div class="label">${userId ? 'Sign-in history' : 'Latest sign-ins (all users)'}</div>` + (rows.length ? `<div class="list">${rows.map(r => { const [t, c] = RESULT[r.result] || [r.result, ''];
@@ -597,8 +665,16 @@ async function viewUser(id) {
       ${r.device_name ? `<button class="btn block" data-x="unbind">${ic('refresh')} Free the phone</button>` : ''}
       <button class="btn ghost block" data-x="remove" style="color:var(--red);border-color:var(--red-100)">${ic('x')} Remove access</button></div>`
       : r.status !== 'approved' && r.status !== 'pending' ? `<div style="padding:14px 16px 0"><button class="btn green block" data-x="approve">${ic('ok')} Approve now</button></div>` : ''}
+    ${r.is_admin ? '' : `<div class="pad" style="padding-bottom:0"><div class="card" style="padding:14px 14px 16px"><div class="label" style="margin:0 0 4px">Module access</div>
+      <p class="hint" style="margin:0 0 10px">Only ticked modules appear in their app. The cloud also blocks the others.</p>
+      ${modTicks(r.modules, 'u' + r.id)}<button class="btn pri block" id="usave" style="margin-top:12px">${ic('ok')} Save access</button></div></div>`}
     <div id="ulog"></div>`;
   drawLog($('#ulog'), r.id);
+  if ($('#usave')) $('#usave').onclick = async () => {
+    const mods = readTicks('u' + r.id);
+    if (!mods.length && !(await ask(`No modules for ${r.full_name}?`, 'They can still sign in but will see no modules.', 'Save'))) return;
+    try { r.modules = await rpc('hsm_set_modules', { p_id: r.id, p_modules: mods }); toast('Access saved'); } catch (e) { netErr(e); }
+  };
   $('#ud').onclick = async e => {
     const b = e.target.closest('[data-x]'); if (!b) return; const x = b.dataset.x;
     const txt = { reset_pin: [`Reset PIN for ${r.full_name}?`, 'They can sign in once with their SAP ID (only on their registered phone) and must set a new PIN.', 'Reset'],
@@ -983,7 +1059,9 @@ async function sopDocs() {
 
 /* ================= SOP's OF MILL PROCESS ================= */
 async function viewMillProcessSops() {
-  $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home')}<main class="scroll" id="ml"><div class="spin">Loading…</div></main>${nav('mill')}`;
+  const admin = !!ME.is_admin;
+  $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home')}<main class="scroll" id="ml" style="${admin ? 'padding-bottom:90px' : ''}"><div class="spin">Loading…</div></main>
+    ${admin ? `<label class="fab" style="cursor:pointer;bottom:88px">${ic('upload', 22)} Add SOP<input type="file" id="mup" hidden accept=".docx,.pdf"></label>` : ''}${nav('mill')}`;
   const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
   if (!MILL_AREAS.some(a => a[0] === S.millArea)) S.millArea = 'CB';
   const label = f => (MILL_AREAS.find(a => a[0] === f) || [f, f])[1];
@@ -995,16 +1073,146 @@ async function viewMillProcessSops() {
     try { items = (await storageList(`${S.millArea}/`, MILL_PROCESS_BUCKET)).filter(o => o.id && o.name && /\.(docx?|pdf)$/i.test(o.name)); }
     catch (e) { $('#ml').innerHTML = `<div class="pad">${btns}<div class="empty"><b>Could not load procedures</b>Check the network and try again.</div></div>`; netErr(e); return; }
     const typ = n => (n.split('.').pop() || '').toUpperCase().slice(0, 4);
+    const row = o => `<button class="lrow" data-f="${esc(S.millArea + '/' + o.name)}" style="${admin ? 'flex:1;min-width:0' : ''}">
+        <span class="ic" style="font-size:12px;font-weight:800">${esc(typ(o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
     $('#ml').innerHTML = `<div class="pad">${btns}
       <div class="label">${items.length} procedure${items.length === 1 ? '' : 's'} · ${esc(label(S.millArea))}</div>
-      <div class="list">${items.length ? items.map(o => `<button class="lrow" data-f="${esc(S.millArea + '/' + o.name)}">
-        <span class="ic" style="font-size:12px;font-weight:800">${esc(typ(o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('') : `<div class="empty"><b>No SOPs in ${esc(label(S.millArea))} yet</b></div>`}</div></div>`;
+      <div class="list">${items.length ? items.map(o => admin ? `<div style="display:flex;align-items:center">${row(o)}<button class="ib" data-del="${esc(S.millArea + '/' + o.name)}" aria-label="Delete ${esc(o.name)}" style="color:var(--ink-2);margin-right:6px">${ic('x', 22)}</button></div>` : row(o)).join('')
+        : `<div class="empty"><b>No SOPs in ${esc(label(S.millArea))} yet</b>${admin ? 'Tap “Add SOP” to upload a Word or PDF file.' : ''}</div>`}</div></div>`;
   };
   $('#ml').onclick = async e => {
     const area = e.target.closest('[data-area]'); if (area) { S.millArea = area.dataset.area; draw(); return; }
+    const d = e.target.closest('[data-del]');
+    if (d) { const name = d.dataset.del.split('/').pop();
+      if (!(await ask('Delete this SOP?', `${name}\nIt is removed for everyone.`, 'Delete', 'Cancel', true))) return;
+      try { await storageDelete(d.dataset.del, MILL_PROCESS_BUCKET); toast('SOP deleted'); draw(); } catch (err) { netErr(err); } return; }
     const r = e.target.closest('[data-f]'); if (!r) return;
     try { await openDoc(r.dataset.f, MILL_PROCESS_BUCKET); } catch (err) { netErr(err); } };
+  if ($('#mup')) $('#mup').onchange = async e => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    if (!/\.(docx|pdf)$/i.test(file.name)) return toast('Choose a Word (.docx) or PDF file');
+    if (file.size > 50 * 1024 * 1024) return toast('File is larger than 50 MB');
+    const path = `${S.millArea}/${file.name.replace(/[\\/#?%]/g, '_')}`;
+    if (!(await ask(`Add to ${label(S.millArea)}?`, file.name, 'Upload'))) return;
+    toast('Uploading…', 60000);
+    try { await storageUpload(path, file, MILL_PROCESS_BUCKET); toast('SOP added'); draw(); }
+    catch (err) {
+      if (err.exists && await ask('Replace the existing SOP?', `${file.name} is already in ${label(S.millArea)}.`, 'Replace')) {
+        try { toast('Uploading…', 60000); await storageUpload(path, file, MILL_PROCESS_BUCKET, true); toast('SOP replaced'); draw(); } catch (e2) { netErr(e2); }
+      } else if (!err.exists) netErr(err); else toast('Not uploaded');
+    }
+  };
   draw();
+}
+
+/* ================= ADMIN UPLOADS (Excel → cloud) ================= */
+const xv = v => { if (v == null) return null; if (v instanceof Date) return v; if (typeof v === 'object') { if ('result' in v) return xv(v.result); if (v.richText) return v.richText.map(t => t.text).join(''); if ('text' in v) return v.text; if ('error' in v) return null; } return v; };
+const xt = v => { v = xv(v); return v == null || v instanceof Date ? '' : String(v).replace(/ /g, ' ').replace(/\s+/g, ' ').trim(); };
+const cleanName = n => String(n || '').replace(/ /g, ' ').trim().replace(/^(mr|mrs|ms|miss)\.?\s+/i, '').replace(/\s+/g, ' ').trim()
+  .split(' ').map(w => /^[A-Z]\.$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+const cleanArea = a => { a = String(a || '').trim(); if (!a) return ''; return a.length <= 3 || /\d/.test(a) ? a.toUpperCase() : a.charAt(0).toUpperCase() + a.slice(1).toLowerCase(); };
+async function readBook(file) { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); return wb; }
+function parseRoster(ws) {
+  let hr = 0; for (let i = 1; i <= Math.min(ws.rowCount, 15) && !hr; i++) ws.getRow(i).eachCell(c => { if (xt(c.value).toUpperCase() === 'NAME') hr = i; });
+  if (!hr) return null;
+  const cols = { days: {} };
+  ws.getRow(hr).eachCell((c, ci) => { const v = xv(c.value), t = xt(c.value).toUpperCase();
+    if (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 31) cols.days[ci] = v;
+    else if (t === 'NAME') cols.name = ci; else if (t.startsWith('SAP')) cols.sap = ci; else if (t === 'AREA') cols.area = ci; else if (t.startsWith('RANK')) cols.rank = ci; });
+  if (!cols.name || Object.keys(cols.days).length < 28) return null;
+  let month = null; for (let i = 1; i <= hr && !month; i++) ws.getRow(i).eachCell(c => { const v = xv(c.value); if (!month && v instanceof Date) month = v; });
+  const people = [], bad = {};
+  for (let i = hr + 1; i <= ws.rowCount; i++) {
+    const row = ws.getRow(i), name = cleanName(xt(row.getCell(cols.name).value)); if (!name || /^\d+$/.test(name) || /^(name|sr\.? ?no)$/i.test(name)) continue;
+    const shifts = {};
+    for (const [ci, d] of Object.entries(cols.days)) { let sh = xt(row.getCell(+ci).value).toUpperCase(); if (!sh) continue;
+      if (/^(MON|TUE|WED|THU|FRI|SAT|SUN)/.test(sh)) continue; if (sh === 'O' || sh === 'OFF') sh = 'WO'; if (!['A', 'B', 'C', 'G', 'L', 'WO'].includes(sh)) { bad[sh] = (bad[sh] || 0) + 1; continue; } shifts[d] = sh; }
+    if (!Object.keys(shifts).length) continue;
+    people.push({ name, sap_id: cols.sap ? xt(row.getCell(cols.sap).value).replace(/\.0$/, '') : '', area: cols.area ? cleanArea(xt(row.getCell(cols.area).value)) : '',
+      ranking: cols.rank ? (parseInt(xt(row.getCell(cols.rank).value), 10) || null) : null, shifts });
+  }
+  return people.length ? { people, month, bad, maxDay: Math.max(...Object.values(cols.days)) } : null;
+}
+function parseTeam(ws) {
+  let hr = 0, cols = {};
+  for (let i = 1; i <= Math.min(ws.rowCount, 10) && !hr; i++) { const m = {};
+    ws.getRow(i).eachCell((c, ci) => { const t = xt(c.value).toLowerCase().replace(/[^a-z]/g, '');
+      if (t === 'fullname' || (t === 'name' && !m.name)) m.name = ci; else if (t.startsWith('sap')) m.sap = ci; else if (t === 'plant') m.plant = ci;
+      else if (t === 'role' || t === 'company') m.company = ci; else if (t.includes('mobile') || t === 'phone') m.mobile = ci; else if (t.includes('email')) m.email = ci; });
+    if (m.name && (m.mobile || m.email || m.sap)) { hr = i; cols = m; } }
+  if (!hr) return null;
+  const rows = [];
+  for (let i = hr + 1; i <= ws.rowCount; i++) { const r = ws.getRow(i), g = k => cols[k] ? xt(r.getCell(cols[k]).value) : '';
+    const name = cleanName(g('name')); if (!name) continue; const sap = g('sap').replace(/\.0$/, '');
+    rows.push({ name, sap_id: /^n\/?a$/i.test(sap) ? '' : sap, plant: g('plant').toUpperCase(), company: g('company'), mobile: g('mobile').replace(/\.0$/, ''), email: g('email').replace(/,/g, '.') }); }
+  return rows.length ? rows : null;
+}
+function viewAdmin() {
+  if (!ME.is_admin) return go('home');
+  $('#app').innerHTML = `${bar('Admin uploads', 'profile')}<main class="scroll"><div class="pad">
+    <div class="card" style="padding:16px;margin-bottom:14px"><div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic('cal', 24)}</span><div><div style="font-size:18px;font-weight:700">Shift schedule</div><div class="hint">Monthly Excel (NAME, SAP ID, day columns 1–31, Area, Ranking). Replaces that month for everyone.</div></div></div>
+      <label class="btn block" style="margin-top:12px;cursor:pointer">${ic('upload')} Choose Excel file<input type="file" id="xr" hidden accept=".xlsx"></label></div>
+    <div class="card" style="padding:16px;margin-bottom:14px"><div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic('users', 24)}</span><div><div style="font-size:18px;font-weight:700">Team list</div><div class="hint">Team Members Excel (Full Name, SAP ID, Role, Mobile, Email, Plant). Replaces the whole Team list.</div></div></div>
+      <label class="btn block" style="margin-top:12px;cursor:pointer">${ic('upload')} Choose Excel file<input type="file" id="xtm" hidden accept=".xlsx"></label></div>
+    <div class="card" style="padding:16px"><div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic('doc', 24)}</span><div><div style="font-size:18px;font-weight:700">SOP's of Mill Process</div><div class="hint">Open an area and tap “Add SOP” (Word or PDF). Tap ✕ next to a SOP to delete it.</div></div></div>
+      <button class="btn block" data-go="mill" style="margin-top:12px">${ic('chev')} Open SOP's of Mill Process</button></div>
+    <div id="xprev"></div><div style="height:30px"></div></div></main>`;
+  const prev = $('#xprev');
+  $('#xr').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    let wb; try { toast('Reading Excel…'); wb = await readBook(f); } catch (err) { return toast('Could not read this Excel file'); }
+    const sheets = wb.worksheets.map(ws => ({ ws, r: parseRoster(ws) })).filter(x => x.r);
+    if (!sheets.length) return toast('No shift schedule found. The sheet needs a NAME column and day columns 1–31.');
+    const show = k => {
+      const { ws, r } = sheets[k];
+      const m = r.month || new Date(); const mv = `${m.getUTCFullYear()}-${String(m.getUTCMonth() + 1).padStart(2, '0')}`;
+      prev.innerHTML = `<div class="card" style="padding:16px;margin-top:16px;border:2px solid var(--red)"><div class="label" style="margin:0 0 10px">Check before uploading</div>
+        ${sheets.length > 1 ? `<div class="fld" style="margin-bottom:10px"><label for="xsh">Sheet</label><select id="xsh">${sheets.map((x, i) => `<option value="${i}" ${i === k ? 'selected' : ''}>${esc(x.ws.name)}</option>`).join('')}</select></div>` : ''}
+        <div class="fld" style="margin-bottom:10px"><label for="xmo">Month</label><input type="month" id="xmo" value="${mv}"></div>
+        <div id="xsum"></div>
+        <div class="two" style="margin-top:12px"><button class="btn ghost" id="xno">Cancel</button><button class="btn pri" id="xgo">${ic('upload')} Upload</button></div></div>`;
+      const sum = () => { const [y, mo] = $('#xmo').value.split('-').map(Number); const dim = new Date(y, mo, 0).getDate();
+        const rows = []; r.people.forEach(p => Object.entries(p.shifts).forEach(([d, sh]) => { if (+d <= dim) rows.push({ day: `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`, name: p.name, sap_id: p.sap_id, shift: sh, area: p.area, ranking: p.ranking }); }));
+        const c = rows.filter(x => x.day.endsWith('-01')).reduce((a, x) => (a[x.shift] = (a[x.shift] || 0) + 1, a), {});
+        const warn = [r.maxDay < dim ? `Only days 1–${r.maxDay} are in the sheet; ${r.maxDay + 1 === dim ? `day ${dim}` : `days ${r.maxDay + 1}–${dim}`} will be empty.` : '',
+          Object.keys(r.bad).length ? `Skipped unknown codes: ${Object.entries(r.bad).map(([k2, n]) => `${esc(k2)} ×${n}`).join(', ')}` : '',
+          r.people.some(p => !p.sap_id) ? `${r.people.filter(p => !p.sap_id).length} people have no SAP ID.` : ''].filter(Boolean);
+        $('#xsum').innerHTML = `<div style="font-size:16px"><b>${r.people.length} people</b> · ${rows.length} shift entries · ${MONTHS[mo - 1]} ${y}</div>
+          <div class="hint" style="margin-top:4px">Day 1: ${['A', 'B', 'C', 'G', 'L', 'WO'].map(k2 => `${k2} ${c[k2] || 0}`).join(' · ')}</div>
+          ${warn.map(w => `<div class="hint" style="color:var(--amber);margin-top:6px">⚠ ${w}</div>`).join('')}`;
+        return { rows, month: `${y}-${String(mo).padStart(2, '0')}-01`, label: `${MONTHS[mo - 1]} ${y}` }; };
+      sum();
+      $('#xmo').onchange = sum; if ($('#xsh')) $('#xsh').onchange = e2 => show(+e2.target.value);
+      $('#xno').onclick = () => { prev.innerHTML = ''; };
+      $('#xgo').onclick = async () => { const d = sum();
+        if (!(await ask(`Replace the ${d.label} schedule?`, `${d.rows.length} entries from “${ws.name}”. Everyone sees the new schedule at once.`, 'Upload'))) return;
+        $('#xgo').disabled = true;
+        try { const n = await rpc('hsm_upload_roster', { p_month: d.month, p_rows: d.rows }); toast(`${d.label} schedule uploaded (${n} entries)`); prev.innerHTML = ''; }
+        catch (err) { netErr(err); $('#xgo').disabled = false; } };
+      prev.scrollIntoView({ behavior: 'smooth' });
+    };
+    show(0);
+  };
+  $('#xtm').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    let wb; try { toast('Reading Excel…'); wb = await readBook(f); } catch (err) { return toast('Could not read this Excel file'); }
+    const hit = wb.worksheets.map(ws => ({ ws, rows: parseTeam(ws) })).find(x => x.rows);
+    if (!hit) return toast('No team list found. The sheet needs a Full Name column with Mobile, Email or SAP ID.');
+    const rows = hit.rows;
+    prev.innerHTML = `<div class="card" style="padding:16px;margin-top:16px;border:2px solid var(--red)"><div class="label" style="margin:0 0 10px">Check before uploading</div>
+      <div style="font-size:16px"><b>${rows.length} members</b> from sheet “${esc(hit.ws.name)}”</div>
+      <div class="hint" style="margin-top:4px">${rows.filter(r => r.sap_id).length} with SAP ID · ${rows.filter(r => r.mobile).length} with mobile · ${rows.filter(r => r.email).length} with e-mail</div>
+      <div class="hint" style="margin-top:4px">First: ${rows.slice(0, 3).map(r => esc(r.name)).join(', ')}…</div>
+      <div class="hint" style="margin-top:6px">Area comes from the latest shift schedule (matched by SAP ID).</div>
+      <div class="two" style="margin-top:12px"><button class="btn ghost" id="xno">Cancel</button><button class="btn pri" id="xgo">${ic('upload')} Upload</button></div></div>`;
+    $('#xno').onclick = () => { prev.innerHTML = ''; };
+    $('#xgo').onclick = async () => {
+      if (!(await ask('Replace the Team list?', `${rows.length} members. Everyone sees the new list at once.`, 'Upload'))) return;
+      $('#xgo').disabled = true;
+      try { const n = await rpc('hsm_upload_team', { p_rows: rows }); TEAM = null; toast(`Team list uploaded (${n} members)`); prev.innerHTML = ''; }
+      catch (err) { netErr(err); $('#xgo').disabled = false; } };
+    prev.scrollIntoView({ behavior: 'smooth' });
+  };
 }
 
 /* ================= TEAM ================= */
@@ -1013,7 +1221,9 @@ async function viewTeam() {
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="tq" type="search" placeholder="Search name, area, SAP ID, mobile" aria-label="Search team" value="${esc(S.teamQuery)}"></div></div>
   <main class="scroll" id="tl"><div class="spin">Loading…</div></main>`;
   let rows = [], today = [];
-  try { [rows, today] = await Promise.all([team(), api(`shift_roster?select=name,shift&day=eq.${ymd(new Date())}`)]); } catch (e) { netErr(e); }
+  let pics = [];
+  try { [rows, today, pics] = await Promise.all([team(), can('schedule') ? api(`shift_roster?select=name,shift&day=eq.${ymd(new Date())}`) : [], avatars()]); } catch (e) { netErr(e); }
+  const photoOf = r => ((r.sap_id && pics.find(p => p.sap_id === r.sap_id)) || pics.find(p => sameName(p.full_name, r.name)) || {}).avatar_url;
   const shiftOf = n => (today.find(r => r.name === n) || today.find(r => sameName(r.name, n)) || {}).shift;
   const tagOf = s => !s ? '' : s === 'WO' ? '<span class="tag">Off</span>' : s === 'L' ? '<span class="tag amber">Leave</span>' : s === 'G' ? '<span class="tag">G</span>' : `<span class="tag red">${s}</span>`;
   const link = (href, icon, txt) => `<a href="${href}" style="display:inline-flex;align-items:center;gap:6px;margin:4px 14px 0 0;color:var(--red, #C8102E);font-weight:600;text-decoration:none">${ic(icon, 18)}${esc(txt)}</a>`;
@@ -1025,7 +1235,7 @@ async function viewTeam() {
       const det = [r.sap_id ? `<span class="hint" style="margin-top:4px">SAP ID: <b style="color:var(--ink)">${esc(r.sap_id)}</b></span>` : '',
         r.mobile ? link('tel:' + r.mobile.replace(/[^0-9+]/g, ''), 'phone', r.mobile) : '',
         r.email ? link('mailto:' + r.email, 'mail', r.email) : ''].filter(Boolean).join('');
-      return `<div class="lrow" style="flex-wrap:wrap;align-items:flex-start"><span class="av">${esc(initials(r.name))}</span><span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span>${det ? `<span style="display:flex;flex-direction:column;align-items:flex-start;margin-top:2px;overflow-wrap:anywhere">${det}</span>` : ''}</span>${tagOf(shiftOf(r.name))}</div>`;
+      return `<div class="lrow" style="flex-wrap:wrap;align-items:flex-start">${avHtml(photoOf(r), r.name)}<span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span>${det ? `<span style="display:flex;flex-direction:column;align-items:flex-start;margin-top:2px;overflow-wrap:anywhere">${det}</span>` : ''}</span>${tagOf(shiftOf(r.name))}</div>`;
     }).join('') + '</div></div>';
   };
   draw();

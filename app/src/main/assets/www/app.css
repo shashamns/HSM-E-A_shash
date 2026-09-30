@@ -278,3 +278,11 @@ body.offline .hero{padding-top:18px}
 #docb table{max-width:100%}
 #docb .pdfpg{display:block;width:100%;height:auto;margin:0 0 10px;background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.12)}
 #docb .spin,#docb .empty{background:transparent}
+
+/* module access ticks */
+.mods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.modchk{display:flex;align-items:center;gap:8px;min-height:46px;padding:6px 10px;border:1.5px solid var(--line-2);border-radius:10px;background:#fff;font-size:14.5px;font-weight:600;color:var(--ink-2);cursor:pointer;line-height:1.2}
+.modchk input{width:20px;height:20px;accent-color:var(--red);flex-shrink:0;margin:0}
+.modchk .mi{display:flex;color:var(--ink-3,#8A9099)}
+.modchk:has(input:checked){border-color:var(--red);background:var(--red-50);color:var(--ink)}
+.modchk:has(input:checked) .mi{color:var(--red)}
