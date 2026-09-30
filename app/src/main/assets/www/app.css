@@ -268,3 +268,13 @@ body.offline .hero{padding-top:18px}
 /* iPhone "Add to Home Screen" hint */
 .iosTip{margin:14px 0 0;padding:12px 14px;border-radius:12px;background:#fff;color:var(--ink);font-size:15px;line-height:1.4;box-shadow:var(--shadow)}
 .iosTip b{color:var(--red)}
+
+/* in-app document viewer */
+#docv{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;background:#EDEEF0;-webkit-user-select:none;user-select:none}
+#docv .bar h1{flex:1;padding-left:12px}
+#docb{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px 8px calc(16px + env(safe-area-inset-bottom))}
+#docb section.docx{width:auto!important;min-height:0!important;padding:16px 14px!important;margin:0 0 10px!important;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.12);overflow-x:auto;color:#111}
+#docb section.docx img{position:static!important;display:block;width:auto!important;max-width:100%!important;height:auto!important}
+#docb table{max-width:100%}
+#docb .pdfpg{display:block;width:100%;height:auto;margin:0 0 10px;background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+#docb .spin,#docb .empty{background:transparent}

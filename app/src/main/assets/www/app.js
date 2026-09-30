@@ -11,6 +11,7 @@ const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','GE Drive','Power','Crane'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
+const MILL_AREAS = [['CB','CB'],['DC','DC'],['FM','FM'],['LEVEL-1','Level 1'],['RHF','RHF'],['RM','RM']];
 const SOP_GROUPS = ['All','Common','Instrument','RM','CB','FM','Coiler','MD Motor','Crane','Power'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -38,6 +39,7 @@ const I = {
   pin:'<path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
   ok:'<path d="M5 12l5 5 9-10"/>', x:'<path d="M6 6l12 12M18 6L6 18"/>',
   hourglass:'<path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/>',
+  phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2z"/>',
   mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   logout:'<path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
   upload:'<path d="M12 20V9M7 14l5-5 5 5"/><path d="M5 4h14"/>',
@@ -248,6 +250,49 @@ function deliver(buf, name, share) {
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast('Downloaded ' + name);
 }
 function openLink(url) { if (window.HSMNative && HSMNative.openUrl) HSMNative.openUrl(url); else window.open(url, '_blank'); }
+/* ================= DOCUMENT VIEWER (in-app, no download) ================= */
+const loadScript = src => new Promise((ok, no) => { if (document.querySelector(`script[data-lib="${src}"]`)) return ok();
+  const t = document.createElement('script'); t.src = src; t.dataset.lib = src; t.onload = ok; t.onerror = () => { t.remove(); no(new Error('Viewer could not load')); }; document.head.appendChild(t); });
+function closeDoc() { const v = $('#docv'); if (v) { v.remove(); document.body.style.overflow = ''; } }
+window.addEventListener('popstate', () => { if ($('#docv')) closeDoc(); });
+async function openDoc(path, bucket) {
+  const name = path.split('/').pop(), ext = (name.split('.').pop() || '').toLowerCase();
+  if (!['docx', 'pdf', 'jpg', 'jpeg', 'png'].includes(ext)) { toast('Opening…'); return openLink(await storageSignedUrl(path, bucket)); }
+  closeDoc();
+  const v = document.createElement('div'); v.id = 'docv';
+  v.innerHTML = `<header class="bar"><h1 style="font-size:17px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(name.replace(/\.[^.]+$/, ''))}</h1><button class="ib" id="docx-close" aria-label="Close">${ic('x', 28)}</button></header><div id="docb"><div class="spin">Opening…</div></div>`;
+  v.addEventListener('contextmenu', e => e.preventDefault());
+  document.body.appendChild(v); document.body.style.overflow = 'hidden';
+  history.pushState({ docv: 1 }, '');
+  $('#docx-close').onclick = () => history.back();
+  const body = $('#docb'), live = () => document.body.contains(body);
+  try {
+    const url = await storageSignedUrl(path, bucket);
+    const res = await fetch(url); if (!res.ok) throw new Error('Could not open document');
+    const buf = await res.arrayBuffer(); if (!live()) return;
+    if (ext === 'docx') {
+      await loadScript('lib/jszip.min.js'); await loadScript('lib/docx-preview.min.js');
+      body.innerHTML = '';
+      await docx.renderAsync(buf, body, null, { inWrapper: false, ignoreWidth: true, ignoreHeight: true, ignoreLastRenderedPageBreak: true, useBase64URL: false, renderHeaders: true, renderFooters: false });
+      // phone layout: pictures sit in line with the text, so the blank lines Word left for floating pictures are not needed
+      body.querySelectorAll('section.docx img').forEach(img => { const d = img.parentElement; if (img.style.width) img.style.maxWidth = img.style.width;
+        if (d && d.tagName === 'DIV') Object.assign(d.style, { position: 'static', display: 'block', width: 'auto', height: 'auto', top: 'auto', left: 'auto', margin: '8px 0' }); });
+      body.querySelectorAll('section.docx p').forEach(p => { const empty = x => x && x.tagName === 'P' && !x.textContent.trim() && !x.querySelector('img,svg,table');
+        if (empty(p) && empty(p.previousElementSibling)) p.remove(); });
+    } else if (ext === 'pdf') {
+      await loadScript('lib/pdf.min.js'); pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise; body.innerHTML = '';
+      const w = body.clientWidth - 16, dpr = Math.min(window.devicePixelRatio || 1, 2);
+      for (let i = 1; i <= pdf.numPages && live(); i++) {
+        const pg = await pdf.getPage(i), vp0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: (w / vp0.width) * dpr });
+        const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; c.className = 'pdfpg'; body.appendChild(c);
+        await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+      }
+    } else {
+      const img = new Image(); img.src = URL.createObjectURL(new Blob([buf])); img.style.cssText = 'width:100%;display:block'; body.innerHTML = ''; body.appendChild(img);
+    }
+  } catch (e) { if (live()) body.innerHTML = `<div class="empty"><b>Could not open this document</b>${esc(isNet(e) ? 'Check the network and try again.' : e.message)}</div>`; }
+}
 let XL = null;
 function xl() {
   if (!XL) {
@@ -270,7 +315,7 @@ async function hiracData() {
   }
   return HIRAC;
 }
-async function team() { if (!TEAM) TEAM = await api('team?select=name,area,role&order=name'); return TEAM; }
+async function team() { if (!TEAM) TEAM = await api('team?select=name,area,role,plant,company,mobile,email&order=name'); return TEAM; }
 const itemCount = t => t.sections.reduce((n, s) => n + s.items.length, 0);
 const fieldsOf = (s, it) => s.fields || [{ l: '', t: it.t || 't' }];
 
@@ -284,6 +329,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-back]'); if (b) { if (history.length > 1) history.back(); else go(b.dataset.back); }
 });
 window.hsmBack = () => {
+  if ($('#docv')) { history.back(); return true; }
   if (!$('#modal').classList.contains('hidden')) { $('#modal').classList.add('hidden'); return true; }
   const h = location.hash.replace(/^#\/?/, ''); if (!h || h === 'home' || !SESSION) return false; history.back(); return true;
 };
@@ -428,7 +474,7 @@ async function viewHome() {
       ${tile('checklist','check','Check List','Daily inspection')}
       ${tile('spares','box','Spares','Stock & location')}
       ${tile('sop','shield',"SOP & HIRAC",'Numbers, hazards, docs')}
-      ${tile('mill','file','SOP\'s of Mill Process','Operational procedures')}
+      ${tile('mill','doc','SOP\'s of Mill Process','Operational procedures')}
       ${tile('team','users','Team','E&amp;A directory')}
     </div><div style="height:24px"></div>
   </main>${nav('home')}`;
@@ -602,7 +648,7 @@ async function viewSchedule() {
       <div class="days">${cells}</div></section>
     <section class="card" style="overflow:hidden;margin-bottom:14px">
       <div class="dayhead"><div class="k">${isToday ? 'Shift Schedule Today' : 'Shift Schedule'}</div><div class="v">${fmtDay(S.calSel)}</div></div>
-      ${rows.length ? grp('A','','A Shift · 07–15',by('A')) + grp('B','','B Shift · 15–23',by('B')) + grp('C','','C Shift · 23–07',by('C')) + grp('L','l','Leave',by('L')) + grp('WO','wo','Weekly Off',by('WO'))
+      ${rows.length ? grp('A','','A Shift · 07–15',by('A')) + grp('B','','B Shift · 15–23',by('B')) + grp('C','','C Shift · 23–07',by('C')) + grp('G','','General Shift',by('G')) + grp('L','l','Leave',by('L')) + grp('WO','wo','Weekly Off',by('WO'))
         : '<div class="empty" style="padding:26px 20px">No schedule uploaded for this date.</div>'}
     </section>
     ${Object.keys(areaMap).length ? `<section class="card" style="overflow:hidden"><div class="boxh"><h2>Area-wise</h2><span class="hint">G = General</span></div>
@@ -931,48 +977,58 @@ async function sopDocs() {
         <span class="ic" style="font-size:12px;font-weight:800">${esc(typ(o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('')}</div></div>`
       : `<div class="empty"><b>No documents in ${esc(S.docArea)} yet</b>Tap “Add document” to upload a SOP (PDF, Word, photo).</div>`;
     $('#dl').onclick = async e => { const r = e.target.closest('[data-p]'); if (!r) return;
-      try { toast('Opening…'); openLink(await storageSignedUrl(r.dataset.p)); } catch (err) { netErr(err); } };
+      try { await openDoc(r.dataset.p, SOP_BUCKET); } catch (err) { netErr(err); } };
   } catch (e) { $('#dl').innerHTML = '<div class="empty"><b>Could not load documents</b></div>'; netErr(e); }
 }
 
 /* ================= SOP's OF MILL PROCESS ================= */
 async function viewMillProcessSops() {
   $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home')}<main class="scroll" id="ml"><div class="spin">Loading…</div></main>${nav('mill')}`;
-  try {
-    const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
-    const draw = async () => {
-      const items = (await storageList(`${S.millArea}/`, MILL_PROCESS_BUCKET)).filter(o => o.id && o.name && o.name.endsWith('.docx'));
-      $('#ml').innerHTML = `<div class="pad">
-        <div class="label">Select area</div>
-        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">${DOC_AREAS.map(a => `<button class="card ${S.millArea === a ? 'on' : ''}" data-area="${a}" style="padding:12px;text-align:center;border:2px solid ${S.millArea === a ? 'var(--ink)' : 'var(--stroke)'};background:${S.millArea === a ? 'var(--ink-0)' : 'transparent'};border-radius:8px;cursor:pointer">${esc(a)}</button>`).join('')}</div>
-        <div class="label">${items.length} procedure${items.length > 1 ? 's' : ''} in ${S.millArea}</div>
-        <div class="list">${items.length ? items.map(o => `<button class="lrow" data-f="${esc(S.millArea + '/' + o.name)}">
-          <span class="ic" style="font-size:12px;font-weight:800">DOCX</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.docx$/i, ''))}</span><span class="b">${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('') : `<div class="empty"><b>No SOPs in ${S.millArea}</b></div>`}</div>
-      </div>`;
-      $('#ml').onclick = async e => {
-        const area = e.target.closest('[data-area]'); if (area) { S.millArea = area.dataset.area; draw(); return; }
-        const r = e.target.closest('[data-f]'); if (!r) return;
-        try { toast('Opening…'); openLink(await storageSignedUrl(r.dataset.f, MILL_PROCESS_BUCKET)); } catch (err) { netErr(err); } };
-    };
-    draw();
-  } catch (e) { $('#ml').innerHTML = '<div class="empty"><b>Could not load procedures</b></div>'; netErr(e); }
+  const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  if (!MILL_AREAS.some(a => a[0] === S.millArea)) S.millArea = 'CB';
+  const label = f => (MILL_AREAS.find(a => a[0] === f) || [f, f])[1];
+  const draw = async () => {
+    const btns = `<div class="label">Select area</div>
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">${MILL_AREAS.map(([f, t]) => `<button class="card" data-area="${f}" style="padding:12px;text-align:center;font-weight:700;border:2px solid ${S.millArea === f ? 'var(--red, #C8102E)' : 'transparent'};border-radius:10px">${esc(t)}</button>`).join('')}</div>`;
+    $('#ml').innerHTML = `<div class="pad">${btns}<div class="spin">Loading…</div></div>`;
+    let items = [];
+    try { items = (await storageList(`${S.millArea}/`, MILL_PROCESS_BUCKET)).filter(o => o.id && o.name && /\.(docx?|pdf)$/i.test(o.name)); }
+    catch (e) { $('#ml').innerHTML = `<div class="pad">${btns}<div class="empty"><b>Could not load procedures</b>Check the network and try again.</div></div>`; netErr(e); return; }
+    const typ = n => (n.split('.').pop() || '').toUpperCase().slice(0, 4);
+    $('#ml').innerHTML = `<div class="pad">${btns}
+      <div class="label">${items.length} procedure${items.length === 1 ? '' : 's'} · ${esc(label(S.millArea))}</div>
+      <div class="list">${items.length ? items.map(o => `<button class="lrow" data-f="${esc(S.millArea + '/' + o.name)}">
+        <span class="ic" style="font-size:12px;font-weight:800">${esc(typ(o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('') : `<div class="empty"><b>No SOPs in ${esc(label(S.millArea))} yet</b></div>`}</div></div>`;
+  };
+  $('#ml').onclick = async e => {
+    const area = e.target.closest('[data-area]'); if (area) { S.millArea = area.dataset.area; draw(); return; }
+    const r = e.target.closest('[data-f]'); if (!r) return;
+    try { await openDoc(r.dataset.f, MILL_PROCESS_BUCKET); } catch (err) { netErr(err); } };
+  draw();
 }
 
 /* ================= TEAM ================= */
 async function viewTeam() {
   $('#app').innerHTML = `${bar('Team', 'home')}
-  <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="tq" type="search" placeholder="Search name or area" aria-label="Search team" value="${esc(S.teamQuery)}"></div></div>
+  <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="tq" type="search" placeholder="Search name, area or company" aria-label="Search team" value="${esc(S.teamQuery)}"></div></div>
   <main class="scroll" id="tl"><div class="spin">Loading…</div></main>`;
   let rows = [], today = [];
   try { [rows, today] = await Promise.all([team(), api(`shift_roster?select=name,shift&day=eq.${ymd(new Date())}`)]); } catch (e) { netErr(e); }
-  const shiftOf = n => (today.find(r => r.name === n) || {}).shift;
+  const shiftOf = n => (today.find(r => r.name === n) || today.find(r => sameName(r.name, n)) || {}).shift;
   const tagOf = s => !s ? '' : s === 'WO' ? '<span class="tag">Off</span>' : s === 'L' ? '<span class="tag amber">Leave</span>' : s === 'G' ? '<span class="tag">G</span>' : `<span class="tag red">${s}</span>`;
+  const link = (href, icon, txt) => `<a href="${href}" style="display:inline-flex;align-items:center;gap:6px;margin:6px 14px 0 0;color:var(--red, #C8102E);font-weight:600;text-decoration:none">${ic(icon, 18)}${esc(txt)}</a>`;
+  let open = null;
   const draw = () => {
     const q = S.teamQuery.toLowerCase();
-    const f = rows.filter(r => !q || r.name.toLowerCase().includes(q) || (r.area || '').toLowerCase().includes(q));
-    $('#tl').innerHTML = `<div class="pad"><div class="label">${f.length} members · today's shift shown</div><div class="list">` + f.map(r => `<div class="lrow"><span class="av">${esc(initials(r.name))}</span><span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc([r.area === 'Shift' ? 'Shift crew' : r.area, r.role].filter(Boolean).join(' · ') || 'E&A')}</span></span>${tagOf(shiftOf(r.name))}</div>`).join('') + '</div></div>';
+    const f = rows.filter(r => !q || [r.name, r.area, r.company, r.mobile].some(v => (v || '').toLowerCase().includes(q)));
+    $('#tl').innerHTML = `<div class="pad"><div class="label">${f.length} members · tap a name for contact details</div><div class="list">` + f.map((r, i) => {
+      const sub = [r.area === 'Shift' ? 'Shift crew' : r.area, r.company].filter(Boolean).join(' · ') || 'E&A';
+      const more = open === r.name ? `<div style="flex-basis:100%;padding:4px 0 2px 52px">${r.plant ? `<div class="hint">Plant: ${esc(r.plant)}</div>` : ''}${r.mobile ? link('tel:' + r.mobile.replace(/[^0-9+]/g, ''), 'phone', r.mobile) : ''}${r.email ? link('mailto:' + r.email, 'mail', r.email) : ''}${!r.mobile && !r.email ? '<div class="hint">No contact details in the list</div>' : ''}</div>` : '';
+      return `<button class="lrow" data-n="${esc(r.name)}" style="flex-wrap:wrap;text-align:left"><span class="av">${esc(initials(r.name))}</span><span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span></span>${tagOf(shiftOf(r.name))}${more}</button>`;
+    }).join('') + '</div></div>';
   };
   draw();
+  $('#tl').onclick = e => { if (e.target.closest('a')) return; const b = e.target.closest('[data-n]'); if (!b) return; open = open === b.dataset.n ? null : b.dataset.n; draw(); };
   $('#tq').oninput = e => { S.teamQuery = e.target.value.trim(); draw(); };
 }
 
