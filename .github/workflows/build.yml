@@ -1,0 +1,54 @@
+name: Build HSM E&A App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Set build number
+        run: sed -i "s/__BUILD__/$(cat BUILD_NUMBER)/" app/src/main/assets/www/boot.js
+
+      - name: Build Android APK
+        run: |
+          gradle :app:assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk HSM-EA-App.apk
+
+      - name: Publish APK (Releases → latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: HSM E&A App (latest)
+          body: Android app. Download HSM-EA-App.apk below and open it on the phone.
+          make_latest: true
+          files: HSM-EA-App.apk
+
+      - name: Build iPhone web app
+        run: |
+          git checkout app/src/main/assets/www/boot.js
+          bash scripts/build-site.sh
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
