@@ -315,7 +315,7 @@ async function hiracData() {
   }
   return HIRAC;
 }
-async function team() { if (!TEAM) TEAM = await api('team?select=name,area,role,plant,company,mobile,email&order=name'); return TEAM; }
+async function team() { if (!TEAM) TEAM = await api('team?select=name,area,role,plant,company,mobile,email,sap_id&order=name'); return TEAM; }
 const itemCount = t => t.sections.reduce((n, s) => n + s.items.length, 0);
 const fieldsOf = (s, it) => s.fields || [{ l: '', t: it.t || 't' }];
 
@@ -1010,25 +1010,25 @@ async function viewMillProcessSops() {
 /* ================= TEAM ================= */
 async function viewTeam() {
   $('#app').innerHTML = `${bar('Team', 'home')}
-  <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="tq" type="search" placeholder="Search name, area or company" aria-label="Search team" value="${esc(S.teamQuery)}"></div></div>
+  <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="tq" type="search" placeholder="Search name, area, SAP ID, mobile" aria-label="Search team" value="${esc(S.teamQuery)}"></div></div>
   <main class="scroll" id="tl"><div class="spin">Loading…</div></main>`;
   let rows = [], today = [];
   try { [rows, today] = await Promise.all([team(), api(`shift_roster?select=name,shift&day=eq.${ymd(new Date())}`)]); } catch (e) { netErr(e); }
   const shiftOf = n => (today.find(r => r.name === n) || today.find(r => sameName(r.name, n)) || {}).shift;
   const tagOf = s => !s ? '' : s === 'WO' ? '<span class="tag">Off</span>' : s === 'L' ? '<span class="tag amber">Leave</span>' : s === 'G' ? '<span class="tag">G</span>' : `<span class="tag red">${s}</span>`;
-  const link = (href, icon, txt) => `<a href="${href}" style="display:inline-flex;align-items:center;gap:6px;margin:6px 14px 0 0;color:var(--red, #C8102E);font-weight:600;text-decoration:none">${ic(icon, 18)}${esc(txt)}</a>`;
-  let open = null;
+  const link = (href, icon, txt) => `<a href="${href}" style="display:inline-flex;align-items:center;gap:6px;margin:4px 14px 0 0;color:var(--red, #C8102E);font-weight:600;text-decoration:none">${ic(icon, 18)}${esc(txt)}</a>`;
   const draw = () => {
     const q = S.teamQuery.toLowerCase();
-    const f = rows.filter(r => !q || [r.name, r.area, r.company, r.mobile].some(v => (v || '').toLowerCase().includes(q)));
-    $('#tl').innerHTML = `<div class="pad"><div class="label">${f.length} members · tap a name for contact details</div><div class="list">` + f.map((r, i) => {
-      const sub = [r.area === 'Shift' ? 'Shift crew' : r.area, r.company].filter(Boolean).join(' · ') || 'E&A';
-      const more = open === r.name ? `<div style="flex-basis:100%;padding:4px 0 2px 52px">${r.plant ? `<div class="hint">Plant: ${esc(r.plant)}</div>` : ''}${r.mobile ? link('tel:' + r.mobile.replace(/[^0-9+]/g, ''), 'phone', r.mobile) : ''}${r.email ? link('mailto:' + r.email, 'mail', r.email) : ''}${!r.mobile && !r.email ? '<div class="hint">No contact details in the list</div>' : ''}</div>` : '';
-      return `<button class="lrow" data-n="${esc(r.name)}" style="flex-wrap:wrap;text-align:left"><span class="av">${esc(initials(r.name))}</span><span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span></span>${tagOf(shiftOf(r.name))}${more}</button>`;
+    const f = rows.filter(r => !q || [r.name, r.area, r.company, r.mobile, r.sap_id, r.email].some(v => (v || '').toLowerCase().includes(q)));
+    $('#tl').innerHTML = `<div class="pad"><div class="label">${f.length} members · today's shift shown</div><div class="list">` + f.map(r => {
+      const sub = [r.area === 'Shift' ? 'Shift crew' : r.area, r.company, r.plant].filter(Boolean).join(' · ') || 'E&A';
+      const det = [r.sap_id ? `<span class="hint" style="margin-top:4px">SAP ID: <b style="color:var(--ink)">${esc(r.sap_id)}</b></span>` : '',
+        r.mobile ? link('tel:' + r.mobile.replace(/[^0-9+]/g, ''), 'phone', r.mobile) : '',
+        r.email ? link('mailto:' + r.email, 'mail', r.email) : ''].filter(Boolean).join('');
+      return `<div class="lrow" style="flex-wrap:wrap;align-items:flex-start"><span class="av">${esc(initials(r.name))}</span><span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span>${det ? `<span style="display:flex;flex-direction:column;align-items:flex-start;margin-top:2px;overflow-wrap:anywhere">${det}</span>` : ''}</span>${tagOf(shiftOf(r.name))}</div>`;
     }).join('') + '</div></div>';
   };
   draw();
-  $('#tl').onclick = e => { if (e.target.closest('a')) return; const b = e.target.closest('[data-n]'); if (!b) return; open = open === b.dataset.n ? null : b.dataset.n; draw(); };
   $('#tq').oninput = e => { S.teamQuery = e.target.value.trim(); draw(); };
 }
 
