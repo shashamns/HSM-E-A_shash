@@ -28,7 +28,19 @@ jobs:
       - name: Set build number
         run: sed -i "s/__BUILD__/$(cat BUILD_NUMBER)/" app/src/main/assets/www/boot.js
 
+      - name: Prepare signing key (from GitHub Secrets)
+        env:
+          KS_B64: ${{ secrets.HSM_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then echo "Secret HSM_KEYSTORE_B64 is missing"; exit 1; fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/hsm-ea-release.keystore"
+          echo "HSM_KEYSTORE_FILE=$RUNNER_TEMP/hsm-ea-release.keystore" >> "$GITHUB_ENV"
+
       - name: Build Android APK
+        env:
+          HSM_KEYSTORE_PASSWORD: ${{ secrets.HSM_KEYSTORE_PASSWORD }}
+          HSM_KEY_ALIAS: ${{ secrets.HSM_KEY_ALIAS }}
+          HSM_KEY_PASSWORD: ${{ secrets.HSM_KEY_PASSWORD }}
         run: |
           gradle :app:assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk HSM-EA-App.apk
