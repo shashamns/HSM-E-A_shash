@@ -10,22 +10,25 @@ android {
         applicationId 'com.hsm.ea'
         minSdk 26
         targetSdk 34
-        versionCode 10
-        versionName '2.8'
+        versionCode 11
+        versionName '3.0'
     }
 
     signingConfigs {
         hsm {
-            storeFile file('hsm-ea.keystore')
-            storePassword 'hsmea2026'
-            keyAlias 'hsmea'
-            keyPassword 'hsmea2026'
+            // Signing key comes from GitHub Secrets at build time (never stored in the repo).
+            def ksFile = System.getenv('HSM_KEYSTORE_FILE')
+            if (ksFile) {
+                storeFile file(ksFile)
+                storePassword System.getenv('HSM_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('HSM_KEY_ALIAS')
+                keyPassword System.getenv('HSM_KEY_PASSWORD')
+            }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.hsm
         }
         release {
             minifyEnabled true

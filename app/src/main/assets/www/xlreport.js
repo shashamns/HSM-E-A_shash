@@ -1,41 +1,17 @@
 /* HSM E&A – Excel reports.
- * Fills the department's own inspection-sheet templates (www/xl/*.xlsx) with checklist readings,
- * builds a combined daily workbook, and exports the spares list.
+ * Check lists are filled into the department's own Excel sheets (www/xl/*.xlsx) so the saved / shared file
+ * looks exactly like the paper format. Each template (from the cloud) says which cell every reading goes to.
+ * Also builds the combined daily workbook and the spares export.
  * Works in the browser (window.ExcelJS) and in Node (for testing).
+ *
+ * Cell specs:  'C9'    -> put the value in the empty cell
+ *              'L:G25' -> keep the cell's label up to its first ':' and write the value after it
+ *              'A:H31' -> append the value after the cell's full text
+ *              'O:F17' -> overwrite the cell (e.g. a printed 'OK / NOK' prompt)
+ *              'P:B28' -> write "Remarks: <value>"
  */
 (function (root) {
   'use strict';
-
-  // Where each checklist's readings go in the original Excel sheets.
-  // Section specs: {r,c}        -> item i on row r+i, field j in column c[j]
-  //                {r,c,split,c2}-> items >= split continue on row r+(i-split) in columns c2
-  //                {cells}       -> one cell per item. 'L:' = write after the cell's own label,
-  //                                 'N:' = append "item: value" to the cell, plain = set value.
-  const XLMAP = {
-    CB:   { file: 'CB.xlsx', sheet: 'Sheet6', date: 'L:J2', remarks: 'L:A22', by: 'L:H22', sec: [
-            { r: 7, c: ['C','D','E','F'] }, { r: 7, c: ['J','K','L'] },
-            { cells: ['L:C19','L:E19','L:C20','L:E20'] } ] },
-    CLR:  { file: 'COILER.xlsx', sheet: 'Sheet1', date: 'L:I1', remarks: 'L:G40', by: 'L:A43', sec: [
-            { r: 3, c: ['B','C'] }, { r: 3, c: ['E'] }, { r: 20, c: ['B','C','D','E'] }, { r: 3, c: ['H','I','J'] },
-            { cells: ['L:D16','F17','L:B35','L:B38','L:B40','H36','H38'] } ] },
-    FMRS: { file: 'FM.xlsx', sheet: 'Sheet7', date: 'L:A1', remarks: 'L:A33', by: 'L:A34', sec: [
-            { r: 5, c: ['B','C','D'] }, { r: 5, c: ['F','G','H'] }, { r: 12, c: ['B','E'] }, { r: 19, c: ['B','E'] },
-            { r: 29, c: ['B','C'] },
-            { cells: ['L:F12','L:F14','L:G18','L:G20','L:G22','L:G24','F29','F30','F31','F32','G29','G30','G31','G32'] } ] },
-    FMHY: { file: 'FM.xlsx', sheet: 'Sheet7', date: 'L:A38', remarks: 'L:A65', by: 'L:A67', sec: [
-            { r: 41, c: ['B','C','D'], split: 24, c2: ['F','G','H'] },
-            { cells: ['L:F67','L:G67','L:F68','L:G68','L:F69','L:G69','L:H69'] } ] },
-    RM:   { file: 'RMRHF.xlsx', sheet: 'RM AREA', date: 'L:R1', remarks: 'L:A39', by: 'L:Q40', sec: [
-            { r: 5, c: ['C','D','E','F','H','I','J'] }, { r: 5, c: ['N','O','P'] }, { r: 25, c: ['C','D','E','F'] },
-            { r: 5, c: ['S','T'] }, { cells: ['N:A40','N:A40','L:A38','L:A37'] } ] },
-    FCE:  { file: 'RMRHF.xlsx', sheet: 'FCE AREA', date: 'L:N1', remarks: 'L:A34', by: 'L:N36', sec: [
-            { r: 4, c: ['C','D','E','F','H','I','J'] }, { r: 4, c: ['N','O','P'] }, { r: 25, c: ['C','D','E','F'] },
-            { r: 26, c: ['I','J'] }, { cells: ['L:H31','L:H32'] } ] },
-    RIO:  { file: 'RMRHF.xlsx', sheet: 'Sheet3', date: 'L:E2', remarks: 'L:A17', by: 'L:A20', sec: [
-            { r: 5, c: ['C','D','E'] } ] },
-    DRV:  { file: 'RMRHF.xlsx', sheet: 'Sheet4', date: 'L:J2', remarks: 'L:H32', by: 'L:J36', sec: [
-            { r: 5, c: ['C','D','E','F'] }, { r: 5, c: ['J','K','L'] }, { r: 23, c: ['J'] }, { cells: ['J29','J30'] } ] }
-  };
 
   const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const fmtDate = iso => { const [y, m, d] = iso.split('-'); return `${d}-${MON3[+m - 1]}-${y.slice(2)}`; };
@@ -43,45 +19,50 @@
     const v = c.value;
     if (v == null) return '';
     if (typeof v === 'object' && v.richText) return v.richText.map(t => t.text).join('');
-    return String(c.text != null ? c.text : v);
+    if (typeof v === 'object' && 'result' in v) return String(v.result ?? '');
+    return String(v);
   };
   const asValue = v => (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) ? Number(v) : v;
+  const RED = { argb: 'FFC8102E' };
+  // temperature fields: a reading above 100 is shown red (app, record and Excel)
+  const isHot = (type, v) => type === 't' && v != null && v !== '' && !isNaN(parseFloat(v)) && parseFloat(v) > 100;
+  const fieldType = (sec, item, fi) => item.t || ((sec.fields && sec.fields[fi]) || {}).t || 's';
 
-  function writeSpec(ws, spec, value, itemName) {
-    if (value == null || value === '') return;
+  function write(ws, spec, value, opts) {
+    if (!spec || value == null || value === '') return;
     let mode = '', ref = spec;
-    if (/^[LN]:/.test(spec)) { mode = spec[0]; ref = spec.slice(2); }
+    if (/^[LAOP]:/.test(spec)) { mode = spec[0]; ref = spec.slice(2); }
     const cell = ws.getCell(ref);
-    if (!mode) { cell.value = asValue(value); return; }
+    cell.style = JSON.parse(JSON.stringify(cell.style || {})); // styles are shared between cells: change only this one
     const cur = cellText(cell).replace(/\s+$/, '');
-    if (mode === 'N') { cell.value = (cur ? cur + '   ' : '') + `${itemName}: ${value}`; return; }
-    const i = cur.indexOf(':');
-    const label = i >= 0 ? cur.slice(0, i + 1) : (cur ? cur + ' —' : '');
-    cell.value = (label ? label + ' ' : '') + value;
+    if (!mode) cell.value = asValue(value);
+    else if (mode === 'O') cell.value = asValue(value);
+    else if (mode === 'P') cell.value = 'Remarks: ' + value;
+    else if (mode === 'A') cell.value = (cur ? cur + ' ' : '') + value;
+    else { const i = cur.indexOf(':'); cell.value = (i >= 0 ? cur.slice(0, i + 1) : (cur ? cur + ' :' : '')) + ' ' + value; }
+    if (opts && opts.center) cell.alignment = Object.assign({}, cell.alignment, { horizontal: 'center', vertical: 'middle', wrapText: true });
+    if (opts && opts.red) cell.font = Object.assign({}, cell.font, { bold: true, color: RED });
   }
 
-  // Write one checklist record into its sheet
+  const hhmm = iso => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+  // Write one check list record into its sheet
   function fillSheet(ws, tpl, entry) {
-    const map = XLMAP[tpl.code]; if (!map) return;
-    const V = entry.vals || {};
-    tpl.sections.forEach((s, si) => {
-      const sp = map.sec[si]; if (!sp) return;
-      s.items.forEach((it, ii) => {
-        const nf = s.fields ? s.fields.length : 1;
-        for (let fi = 0; fi < nf; fi++) {
-          const v = V[`${si}.${ii}.${fi}`]; if (v == null || v === '') continue;
-          if (sp.cells) { writeSpec(ws, sp.cells[ii], v, it.name); continue; }
-          let row = sp.r + ii, cols = sp.c;
-          if (sp.split != null && ii >= sp.split) { row = sp.r + (ii - sp.split); cols = sp.c2; }
-          if (cols[fi]) { const c = ws.getCell(cols[fi] + row); c.value = asValue(v);
-            c.alignment = Object.assign({}, c.alignment, { horizontal: 'center', vertical: 'middle' });
-            if (v === 'NOT OK') c.font = Object.assign({}, c.font, { bold: true, color: { argb: 'FFC8102E' } }); }
-        }
-      });
-    });
-    writeSpec(ws, map.date, `${fmtDate(entry.check_date)}   Shift: ${entry.shift || '-'}`);
-    if (entry.remarks) writeSpec(ws, map.remarks, entry.remarks);
-    writeSpec(ws, map.by, `${entry.inspected_name || ''}${entry.inspected_by ? ' (' + entry.inspected_by + ')' : ''}`);
+    const V = entry.vals || {}, map = tpl.map || {};
+    (tpl.sections || []).forEach((s, si) => (s.items || []).forEach((it, ii) => (it.cells || []).forEach((spec, fi) => {
+      const v = V[`${si}.${ii}.${fi}`]; if (!spec || v == null || v === '') return;
+      const plain = !/^[LAP]:/.test(spec);
+      write(ws, spec, v, { center: plain, red: v === 'NOT OK' || isHot(fieldType(s, it, fi), v) });
+    })));
+    const date = `${fmtDate(entry.check_date)} (${entry.shift || '-'})`;
+    const by = `${entry.inspected_name || ''}${entry.inspected_by ? ' (' + entry.inspected_by + ')' : ''}`;
+    const time = hhmm(entry.filled_at || entry.created_at || new Date().toISOString());
+    write(ws, map.date, date); write(ws, map.date2, date); write(ws, map.time, time);
+    (map.by || []).forEach(b => write(ws, b, by));
+    if (entry.remarks) write(ws, map.remarks, entry.remarks);
+    (map.custom || []).forEach(([ref, fmt]) => { ws.getCell(ref).value = fmt.replace('{remarks}', entry.remarks || '').replace('{by}', by); });
+    const hf = ws.headerFooter || {};
+    Object.keys(hf).forEach(k => { if (typeof hf[k] === 'string') hf[k] = hf[k].replace(/_x000D_/g, ''); });
   }
 
   function make(ExcelJS, loadTemplate) {
@@ -90,11 +71,12 @@
       await wb.xlsx.load(await loadTemplate(file));
       return wb;
     }
+    const sheetOf = (wb, tpl) => wb.getWorksheet(tpl.sheet) || wb.worksheets[0];
 
     // Copy a sheet (values, styles, merges, widths, heights, print setup) into another workbook
     function copySheet(src, dstWb, name) {
       const dst = dstWb.addWorksheet(name, {
-        pageSetup: Object.assign({}, src.pageSetup),
+        pageSetup: Object.assign({}, src.pageSetup, { printArea: undefined }),
         properties: Object.assign({}, src.properties),
         views: src.views
       });
@@ -116,55 +98,46 @@
       return dst;
     }
 
-    const sheetTitle = (tpl, entry) => `${tpl.code} ${entry.shift || ''}`.trim();
-
-    // One record → its own workbook (the template sheet only)
+    // One record → the department's Excel file, filled in
     async function recordWorkbook(tpl, entry) {
-      const map = XLMAP[tpl.code];
-      const wb = await openTemplate(map.file);
-      const ws = wb.getWorksheet(map.sheet);
+      const wb = await openTemplate(tpl.file);
+      const ws = sheetOf(wb, tpl);
       fillSheet(ws, tpl, entry);
-      const out = new ExcelJS.Workbook();
-      copySheet(ws, out, sheetTitle(tpl, entry));
-      return out.xlsx.writeBuffer();
+      wb.worksheets.filter(w => w !== ws).forEach(w => wb.removeWorksheet(w.id));
+      ws.name = `${tpl.code} ${entry.shift || ''}`.trim().slice(0, 31);
+      wb.creator = 'HSM E&A App';
+      return wb.xlsx.writeBuffer();
     }
 
-    // All records of a day → one workbook, one sheet per checklist sheet + shift
+    // All records of a day → one workbook: summary + one sheet per record
     async function dailyWorkbook(templates, entries, isoDate) {
       const out = new ExcelJS.Workbook();
       out.creator = 'HSM E&A App';
-      const groups = new Map(); // file|sheet|shift -> [{tpl, entry}]
-      entries.slice().sort((a, b) => (a.filled_at || a.created_at) < (b.filled_at || b.created_at) ? -1 : 1).forEach(e => {
-        const tpl = templates.find(t => t.code === e.template_code); const map = tpl && XLMAP[tpl.code];
-        if (!map) return;
-        const key = `${map.file}|${map.sheet}|${e.shift || ''}`;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push({ tpl, entry: e });
-      });
       const sum = out.addWorksheet('Summary');
       const used = new Set();
-      for (const [key, list] of groups) {
-        const [file, sheet, shift] = key.split('|');
-        const wb = await openTemplate(file); // fresh copy for each group
-        const ws = wb.getWorksheet(sheet);
-        list.forEach(({ tpl, entry }) => fillSheet(ws, tpl, entry));
-        let name = list.map(x => x.tpl.code).filter((v, i, a) => a.indexOf(v) === i).join('+') + (shift ? ' ' + shift : '');
-        name = name.slice(0, 28); let n = name, k = 2; while (used.has(n)) n = `${name} (${k++})`; used.add(n);
+      const list = entries.slice().sort((a, b) => (a.filled_at || a.created_at) < (b.filled_at || b.created_at) ? -1 : 1);
+      for (const e of list) {
+        const tpl = templates.find(t => t.code === e.template_code); if (!tpl || !tpl.file) continue;
+        const wb = await openTemplate(tpl.file);
+        const ws = sheetOf(wb, tpl);
+        fillSheet(ws, tpl, e);
+        let name = `${tpl.code} ${e.shift || ''}`.trim().slice(0, 26); let n = name, k = 2; while (used.has(n)) n = `${name} (${k++})`; used.add(n);
         copySheet(ws, out, n);
       }
-      // Summary sheet (created first so it is the first tab)
-      sum.columns = [{ width: 30 }, { width: 8 }, { width: 26 }, { width: 12 }, { width: 12 }, { width: 40 }];
+      sum.columns = [{ width: 34 }, { width: 8 }, { width: 26 }, { width: 11 }, { width: 10 }, { width: 12 }, { width: 40 }];
       sum.addRow([`HSM E&A – Daily Inspection Report   ${fmtDate(isoDate)}`]).font = { bold: true, size: 14 };
       sum.addRow([]);
-      const h = sum.addRow(['Check list', 'Shift', 'Inspected by', 'Readings', 'NOT OK', 'Remarks']);
+      const h = sum.addRow(['Check list', 'Shift', 'Inspected by', 'Readings', 'NOT OK', 'Temp > 100', 'Remarks']);
       h.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       h.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC8102E' } }; });
-      entries.forEach(e => {
+      list.forEach(e => {
         const tpl = templates.find(t => t.code === e.template_code);
         const vals = Object.values(e.vals || {});
+        const hot = tpl ? hotCount(tpl, e.vals || {}) : 0;
         const r = sum.addRow([tpl ? tpl.name : e.template_code, e.shift || '', e.inspected_name || '', vals.length,
-          vals.filter(v => v === 'NOT OK').length, e.remarks || '']);
-        if (vals.includes('NOT OK')) r.getCell(5).font = { bold: true, color: { argb: 'FFC8102E' } };
+          vals.filter(v => v === 'NOT OK').length, hot, e.remarks || '']);
+        if (vals.includes('NOT OK')) r.getCell(5).font = { bold: true, color: RED };
+        if (hot) r.getCell(6).font = { bold: true, color: RED };
       });
       return out.xlsx.writeBuffer();
     }
@@ -174,27 +147,35 @@
       const out = new ExcelJS.Workbook();
       const byArea = {};
       rows.forEach(r => { (byArea[r.area] = byArea[r.area] || []).push(r); });
-      (areas || Object.keys(byArea)).forEach(area => {
+      const names = (areas || []).concat(Object.keys(byArea).filter(a => !(areas || []).includes(a)));
+      names.forEach(area => {
         const list = byArea[area] || [];
-        const ws = out.addWorksheet(area.replace(/[\\/*?:[\]]/g, ' ').slice(0, 31));
-        ws.columns = [{ width: 7 }, { width: 34 }, { width: 30 }, { width: 44 }, { width: 14 }, { width: 11 }, { width: 22 }, { width: 9 }, { width: 28 }, { width: 18 }];
-        const h = ws.addRow(['Sl. No.', 'Item', 'Type/ Model', 'Item Description', 'Make (OEM)', 'Avilable Qty.', 'Location', 'Rack No.', 'Update by last', 'Updated on']);
+        if (!list.length && !(areas || []).includes(area)) return;
+        const ws = out.addWorksheet(String(area).replace(/[\\/*?:[\]]/g, ' ').slice(0, 31));
+        ws.columns = [{ width: 7 }, { width: 34 }, { width: 30 }, { width: 44 }, { width: 14 }, { width: 11 }, { width: 22 }, { width: 9 }, { width: 13 }, { width: 13 }, { width: 28 }, { width: 18 }];
+        const h = ws.addRow(['Sl. No.', 'Item', 'Type/ Model', 'Item Description', 'Make (OEM)', 'Avilable Qty.', 'Location', 'Rack No.', 'Cupboard No.', 'Cupboard Key No.', 'Update by last', 'Updated on']);
         h.font = { bold: true, color: { argb: 'FFFFFFFF' } };
         h.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC8102E' } }; c.alignment = { vertical: 'middle', wrapText: true }; });
         ws.views = [{ state: 'frozen', ySplit: 1 }];
         list.forEach((r, i) => {
-          const row = ws.addRow([i + 1, r.material, r.model || '', r.description || '', r.make || '', r.qty, r.location || '', r.rack || '', r.updated_by || '',
+          const row = ws.addRow([i + 1, r.material, r.model || '', r.description || '', r.make || '', r.qty, r.location || '', r.rack || '', r.cupboard || '', r.cupboard_key || '', r.updated_by || '',
             r.updated_at ? new Date(r.updated_at).toLocaleString('en-GB') : '']);
           row.alignment = { vertical: 'top', wrapText: true };
-          if (r.qty <= 0) row.getCell(6).font = { bold: true, color: { argb: 'FFC8102E' } };
+          if (r.qty <= 0) row.getCell(6).font = { bold: true, color: RED };
         });
       });
       return out.xlsx.writeBuffer();
     }
 
-    return { recordWorkbook, dailyWorkbook, sparesWorkbook, XLMAP };
+    return { recordWorkbook, dailyWorkbook, sparesWorkbook };
   }
 
-  const api = { make, XLMAP, fillSheet };
+  function hotCount(tpl, V) {
+    let n = 0;
+    (tpl.sections || []).forEach((s, si) => (s.items || []).forEach((it, ii) => (it.cells || []).forEach((c, fi) => { if (isHot(fieldType(s, it, fi), V[`${si}.${ii}.${fi}`])) n++; })));
+    return n;
+  }
+
+  const api = { make, fillSheet, isHot, fieldType, hotCount };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HSMXL = api;
 })(typeof window !== 'undefined' ? window : globalThis);

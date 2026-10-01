@@ -2,7 +2,8 @@
  * Data (Supabase) is never cached here; the app keeps its own offline copy. */
 const CACHE = 'hsm-ea-__BUILD__';
 const FILES = ['./', 'index.html', 'boot.js', 'app.js', 'xlreport.js', 'app.css', 'lib/exceljs.min.js', 'manifest.webmanifest',
-  'xl/CB.xlsx', 'xl/COILER.xlsx', 'xl/FM.xlsx', 'xl/RMRHF.xlsx', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
+  'xl/templates.json', 'xl/ABB.xlsx', 'xl/DC.xlsx', 'xl/FMCB.xlsx', 'xl/INST.xlsx', 'xl/MOTABB.xlsx', 'xl/MOTMD.xlsx', 'xl/PWRSG.xlsx',
+  'xl/PWRLA.xlsx', 'xl/PWRTR.xlsx', 'xl/RHF.xlsx', 'xl/RMD.xlsx', 'img/coil.png', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
   'fonts/barlow-latin-400-normal.woff2', 'fonts/barlow-latin-500-normal.woff2', 'fonts/barlow-latin-600-normal.woff2',
   'fonts/barlow-latin-700-normal.woff2', 'fonts/barlow-semi-condensed-latin-700-normal.woff2'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });

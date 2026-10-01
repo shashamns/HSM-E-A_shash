@@ -9,13 +9,19 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','GE Drive','Power','Crane'];
+const APP_VERSION = '3.0';
+const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
-  ['sop','SOP & HIRAC','shield','Numbers, hazards, docs'],['mill',"SOP's of Mill Process",'doc','Operational procedures'],['team','Team','users','E&amp;A directory']];
+  ['sop','SOP & HIRAC','shield','Numbers, hazards, docs'],['mill',"SOP's of Mill Process",'doc','Operational procedures'],['team','Team','users','E&amp;A directory'],
+  ['contacts','Contacts','phone','AMNS phone numbers'],['tbt','TBT – HSM Electrical','talk','Tool box talks']];
 const ALL_MODS = MODULES.map(m => m[0]);
-const ROUTE_MOD = { schedule: 'schedule', checklist: 'checklist', cl: 'checklist', clh: 'checklist', cle: 'checklist', spares: 'spares', spare: 'spares', sop: 'sop', hirac: 'sop', mill: 'mill', team: 'team' };
-const MILL_AREAS = [['CB','CB'],['DC','DC'],['FM','FM'],['LEVEL-1','Level 1'],['RHF','RHF'],['RM','RM']];
+const ROUTE_MOD = { schedule: 'schedule', checklist: 'checklist', cl: 'checklist', clh: 'checklist', cle: 'checklist', spares: 'spares', spare: 'spares', sop: 'sop', hirac: 'sop', mill: 'mill', team: 'team',
+  contacts: 'contacts', tbt: 'tbt' };
+const MILL_AREAS = [['CB','CB'],['DC','DC'],['FM','FM'],['LEVEL-1','Level 1'],['RHF','RHF'],['RM','RM'],['CRANE','Crane'],['MOTOR','Motor'],['POWER','Power'],['INSTRUMENT','Instrument']];
+const CL_AREAS = [['ABB','ABB Drive'],['DC','DC'],['FMCB','FM & CB'],['INST','Instrument'],['MOTOR','Motor'],['POWER','Power'],['RHF','RHF'],['RM','RM']];
+const AREA_MODS = { checklist: CL_AREAS, mill: MILL_AREAS };
+const SHIFT_NAME = { A: 'A Shift', B: 'B Shift', C: 'C Shift', G: 'General', L: 'Leave', WO: 'Weekly Off' };
 const SOP_GROUPS = ['All','Common','Instrument','RM','CB','FM','Coiler','MD Motor','Crane','Power'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -48,7 +54,13 @@ const I = {
   logout:'<path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
   upload:'<path d="M12 20V9M7 14l5-5 5 5"/><path d="M5 4h14"/>',
   key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>',
-  warn:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>'
+  warn:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
+  talk:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+  bulb:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+  edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  camera:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  wa:'<path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9c0 3 3 6 6 6l1-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/>'
 };
 const ic = (n, s = 24) => `<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true">${I[n]}</svg>`;
 
@@ -62,7 +74,13 @@ const fromYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Da
 const fmtDay = d => `${pad2(d.getDate())}-${MON3[d.getMonth()]}-${String(d.getFullYear()).slice(2)}, ${DAY3[d.getDay()]}`;
 const fmtShort = d => `${pad2(d.getDate())}-${MON3[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`;
 const fmtStamp = iso => { const d = new Date(iso); return `${fmtShort(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
-const can = m => !ME || ME.is_admin || !Array.isArray(ME.modules) || ME.modules.includes(m);
+const can = m => !ME || ME.is_admin || !Array.isArray(ME.modules) || ME.modules.includes(m) || (ME.admin_modules || []).includes(m);
+// module admin: can upload / edit inside that module and sees all its areas
+const isModAdmin = m => !!ME && (ME.is_admin || (ME.admin_modules || []).includes(m));
+// area inside a module (check list areas, mill SOP areas): no list saved = all areas
+const canArea = (m, a) => isModAdmin(m) || (can(m) && (!ME.areas || !Array.isArray(ME.areas[m]) || ME.areas[m].includes(a)));
+const meFields = me => ({ name: me.name, username: me.username, is_admin: me.is_admin, role: me.role, modules: me.modules, avatar: me.avatar,
+  areas: me.areas || {}, admin_modules: me.admin_modules || [], sap_id: me.sap_id || '' });
 const avHtml = (url, name, style = '') => url
   ? `<span class="av" style="padding:0;overflow:hidden;${style}"><img src="${esc(url)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover"></span>`
   : `<span class="av" style="${style}">${esc(initials(name))}</span>`;
@@ -341,7 +359,17 @@ function xl() {
 
 /* ================= DATA CACHES ================= */
 let TPL = null, HIRAC = null, TEAM = null;
-async function templates() { if (!TPL) TPL = await api('checklist_templates?select=code,name,area,sections&order=sort'); return TPL; }
+// Check list templates: the cloud says which ones this person may use (area access); the layout of each
+// (sections, fields, Excel cells) ships with the app together with the Excel sheets in www/xl/.
+let LOCAL_TPL = null;
+async function localTemplates() { if (!LOCAL_TPL) { const r = await fetch('xl/templates.json'); if (!r.ok) throw new Error('Check list files missing – update the app'); LOCAL_TPL = await r.json(); } return LOCAL_TPL; }
+async function templates() {
+  if (!TPL) {
+    const [rows, local] = await Promise.all([api('checklist_templates?select=code,name,area,sort,file,sheet&order=sort'), localTemplates()]);
+    TPL = (rows || []).map(r => { const l = local.find(x => x.code === r.code); return l ? Object.assign({}, l, r) : null; }).filter(Boolean);
+  }
+  return TPL;
+}
 async function hiracData() {
   if (!HIRAC) {
     // HIRAC register comes from the cloud (approved login only) and is kept on the phone for offline use
@@ -353,12 +381,14 @@ async function hiracData() {
   return HIRAC;
 }
 async function team() { if (!TEAM) TEAM = await api('team?select=name,area,role,plant,company,mobile,email,sap_id&order=name'); return TEAM; }
-const itemCount = t => t.sections.reduce((n, s) => n + s.items.length, 0);
-const fieldsOf = (s, it) => s.fields || [{ l: '', t: it.t || 't' }];
+const itemCount = t => t.sections.reduce((n, s) => n + s.items.reduce((m, it) => m + it.cells.filter(Boolean).length, 0), 0);
+const ftype = (s, it, fi) => window.HSMXL ? HSMXL.fieldType(s, it, fi) : (it.t || (s.fields[fi] || {}).t || 's');
+const isHot = (t, v) => t === 't' && v != null && v !== '' && !isNaN(parseFloat(v)) && parseFloat(v) > 100;
+const clAreaName = a => (CL_AREAS.find(x => x[0] === a) || [a, a])[1];
 
 /* ================= ROUTER ================= */
 const S = { spareArea: SPARE_AREAS[0], spareQuery: '', spareLow: false, sopTab: 'numbers', sopGroup: 'All', sopQuery: '', docArea: 'CB',
-            calMonth: null, calSel: null, teamQuery: '', reqTab: 'pending', reportDate: null, millArea: 'CB' };
+            calMonth: null, calSel: null, schedEdit: false, clArea: null, tbtArea: null, contactQuery: '', tbtQuery: '', teamQuery: '', reqTab: 'pending', reportDate: null, millArea: 'CB' };
 const go = h => { location.hash = h; };
 window.addEventListener('hashchange', render);
 document.addEventListener('click', e => {
@@ -376,14 +406,15 @@ async function refreshMe() {
   if (meFresh || !SESSION || !ME) return; meFresh = true;
   try {
     const me = await rpc('hsm_me'); if (!me) return;
-    const key = () => JSON.stringify([ME.modules, ME.avatar, ME.is_admin, ME.name]), before = key();
-    Object.assign(ME, { name: me.name, username: me.username, is_admin: me.is_admin, role: me.role, modules: me.modules, avatar: me.avatar });
+    const key = () => JSON.stringify([ME.modules, ME.avatar, ME.is_admin, ME.name, ME.areas, ME.admin_modules]), before = key();
+    Object.assign(ME, meFields(me));
     store.set('hsm_me', ME);
     if (key() !== before) render();
   } catch (e) { meFresh = false; }
 }
 function render() {
   window.scrollTo(0, 0);
+  const md = $('#modal'); if (md && !md.classList.contains('hidden')) { md.classList.add('hidden'); md.onclick = null; }
   if (!SESSION || !ME) return viewLogin();
   refreshMe();
   if (ME.need_pin) return viewSetPin(false);
@@ -391,12 +422,13 @@ function render() {
   const [page, ...rest] = h.split('/'); const arg = decodeURIComponent(rest.join('/'));
   const routes = { home: viewHome, schedule: viewSchedule, checklist: viewChecklist, cl: () => viewChecklistFill(arg), clh: () => viewChecklistHistory(arg),
     cle: () => viewChecklistEntry(arg), spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
-    approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, admin: viewAdmin };
+    approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, admin: viewAdmin,
+    contacts: viewContacts, tbt: viewTbt, suggest: viewSuggest, about: viewAbout };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
   (routes[page] || viewHome)();
 }
 const bar = (title, backTo, extra = '') => `<header class="bar">${backTo ? `<button class="ib back" aria-label="Back" data-back="${backTo}">${ic('back', 26)}</button>` : ''}<h1>${esc(title)}</h1>${extra}</header>`;
-const nav = on => `<nav class="nav" aria-label="Main">${[['home','home','Home'],['schedule','cal','Schedule'],['checklist','check','Check List'],['spares','box','Spares']].filter(([k]) => k === 'home' || can(k))
+const nav = on => `<nav class="nav" aria-label="Main">${[['home','home','Home'],['schedule','cal','Schedule'],['checklist','check','Check List'],['suggest','bulb','Suggestions']].filter(([k]) => k === 'home' || k === 'suggest' || can(k))
   .map(([k, i, l]) => `<button class="${on === k ? 'on' : ''}" data-go="${k}" ${on === k ? 'aria-current="page"' : ''}><span class="pill">${ic(i, 24)}</span>${l}</button>`).join('')}</nav>`;
 
 /* ================= LOGIN / APPROVAL ================= */
@@ -414,7 +446,7 @@ let pendingCreds = null;
 function viewLogin(state) {
   const st = state || (pendingCreds ? pendingCreds.kind : 'login');
   $('#app').innerHTML = `<div class="login">
-    <div class="top"><div class="mk">E&amp;A</div><h1>HSM E&amp;A</h1><p>Electrical &amp; Automation · Hot Strip Mill</p></div>
+    <div class="top"><div class="mk" style="padding:0;overflow:hidden;background:#140806"><img src="img/coil.png" alt="" style="width:100%;height:100%"></div><h1>HSM E&amp;A</h1><p>Electrical &amp; Automation · Hot Strip Mill</p></div>
     <div class="sheet" id="lsheet"></div></div>`;
   const sh = $('#lsheet');
   if (st === 'pending' || st === 'new_device') {
@@ -466,7 +498,7 @@ async function doLogin(user, pass, recheck) {
     const j = await gotrue('token?grant_type=password', { email: r.email, password: r.secret });
     saveSession(j);
     ME = { name: r.name, username: user.toLowerCase(), is_admin: !!r.is_admin, need_pin: !!r.need_pin };
-    try { const me = await rpc('hsm_me'); if (me) Object.assign(ME, { name: me.name, username: me.username, is_admin: me.is_admin, role: me.role, modules: me.modules, avatar: me.avatar }); } catch (e) {}
+    try { const me = await rpc('hsm_me'); if (me) Object.assign(ME, meFields(me)); } catch (e) {}
     store.set('hsm_me', ME); pendingCreds = null;
     location.hash = 'home'; render();
     if (!ME.need_pin) toast(`Welcome, ${firstName(ME.name)}`);
@@ -523,6 +555,7 @@ async function viewHome() {
     <div class="sec-h">Apps</div>
     ${mods.length ? `<div class="grid">${mods.map(([k, t, i, sub]) => tile(k, i, t.replace(/'/g, '&#39;'), sub)).join('')}</div>`
       : `<div class="empty"><b>No modules yet</b>Ask ${esc(ADMIN_NAME)} to give you access.</div>`}
+    <button class="aboutlink" data-go="about">${ic('info', 18)} About this app</button>
     <div style="height:24px"></div>
   </main>${nav('home')}`;
   if ($('#hlow')) $('#hlow').onclick = () => { S.spareLow = true; go('spares'); };
@@ -549,30 +582,44 @@ async function viewHome() {
     if (cP && $('#hsp')) $('#hsp').textContent = low ? low.length : '–';
   } catch (e) { netErr(e); }
   if (ME.is_admin) {
-    try { const req = await rpc('hsm_requests'); const p = req.filter(r => r.status === 'pending' || (r.status === 'approved' && r.pending_device_name)).length; const bad = req.reduce((n, r) => n + (r.fails_24h || 0), 0);
-      $('#hadmin').innerHTML = `<button class="alert" data-go="approvals" style="${p ? '' : 'background:#fff;color:var(--ink-2);box-shadow:var(--shadow)'}">${ic('key')}<span style="flex:1">${p ? `${p} request${p > 1 ? 's' : ''} waiting for your approval` : 'Approvals & sign-ins – nothing pending'}${bad ? ` · ${bad} wrong login${bad > 1 ? 's' : ''} today` : ''}</span>${ic('chev')}</button>`;
+    try { const [req, sug] = await Promise.all([rpc('hsm_users'), api('suggestions?select=id&status=eq.new').catch(() => [])]);
+      const p = req.filter(r => r.status === 'pending' || (r.status === 'approved' && r.pending_device_name)).length; const bad = req.reduce((n, r) => n + (r.fails_24h || 0), 0);
+      const sn = (sug || []).length;
+      $('#hadmin').innerHTML = `<button class="alert" data-go="approvals" style="${p ? '' : 'background:#fff;color:var(--ink-2);box-shadow:var(--shadow)'}">${ic('key')}<span style="flex:1">${p ? `${p} request${p > 1 ? 's' : ''} waiting for your approval` : 'Approvals & sign-ins – nothing pending'}${bad ? ` · ${bad} wrong login${bad > 1 ? 's' : ''} today` : ''}</span>${ic('chev')}</button>`
+        + (sn ? `<button class="alert" data-go="suggest" style="margin-top:10px;background:var(--amber-50,#FFF4E5);color:#8a4b00">${ic('bulb')}<span style="flex:1">${sn} new suggestion${sn > 1 ? 's' : ''} from the team</span>${ic('chev')}</button>` : '');
     } catch (e) {}
   }
 }
 const tile = (to, icon, t, s) => `<button class="card tile" data-go="${to}"><span class="ic">${ic(icon, 26)}</span><span><span class="tt">${t}</span></span><span class="ts">${s}</span></button>`;
 
 /* ================= PROFILE ================= */
+// full-screen photo (tap to close)
+function showPhoto(url, name) {
+  if (!url) return;
+  const m = $('#modal');
+  m.innerHTML = `<div class="photov" role="img" aria-label="${esc(name || 'Photo')}"><img src="${esc(url)}" alt=""><div class="cap">${esc(name || '')}</div><button class="ib" aria-label="Close">${ic('x', 30)}</button></div>`;
+  m.classList.remove('hidden'); m.onclick = () => { m.classList.add('hidden'); m.onclick = null; };
+}
+const ADMIN_UPLOAD_MODS = ['schedule', 'team', 'contacts', 'tbt', 'mill'];
 function viewProfile() {
+  const upl = ME.is_admin || ADMIN_UPLOAD_MODS.some(isModAdmin);
   $('#app').innerHTML = `${bar('My Profile', 'home')}<main class="scroll"><div class="pad">
     <div class="card" style="padding:22px;display:flex;align-items:center;gap:16px">
-      <label style="position:relative;cursor:pointer;flex-shrink:0" aria-label="Change profile photo">${avHtml(ME.avatar, ME.name, 'width:76px;height:76px;border-radius:38px;font-size:26px')}
-        <span style="position:absolute;right:-2px;bottom:-2px;width:30px;height:30px;border-radius:15px;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;border:2px solid #fff">${ic('plus', 16)}</span>
-        <input type="file" id="pph" accept="image/*" hidden></label>
-      <div><div style="font-size:21px;font-weight:700">${esc(ME.name)}</div><div class="hint">${esc(ME.username)}${ME.role ? ' · ' + esc(ME.role) : ''}</div>
-      ${ME.is_admin ? '<span class="tag soft" style="margin-top:6px">App admin</span>' : ''}
-      ${ME.avatar ? '<div><button class="linkbtn" id="prm" style="background:none;border:0;padding:6px 0 0;color:var(--ink-2);font-size:14px;text-decoration:underline">Remove photo</button></div>' : '<div class="hint" style="margin-top:4px">Tap the circle to add your photo</div>'}</div></div>
+      <button class="phbtn" id="pview" aria-label="${ME.avatar ? 'View my photo' : 'Add a photo'}">${avHtml(ME.avatar, ME.name, 'width:84px;height:84px;border-radius:42px;font-size:28px')}</button>
+      <div style="min-width:0"><div style="font-size:21px;font-weight:700">${esc(ME.name)}</div><div class="hint">${esc(ME.username)}${ME.role ? ' · ' + esc(ME.role) : ''}</div>
+      ${ME.is_admin ? '<span class="tag soft" style="margin-top:6px">App admin</span>' : (ME.admin_modules || []).length ? `<span class="tag soft" style="margin-top:6px">Admin: ${esc(MODULES.filter(m => ME.admin_modules.includes(m[0])).map(m => m[1].replace(/&#39;|'/g, '’')).join(', '))}</span>` : ''}
+      <div class="phact"><label class="linkbtn">${ic('camera', 18)} ${ME.avatar ? 'Change photo' : 'Add photo'}<input type="file" id="pph" accept="image/*" hidden></label>
+        ${ME.avatar ? `<button class="linkbtn" id="prm">${ic('x', 18)} Remove</button>` : ''}</div></div></div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-top:18px">
       <button class="btn block" data-go="pin">${ic('key')} Change PIN</button>
-      ${ME.is_admin ? `<button class="btn block" data-go="approvals">${ic('users')} App approvals &amp; sign-ins</button>
-        <button class="btn block" data-go="admin">${ic('upload')} Admin uploads</button>
+      ${ME.is_admin ? `<button class="btn block" data-go="approvals">${ic('users')} App approvals &amp; sign-ins</button>` : ''}
+      ${upl ? `<button class="btn block" data-go="admin">${ic('upload')} Admin uploads</button>` : ''}
+      ${ME.is_admin ? `<button class="btn block" data-go="suggest">${ic('bulb')} Suggestions from the team</button>
         <button class="btn block" id="pxl">${ic('xls')} Master spares Excel (cloud)</button>` : ''}
+      <button class="btn block" data-go="about">${ic('info')} About this app</button>
       <button class="btn ghost block" id="pout">${ic('logout')} Sign out</button></div>
-    <p class="hint" style="margin-top:22px;text-align:center">HSM E&amp;A App · version 2.8 (build ${esc(window.HSM_APP_VERSION || 0)})</p></div></main>`;
+    <p class="hint" style="margin-top:22px;text-align:center">HSM E&amp;A App · version ${APP_VERSION} (build ${esc(window.HSM_APP_VERSION || 0)})</p></div></main>`;
+  $('#pview').onclick = () => ME.avatar ? showPhoto(ME.avatar, ME.name) : $('#pph').click();
   $('#pph').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     if (f.size > 25 * 1024 * 1024) return toast('Photo is too large');
     try { await setMyPhoto(f); viewProfile(); } catch (err) { netErr(err); } };
@@ -597,8 +644,27 @@ function viewProfile() {
 let REQ = [];
 const RESULT = { ok: ['Signed in', 'green'], first_login: ['First sign-in', 'green'], new_device: ['New phone tried', 'amber'], wrong_password: ['Wrong SAP ID / PIN', 'red'],
   locked: ['Locked (too many tries)', 'red'], not_approved: ['Not approved yet', 'amber'], unknown_user: ['Unknown username', 'red'] };
-const modTicks = (mods, key) => `<div class="mods" data-mk="${key}">${MODULES.map(([k, t, i]) => `<label class="modchk"><input type="checkbox" value="${k}" ${(mods || ALL_MODS).includes(k) ? 'checked' : ''}><span class="mi">${ic(i, 18)}</span><span>${t}</span></label>`).join('')}</div>`;
-const readTicks = key => $$(`[data-mk="${key}"] input:checked`).map(x => x.value);
+// Access editor: module ticks, area ticks inside Check List / Mill SOPs, and "Admin" per module
+const accessEditor = (r, key, withAdmin = true) => `<div class="acc" data-ak="${key}">${MODULES.map(([k, t, i]) => {
+  const on = (r.modules || ALL_MODS).includes(k), adm = (r.admin_modules || []).includes(k);
+  const areas = AREA_MODS[k], sel = r.areas && Array.isArray(r.areas[k]) ? r.areas[k] : null;
+  return `<div class="accm ${on ? 'on' : ''}" data-m="${k}"><div class="accr"><label class="modchk"><input type="checkbox" class="am" value="${k}" ${on ? 'checked' : ''}><span class="mi">${ic(i, 18)}</span><span>${t}</span></label>
+    ${withAdmin ? `<label class="admchk"><input type="checkbox" class="ad" ${adm ? 'checked' : ''}><span>Admin</span></label>` : ''}</div>
+    ${areas ? `<div class="areas"><span class="hint">Areas</span>${areas.map(([a, l]) => `<label class="chipchk"><input type="checkbox" class="aa" value="${a}" ${!sel || sel.includes(a) ? 'checked' : ''}><span>${esc(l)}</span></label>`).join('')}</div>` : ''}</div>`; }).join('')}</div>`;
+function wireAccess(key) {
+  const box = $(`[data-ak="${key}"]`); if (!box) return;
+  box.addEventListener('change', e => { const m = e.target.closest('.accm'); if (!m) return;
+    if (e.target.classList.contains('ad') && e.target.checked) $('.am', m).checked = true;
+    if (e.target.classList.contains('am') && !e.target.checked) { const ad = $('.ad', m); if (ad) ad.checked = false; }
+    m.classList.toggle('on', $('.am', m).checked); });
+}
+function readAccess(key) {
+  const box = $(`[data-ak="${key}"]`), out = { modules: [], admin_modules: [], areas: {} };
+  $$('.accm', box).forEach(m => { const k = m.dataset.m, on = $('.am', m).checked, ad = $('.ad', m);
+    if (on) out.modules.push(k); if (ad && ad.checked) out.admin_modules.push(k);
+    const aa = $$('.aa', m); if (on && aa.length) { const sel = aa.filter(x => x.checked).map(x => x.value); if (sel.length < aa.length) out.areas[k] = sel; } });
+  return out;
+}
 async function viewApprovals() {
   if (!ME.is_admin) return go('home');
   $('#app').innerHTML = `${bar('Approvals & Sign-ins', 'home', `<button class="ib" id="arf" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
@@ -606,7 +672,7 @@ async function viewApprovals() {
     <main class="scroll" id="al"><div class="spin">Loading…</div></main>`;
   $('#arf').onclick = viewApprovals;
   $('#aseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.reqTab = b.dataset.t; viewApprovals(); } };
-  try { REQ = await rpc('hsm_requests'); } catch (e) { netErr(e); $('#al').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
+  try { REQ = await rpc('hsm_users'); } catch (e) { netErr(e); $('#al').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
   const isPend = r => r.status === 'pending' || (r.status === 'approved' && r.pending_device_name);
   const groups = { pending: REQ.filter(isPend), users: REQ.filter(r => r.status === 'approved'), other: REQ.filter(r => !['pending','approved'].includes(r.status)) };
   $$('#aseg button').forEach(b => { if (groups[b.dataset.t]) b.textContent = `${b.textContent.replace(/ \(\d+\)$/, '')} (${groups[b.dataset.t].length})`; });
@@ -619,23 +685,24 @@ async function viewApprovals() {
         <span class="b">${phone ? `<b style="color:var(--amber)">New phone:</b> ${esc(r.pending_device_name)}<br>Current: ${esc(r.device_name || '-')}` : `Phone: ${esc(r.pending_device_name || '-')}`}</span>
         <span class="b">${fmtStamp(r.pending_since || r.requested_at)}</span></span>
         <span class="tag ${phone ? 'amber' : 'soft'}">${phone ? 'Phone change' : 'New user'}</span>
-        ${phone ? '' : `<div style="width:100%;margin-top:10px"><div class="label" style="margin:0 0 6px">Modules this person can open</div>${modTicks(r.modules, 'p' + r.id)}</div>`}
+        ${phone ? '' : `<div style="width:100%;margin-top:10px"><div class="label" style="margin:0 0 6px">What this person can open</div>${accessEditor(r, 'p' + r.id)}</div>`}
         <div class="two" style="width:100%;margin-top:8px"><button class="btn ghost" data-d="${r.id}" data-a="0">${ic('x')} Reject</button><button class="btn green" data-d="${r.id}" data-a="1">${ic('ok')} Approve</button></div></div>`; }).join('')
     : list.map(r => `<button class="lrow" data-go="user/${r.id}">${avHtml(r.avatar_url, r.full_name)}
         <span class="tx"><span class="a">${esc(r.full_name)}</span><span class="b">${esc(r.username || 'No username / SAP ID in list')}${r.device_name ? ' · ' + esc(r.device_name) : ''}</span>
-        <span class="b">${r.last_login ? 'Last sign-in ' + fmtStamp(r.last_login) : r.status === 'approved' ? 'Not signed in yet' : esc(r.company_role || '')}${r.status === 'approved' && !r.has_pin ? ' · no PIN yet' : ''}${r.status === 'approved' ? ' · ' + (r.is_admin ? 'all modules (admin)' : `${(r.modules || []).length} of 6 modules`) : ''}</span></span>
+        <span class="b">${r.last_login ? 'Last sign-in ' + fmtStamp(r.last_login) : r.status === 'approved' ? 'Not signed in yet' : esc(r.company_role || '')}${r.status === 'approved' && !r.has_pin ? ' · no PIN yet' : ''}${r.status === 'approved' ? ' · ' + (r.is_admin ? 'all modules (admin)' : `${(r.modules || []).length} of ${MODULES.length} modules`) : ''}</span></span>
         ${r.fails_24h ? `<span class="tag red">${r.fails_24h} wrong</span>` : r.status === 'rejected' ? '<span class="tag red">Rejected</span>' : r.status === 'none' ? '<span class="tag">Not requested</span>' : ''}<span class="chev">${ic('chev', 20)}</span></button>`).join('');
   $('#al').innerHTML = list.length ? `<div class="pad">${S.reqTab === 'users' ? '<div class="label">Tap a person to see their sign-ins and phone</div>' : ''}<div class="list">${body}</div></div>`
     : `<div class="empty"><b>${S.reqTab === 'pending' ? 'Nothing waiting' : 'Nobody here'}</b>${S.reqTab === 'pending' ? 'New users and phone changes appear here.' : ''}</div>`;
+  list.filter(isPend).forEach(r => wireAccess('p' + r.id));
   $('#al').onclick = async e => {
     const b = e.target.closest('[data-d]'); if (!b) return;
     const r = REQ.find(x => String(x.id) === b.dataset.d); const ok = b.dataset.a === '1'; const phone = r.status === 'approved';
     if (!ok && !(await ask(phone ? `Block the new phone for ${r.full_name}?` : `Reject ${r.full_name}?`, phone ? 'They stay signed in on their current phone only.' : 'They will not be able to open the app.', 'Reject'))) return;
     if (ok && phone && !(await ask(`Move ${r.full_name} to the new phone?`, `${r.pending_device_name}\nThe old phone (${r.device_name || '-'}) will be signed out.`, 'Approve'))) return;
-    let mods = null;
-    if (ok && !phone) { mods = readTicks('p' + r.id); if (!mods.length) return toast('Tick at least one module'); }
+    let acc = null;
+    if (ok && !phone) { acc = readAccess('p' + r.id); if (!acc.modules.length) return toast('Tick at least one module'); }
     b.disabled = true;
-    try { if (mods) await rpc('hsm_set_modules', { p_id: r.id, p_modules: mods });
+    try { if (acc) await rpc('hsm_set_access', { p_id: r.id, p_modules: acc.modules, p_areas: acc.areas, p_admin_modules: acc.admin_modules });
       const res = await rpc('hsm_decide', { p_id: r.id, p_approve: ok }); toast({ approved: `${r.full_name} approved`, rejected: `${r.full_name} rejected`, device_changed: 'New phone approved', device_rejected: 'New phone blocked' }[res] || 'Done'); viewApprovals(); }
     catch (err) { netErr(err); b.disabled = false; }
   };
@@ -654,29 +721,34 @@ async function drawLog(el, userId) {
 async function viewUser(id) {
   if (!ME.is_admin) return go('home');
   $('#app').innerHTML = `${bar('User', 'approvals')}<main class="scroll" id="ud"><div class="spin">Loading…</div></main>`;
-  if (!REQ.length) { try { REQ = await rpc('hsm_requests'); } catch (e) { netErr(e); return; } }
+  if (!REQ.length) { try { REQ = await rpc('hsm_users'); } catch (e) { netErr(e); return; } }
   const r = REQ.find(x => String(x.id) === String(id)); if (!r) { $('#ud').innerHTML = '<div class="empty"><b>User not found</b></div>'; return; }
   const self = sameName(r.full_name, ME.name) && r.username === ME.username;
   $('#ud').innerHTML = `<div class="dayhead"><div class="k">${esc(r.company_role || '')} · ${esc(r.status)}</div><div class="v">${esc(r.full_name)}</div><div style="font-size:15px">${esc(r.username || '')}</div></div>
-    <div class="meta"><div><span class="k">Registered phone</span><span class="v">${esc(r.device_name || 'None yet')}</span></div><div><span class="k">PIN</span><span class="v">${r.has_pin ? 'Set' : 'Not set'}</span></div>
+    <div class="meta"><div><span class="k">Username</span><span class="v">${esc(r.login_name || '-')}</span></div><div><span class="k">SAP ID</span><span class="v">${esc(r.sap_id || '-')}</span></div>
+      <div><span class="k">Registered phone</span><span class="v">${esc(r.device_name || 'None yet')}</span></div><div><span class="k">PIN</span><span class="v">${r.has_pin ? 'Set' : 'Not set'}</span></div>
       <div><span class="k">Last sign-in</span><span class="v">${r.last_login ? fmtStamp(r.last_login) : '-'}</span></div><div><span class="k">Approved by</span><span class="v">${esc(r.decided_by || '-')}${r.decided_at ? ' · ' + fmtShort(new Date(r.decided_at)) : ''}</span></div></div>
     ${r.status === 'approved' && !self ? `<div style="padding:14px 16px 0;display:flex;flex-direction:column;gap:10px">
       ${r.has_pin ? `<button class="btn block" data-x="reset_pin">${ic('key')} Reset PIN (forgot PIN)</button>` : ''}
       ${r.device_name ? `<button class="btn block" data-x="unbind">${ic('refresh')} Free the phone</button>` : ''}
       <button class="btn ghost block" data-x="remove" style="color:var(--red);border-color:var(--red-100)">${ic('x')} Remove access</button></div>`
       : r.status !== 'approved' && r.status !== 'pending' ? `<div style="padding:14px 16px 0"><button class="btn green block" data-x="approve">${ic('ok')} Approve now</button></div>` : ''}
-    ${r.is_admin ? '' : `<div class="pad" style="padding-bottom:0"><div class="card" style="padding:14px 14px 16px"><div class="label" style="margin:0 0 4px">Module access</div>
-      <p class="hint" style="margin:0 0 10px">Only ticked modules appear in their app. The cloud also blocks the others.</p>
-      ${modTicks(r.modules, 'u' + r.id)}<button class="btn pri block" id="usave" style="margin-top:12px">${ic('ok')} Save access</button></div></div>`}
+    <div style="padding:10px 16px 0"><button class="btn block" data-x="edit">${ic('edit')} Edit name, username, SAP ID</button></div>
+    ${r.is_admin ? '' : `<div class="pad" style="padding-bottom:0"><div class="card" style="padding:14px 14px 16px"><div class="label" style="margin:0 0 4px">Access</div>
+      <p class="hint" style="margin:0 0 10px">Tick the modules they can open. For Check List and SOP's of Mill Process, untick the areas they must not see. <b>Admin</b> lets them upload / edit in that module. The cloud enforces all of this.</p>
+      ${accessEditor(r, 'u' + r.id)}<button class="btn pri block" id="usave" style="margin-top:12px">${ic('ok')} Save access</button></div></div>`}
     <div id="ulog"></div>`;
   drawLog($('#ulog'), r.id);
+  wireAccess('u' + r.id);
   if ($('#usave')) $('#usave').onclick = async () => {
-    const mods = readTicks('u' + r.id);
-    if (!mods.length && !(await ask(`No modules for ${r.full_name}?`, 'They can still sign in but will see no modules.', 'Save'))) return;
-    try { r.modules = await rpc('hsm_set_modules', { p_id: r.id, p_modules: mods }); toast('Access saved'); } catch (e) { netErr(e); }
+    const acc = readAccess('u' + r.id);
+    if (!acc.modules.length && !(await ask(`No modules for ${r.full_name}?`, 'They can still sign in but will see no modules.', 'Save'))) return;
+    try { const res = await rpc('hsm_set_access', { p_id: r.id, p_modules: acc.modules, p_areas: acc.areas, p_admin_modules: acc.admin_modules });
+      Object.assign(r, res); toast('Access saved'); } catch (e) { netErr(e); }
   };
   $('#ud').onclick = async e => {
     const b = e.target.closest('[data-x]'); if (!b) return; const x = b.dataset.x;
+    if (x === 'edit') return editUser(r, () => { REQ = []; viewUser(id); });
     const txt = { reset_pin: [`Reset PIN for ${r.full_name}?`, 'They can sign in once with their SAP ID (only on their registered phone) and must set a new PIN.', 'Reset'],
       unbind: [`Free the phone for ${r.full_name}?`, 'They are signed out now; the next phone they sign in on becomes their phone without asking you. Use this only if you know they changed phone.', 'Free phone'],
       remove: [`Remove access for ${r.full_name}?`, 'They are signed out immediately and cannot open the app.', 'Remove'],
@@ -691,6 +763,23 @@ async function viewUser(id) {
   };
 }
 
+function editUser(r, done) {
+  const m = $('#modal');
+  m.innerHTML = `<div class="sheet"><h3>Edit details</h3><form class="f" id="euf" style="padding:0">
+    <div class="fld"><label for="eu-n">Full name</label><input id="eu-n" value="${esc(r.full_name)}"></div>
+    <div class="two"><div class="fld"><label for="eu-u">Username</label><input id="eu-u" autocapitalize="none" value="${esc(r.login_name || '')}"></div>
+      <div class="fld"><label for="eu-s">SAP ID</label><input id="eu-s" value="${esc(r.sap_id || '')}"></div></div>
+    <div class="two"><div class="fld"><label for="eu-r">Role / company</label><input id="eu-r" value="${esc(r.company_role || '')}"></div>
+      <div class="fld"><label for="eu-e">E-mail</label><input id="eu-e" type="email" value="${esc(r.office_email || '')}"></div></div>
+    <p class="hint" style="margin:0">They sign in with the username (or the SAP ID). Before their PIN is set, the first password is the SAP ID.</p>
+    <div class="two"><button type="button" class="btn ghost" id="eu-x">Cancel</button><button type="submit" class="btn pri">Save</button></div></form></div>`;
+  m.classList.remove('hidden'); m.onclick = e => { if (e.target === m) m.classList.add('hidden'); };
+  $('#eu-x').onclick = () => m.classList.add('hidden');
+  $('#euf').onsubmit = async e => { e.preventDefault();
+    try { await rpc('hsm_edit_user', { p_id: r.id, p_full_name: $('#eu-n').value, p_username: $('#eu-u').value, p_sap_id: $('#eu-s').value, p_role: $('#eu-r').value, p_email: $('#eu-e').value });
+      m.classList.add('hidden'); toast('Details saved'); done(); } catch (err) { netErr(err); } };
+}
+
 /* ================= SHIFT SCHEDULE ================= */
 async function viewSchedule() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -702,7 +791,7 @@ async function viewSchedule() {
   try {
     const [daysR, dayR] = await Promise.all([
       api(`shift_roster?select=day&day=gte.${ymd(m)}&day=lte.${ymd(new Date(y, mo + 1, 0))}`),
-      api(`shift_roster?select=name,shift,area,ranking&day=eq.${ymd(S.calSel)}&order=ranking,name`)]);
+      api(`shift_roster?select=name,shift,area,ranking,sap_id,edited_by&day=eq.${ymd(S.calSel)}&order=ranking,name`)]);
     daysR.forEach(r => marked.add(r.day)); rows = dayR;
   } catch (e) { netErr(e); }
   const lead = (new Date(y, mo, 1).getDay() + 6) % 7, nDays = new Date(y, mo + 1, 0).getDate();
@@ -712,10 +801,13 @@ async function viewSchedule() {
     const cls = [dt.getDay() === 0 ? 'sun' : '', +dt === +today ? 'today' : '', +dt === +S.calSel && +dt !== +today ? 'sel' : '', marked.has(k) ? 'has' : ''].join(' ');
     cells += `<button class="${cls}" data-day="${k}" aria-label="${d} ${MONTHS[mo]}">${d}</button>`;
   }
+  const editable = isModAdmin('schedule') && +S.calSel >= +today, edit = editable && S.schedEdit;
   const by = s => rows.filter(r => r.shift === s);
-  const nm = r => `<div class="nm ${sameName(r.name, ME.name) ? 'me' : ''}">${esc(r.name)}${r.area ? ` <span class="hint">· ${esc(r.area)}</span>` : ''}</div>`;
-  const grp = (b, cls, t, list) => list.length ? `<div class="grp"><span class="badge ${cls}">${b}</span><div><div class="gt">${t}</div>${list.map(nm).join('')}</div></div>` : '';
-  const areaMap = {}; rows.filter(r => r.area && !['L','WO'].includes(r.shift)).forEach(r => (areaMap[r.area] = areaMap[r.area] || []).push(r));
+  const nm = r => `<div class="nm ${sameName(r.name, ME.name) ? 'me' : ''}${edit ? ' ed' : ''}" ${edit ? `data-p="${esc(r.name)}" role="button" tabindex="0"` : ''}>${esc(r.name)}${r.area ? ` <span class="hint">· ${esc(r.area)}</span>` : ''}${r.edited_by ? ` <span class="edmark" title="Changed in the app by ${esc(r.edited_by)}">${ic('edit', 13)}</span>` : ''}${edit ? `<span class="chev">${ic('chev', 18)}</span>` : ''}</div>`;
+  // General shift people are shown area-wise below, so the shift list shows A, B, C, Leave and Weekly Off
+  const grp = (b, cls, t, list) => list.length ? `<div class="grp g-${cls}"><span class="badge ${cls}">${b}</span><div style="flex:1;min-width:0"><div class="gt">${t}</div>${list.map(nm).join('')}</div></div>` : '';
+  const general = by('G'), areaMap = {};
+  general.forEach(r => (areaMap[r.area || 'Other'] = areaMap[r.area || 'Other'] || []).push(r));
   const isToday = +S.calSel === +today;
   $('#sc').innerHTML = `<div class="pad">
     <section class="card" style="padding:8px 12px 14px;margin-bottom:14px">
@@ -723,20 +815,58 @@ async function viewSchedule() {
       <div class="wk"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
       <div class="days">${cells}</div></section>
     <section class="card" style="overflow:hidden;margin-bottom:14px">
-      <div class="dayhead"><div class="k">${isToday ? 'Shift Schedule Today' : 'Shift Schedule'}</div><div class="v">${fmtDay(S.calSel)}</div></div>
-      ${rows.length ? grp('A','','A Shift · 07–15',by('A')) + grp('B','','B Shift · 15–23',by('B')) + grp('C','','C Shift · 23–07',by('C')) + grp('G','','General Shift',by('G')) + grp('L','l','Leave',by('L')) + grp('WO','wo','Weekly Off',by('WO'))
+      <div class="dayhead" style="display:flex;align-items:flex-start;gap:10px"><div style="flex:1"><div class="k">${isToday ? 'Shift Schedule Today' : 'Shift Schedule'}</div><div class="v">${fmtDay(S.calSel)}</div></div>
+        ${editable ? `<button class="btn sm ${edit ? 'pri' : ''}" id="sedit">${ic(edit ? 'ok' : 'edit', 18)} ${edit ? 'Done' : 'Edit'}</button>` : ''}</div>
+      ${edit ? `<div class="edbar">${ic('edit', 18)}<span>Tap a name to change the shift, or add a person.</span><button class="btn sm" id="sadd">${ic('plus', 18)} Add</button></div>` : ''}
+      ${rows.length ? grp('A','a','A Shift · 07–15',by('A')) + grp('B','b','B Shift · 15–23',by('B')) + grp('C','c','C Shift · 23–07',by('C')) + grp('L','l','Leave',by('L')) + grp('WO','wo','Weekly Off',by('WO'))
+          + (!by('A').length && !by('B').length && !by('C').length && !by('L').length && !by('WO').length ? '<div class="empty" style="padding:18px 20px">Only general shift on this date – see Area-wise below.</div>' : '')
         : '<div class="empty" style="padding:26px 20px">No schedule uploaded for this date.</div>'}
     </section>
-    ${Object.keys(areaMap).length ? `<section class="card" style="overflow:hidden"><div class="boxh"><h2>Area-wise</h2><span class="hint">G = General</span></div>
-      ${Object.keys(areaMap).sort().map(a => `<div class="arow"><span class="an">${esc(a)}</span><div>${areaMap[a].map(p => `<div class="pp"><span>${esc(p.name)}</span><span class="tag ${p.shift === 'G' ? '' : 'red'}">${esc(p.shift)}</span></div>`).join('')}</div></div>`).join('')}
+    ${general.length ? `<section class="card" style="overflow:hidden"><div class="boxh g-area"><h2>Area-wise · General Shift</h2></div>
+      ${Object.keys(areaMap).sort().map(a => `<div class="arow"><span class="an">${esc(a)}</span><div>${areaMap[a].map(p => `<div class="pp${edit ? ' ed' : ''}${sameName(p.name, ME.name) ? ' me' : ''}" ${edit ? `data-p="${esc(p.name)}" role="button" tabindex="0"` : ''}><span>${esc(p.name)}</span>${p.edited_by ? `<span class="edmark">${ic('edit', 13)}</span>` : ''}</div>`).join('')}</div></div>`).join('')}
     </section>` : ''}</div>`;
   $('#pm').onclick = () => { S.calMonth = new Date(y, mo - 1, 1); viewSchedule(); };
   $('#nm').onclick = () => { S.calMonth = new Date(y, mo + 1, 1); viewSchedule(); };
   $$('#sc [data-day]').forEach(b => b.onclick = () => { S.calSel = fromYmd(b.dataset.day); viewSchedule(); });
+  if ($('#sedit')) $('#sedit').onclick = () => { S.schedEdit = !S.schedEdit; viewSchedule(); };
+  if (!edit) return;
+  const day = ymd(S.calSel);
+  const setShift = async (p, sh) => {
+    try { await rpc('hsm_set_shift', { p_day: day, p_name: p.name, p_sap_id: p.sap_id || null, p_shift: sh, p_area: p.area || null });
+      toast(sh ? `${p.name}: ${SHIFT_NAME[sh]}` : `${p.name} removed from ${fmtShort(S.calSel)}`); viewSchedule(); }
+    catch (e) { netErr(e); }
+  };
+  const pick = (p, isNew) => {
+    const md = $('#modal');
+    md.innerHTML = `<div class="sheet"><h3>${esc(p.name)}</h3><p>${fmtDay(S.calSel)}${p.shift ? ` · now <b>${esc(SHIFT_NAME[p.shift])}</b>` : ''}</p>
+      <div class="shpick">${['A','B','C','G','L','WO'].map(k => `<button class="sp-${k.toLowerCase()} ${p.shift === k ? 'on' : ''}" data-sh="${k}"><b>${k}</b><span>${SHIFT_NAME[k]}</span></button>`).join('')}</div>
+      ${isNew ? '' : `<button class="btn ghost block" data-sh="__x" style="color:var(--red)">${ic('x')} Remove from this date</button>`}
+      <button class="btn ghost block" data-sh="__c">Cancel</button></div>`;
+    md.classList.remove('hidden');
+    md.onclick = e => { const b = e.target.closest('[data-sh]'); if (!b && e.target !== md) return; md.classList.add('hidden'); md.onclick = null;
+      if (!b || b.dataset.sh === '__c') return; setShift(p, b.dataset.sh === '__x' ? null : b.dataset.sh); };
+  };
+  $('#sc').addEventListener('click', e => { const t = e.target.closest('[data-p]'); if (!t) return; const p = rows.find(r => r.name === t.dataset.p); if (p) pick(p); });
+  $('#sadd').onclick = async () => {
+    let people = []; try { people = await team(); } catch (e) {}
+    const md = $('#modal');
+    md.innerHTML = `<div class="sheet" style="max-height:80vh;display:flex;flex-direction:column"><h3>Add a person to ${fmtShort(S.calSel)}</h3>
+      <div class="search" style="margin:4px 0 8px">${ic('search', 20)}<input id="aq" type="search" placeholder="Search name" aria-label="Search name"></div>
+      <div id="al2" style="overflow:auto;flex:1"></div><button class="btn ghost block" id="acx">Cancel</button></div>`;
+    md.classList.remove('hidden'); md.onclick = null;
+    const draw = q => { const f = people.filter(p => !q || p.name.toLowerCase().includes(q)).slice(0, 60);
+      $('#al2').innerHTML = f.map(p => `<button class="lrow" data-n="${esc(p.name)}"><span class="tx"><span class="a" style="font-size:16px">${esc(p.name)}</span><span class="b">${esc(p.area || '')}${p.sap_id ? ' · ' + esc(p.sap_id) : ''}</span></span></button>`).join('') || '<div class="empty">No match</div>'; };
+    draw('');
+    $('#aq').oninput = e => draw(e.target.value.trim().toLowerCase());
+    $('#acx').onclick = () => md.classList.add('hidden');
+    $('#al2').onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; const p = people.find(x => x.name === b.dataset.n);
+      md.classList.add('hidden'); const cur = rows.find(r => (p.sap_id && r.sap_id === p.sap_id) || sameName(r.name, p.name));
+      pick(cur || { name: p.name, sap_id: p.sap_id, area: p.area }, !cur); };
+  };
 }
 
 /* ================= CHECK LISTS ================= */
-const draftKey = code => `hsm_cl_${code}`;
+const draftKey = code => `hsm_cl2_${code}`;
 async function viewChecklist() {
   $('#app').innerHTML = `${bar('Check List')}<main class="scroll" id="cl"><div class="spin">Loading…</div></main>${nav('checklist')}`;
   const today = ymd(new Date()); S.reportDate = S.reportDate || today;
@@ -745,21 +875,29 @@ async function viewChecklist() {
     let done = []; try { done = await api(`checklist_entries?select=template_code,created_at,filled_at,inspected_name,shift&check_date=eq.${today}&order=created_at.desc`); } catch (e) { if (!isNet(e)) throw e; }
     const waiting = outbox();
     const last = {}; [...obxEntries(today), ...done].forEach(d => { (last[d.template_code] = last[d.template_code] || []).push(d); });
-    const nDone = Object.keys(last).length;
-    $('#cl').innerHTML = `<div class="pad">
+    const areas = CL_AREAS.filter(([a]) => tpl.some(t => t.area === a));
+    if (!areas.length) { $('#cl').innerHTML = `<div class="empty"><b>No check lists for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access to your area.</div>`; return; }
+    if (!areas.some(([a]) => a === S.clArea)) S.clArea = areas[0][0];
+    const list = tpl.filter(t => t.area === S.clArea);
+    const nDone = tpl.filter(t => last[t.code]).length;
+    $('#cl').innerHTML = `<div class="tabs cltabs" id="clt" role="tablist">${areas.map(([a, l]) => { const n = tpl.filter(t => t.area === a), d = n.filter(t => last[t.code]).length;
+        return `<button role="tab" data-a="${a}" class="${a === S.clArea ? 'on' : ''}" aria-selected="${a === S.clArea}">${esc(l)}<span class="cnt ${d === n.length ? 'all' : ''}">${d}/${n.length}</span></button>`; }).join('')}</div>
+      <div class="pad">
       ${waiting.length ? `<div class="card obx"><span class="ic">${ic('clock', 24)}</span><div style="flex:1"><div class="t">${waiting.length} check list${waiting.length > 1 ? 's' : ''} saved on this phone</div>
         <div class="s">${waiting.some(x => x.err) ? 'Upload problem: ' + esc(waiting.find(x => x.err).err) : 'Will upload by itself when the network is back'}</div></div><button class="btn" id="obxgo">Upload now</button></div>` : ''}
-      <div class="card report"><div class="row"><span class="ic">${ic('xls', 26)}</span><div style="flex:1"><div class="t">Daily report (Excel)</div><div class="s">All check lists of the day in your inspection-sheet format</div></div></div>
-        <div class="row"><input type="date" id="rdate" value="${S.reportDate}" max="${today}" aria-label="Report date"></div>
-        <div class="two"><button class="btn" id="rsave">${ic('download')} Save</button><button class="btn pri" id="rshare">${ic('share')} Share / Mail</button></div></div>
-      <div class="label">Today · ${fmtDay(new Date())} · ${nDone}/${tpl.length} done</div>
-      ${tpl.map(t => {
+      <div class="label">${esc(clAreaName(S.clArea))} · ${fmtDay(new Date())}</div>
+      ${list.map(t => {
         const d = last[t.code], dr = store.get(draftKey(t.code));
         const cls = d ? (d.every(x => x.local) ? 'draft' : 'done') : dr ? 'draft' : '';
         const b = d ? `${d.some(x => x.local) ? 'Saved on phone' : 'Done'} · ${d.map(x => `${esc(x.shift || '')} ${new Date(x.filled_at || x.created_at).toTimeString().slice(0, 5)}`).join(', ')} · ${esc(firstName(d[0].inspected_name))}`
-          : dr ? 'Draft saved – not submitted' : `${itemCount(t)} items · not done today`;
-        return `<button class="card clcard ${cls}" data-go="cl/${esc(t.code)}"><span class="ic">${ic(d ? 'ok' : dr ? 'clock' : 'check', 24)}</span><span class="tx"><span class="a">${esc(t.name)}</span><span class="b">${b}</span></span><span class="tag">${esc(t.area || '')}</span></button>`;
-      }).join('')}</div>`;
+          : dr ? 'Draft saved – not submitted' : `${itemCount(t)} readings · not done today`;
+        return `<button class="card clcard ${cls}" data-go="cl/${esc(t.code)}"><span class="ic">${ic(d ? 'ok' : dr ? 'clock' : 'check', 24)}</span><span class="tx"><span class="a">${esc(t.name)}</span><span class="b">${b}</span></span><span class="chev">${ic('chev', 20)}</span></button>`;
+      }).join('')}
+      <div class="card report" style="margin-top:18px"><div class="row"><span class="ic">${ic('xls', 26)}</span><div style="flex:1"><div class="t">Daily report (Excel)</div><div class="s">All check lists of the day${tpl.length < 11 ? ' (your areas)' : ''} in the inspection-sheet format · ${nDone} done today</div></div></div>
+        <div class="row"><input type="date" id="rdate" value="${S.reportDate}" max="${today}" aria-label="Report date"></div>
+        <div class="two"><button class="btn" id="rsave">${ic('download')} Save</button><button class="btn pri" id="rshare">${ic('share')} Share / Mail</button></div></div></div>`;
+    const on = $('#clt .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+    $('#clt').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; S.clArea = b.dataset.a; viewChecklist(); };
     $('#rdate').onchange = e => { S.reportDate = e.target.value || today; };
     $('#rsave').onclick = () => dailyReport(S.reportDate, false);
     $('#rshare').onclick = () => dailyReport(S.reportDate, true);
@@ -773,7 +911,7 @@ async function dailyReport(day, share) {
     let rows = [], off = false;
     try { rows = await api(`checklist_entries?select=*&check_date=eq.${day}&order=created_at`); } catch (e) { if (!isNet(e)) throw e; off = true; }
     const have = new Set(rows.map(r => r.client_id).filter(Boolean));
-    rows = [...rows, ...obxEntries(day).filter(r => !have.has(r.client_id))];
+    rows = [...rows, ...obxEntries(day).filter(r => !have.has(r.client_id))].filter(r => tpl.some(t => t.code === r.template_code));
     if (!rows.length) { toast(off ? 'No network, and no check lists for this day on this phone' : `No check lists submitted on ${fmtShort(fromYmd(day))}`); return; }
     if (off || OFFLINE) toast('No network: report made from data on this phone', 4000);
     const buf = await xl().dailyWorkbook(tpl, rows, day);
@@ -782,35 +920,40 @@ async function dailyReport(day, share) {
 }
 async function recordReport(tpl, entry, share) {
   try { toast('Preparing Excel…', 6000); const buf = await xl().recordWorkbook(tpl, entry);
-    deliver(buf, `${tpl.name} ${fmtShort(fromYmd(entry.check_date))} Shift ${entry.shift || ''}.xlsx`, share);
+    deliver(buf, `${tpl.name.replace(/[\\/:*?"<>|]/g, '-')} ${fmtShort(fromYmd(entry.check_date))} Shift ${entry.shift || ''}.xlsx`, share);
   } catch (e) { netErr(e); }
 }
+const countFlags = (t, V) => { let nok = 0, hot = 0;
+  t.sections.forEach((s, si) => s.items.forEach((it, ii) => it.cells.forEach((c, fi) => { const v = V[`${si}.${ii}.${fi}`]; if (!c || !v) return;
+    if (v === 'NOT OK') nok++; if (isHot(ftype(s, it, fi), v)) hot++; }))); return { nok, hot }; };
 
 async function viewChecklistFill(code) {
   $('#app').innerHTML = `${bar('Check List', 'checklist')}<main class="scroll"><div class="spin">Loading…</div></main>`;
   let t; try { t = (await templates()).find(x => x.code === code); } catch (e) { netErr(e); }
-  if (!t) { $('#app').innerHTML = `${bar('Check List', 'checklist')}<div class="empty"><b>Check list not found</b></div>`; return; }
-  const total = t.sections.reduce((n, s) => n + s.items.reduce((m, it) => m + fieldsOf(s, it).length, 0), 0);
+  if (!t) { $('#app').innerHTML = `${bar('Check List', 'checklist')}<div class="empty"><b>Check list not found</b>You may not have access to this area.</div>`; return; }
+  const total = itemCount(t);
   const dr = store.get(draftKey(code)) || { v: {}, shift: curShift(), remarks: '' }; const V = dr.v;
-  const okBtns = k => `<span class="okg" data-k="${k}"><button type="button" data-ok="OK" class="${V[k] === 'OK' ? 'on' : ''}">OK</button><button type="button" data-ok="NOT OK" class="nok ${V[k] === 'NOT OK' ? 'on' : ''}">NOT OK</button></span>`;
-  const input = (f, k) => f.t === 'ok' ? okBtns(k)
-    : `<input data-k="${k}" ${f.t === 'n' ? 'inputmode="decimal"' : ''} value="${esc(V[k] || '')}" aria-label="${esc(f.l || 'Value')}" placeholder="${f.t === 'n' && !/current|pos/i.test(f.l) ? '°C' : ''}">`;
+  const btns = (k, opts) => `<span class="okg" data-k="${k}">${opts.map(o => `<button type="button" data-ok="${o}" class="${o === 'NOT OK' || o === 'OUT' ? 'nok ' : ''}${V[k] === o ? 'on' : ''}">${o}</button>`).join('')}</span>`;
+  const input = (ty, k, label) => ty === 'ok' ? btns(k, ['OK', 'NOT OK']) : ty === 'io' ? btns(k, ['IN', 'OUT'])
+    : `<input data-k="${k}" data-t="${ty}" class="${isHot(ty, V[k]) ? 'hot' : ''}" ${ty === 't' || ty === 'n' ? 'inputmode="decimal"' : ''} value="${esc(V[k] || '')}" aria-label="${esc(label || 'Value')}" placeholder="${ty === 't' ? '°C' : ''}">`;
   $('#app').innerHTML = `${bar(t.name, 'checklist', `<button class="ib" aria-label="Past records" data-go="clh/${esc(code)}">${ic('clock', 26)}</button>`)}
-  <div class="clhead"><span>${fmtDay(new Date())}</span><span class="shiftsel" id="shs">${['A','B','C','G'].map(s => `<button type="button" data-s="${s}" class="${dr.shift === s ? 'on' : ''}" aria-pressed="${dr.shift === s}">${s}</button>`).join('')}</span></div>
+  <div class="clhead"><span>${fmtDay(new Date())}</span><span class="shiftsel" id="shs">${['A','B','C','G'].map(x => `<button type="button" data-s="${x}" class="${dr.shift === x ? 'on' : ''}" aria-pressed="${dr.shift === x}">${x}</button>`).join('')}</span></div>
   <div class="prog"><div id="pbar"></div></div>
   <main class="scroll" id="clf"><div style="padding:6px 12px 24px">
-    ${t.sections.map((s, si) => `<h2 class="clsec">${esc(s.title)}${s.fields ? `<span>${s.fields.map(f => esc(f.l)).join(' · ')}</span>` : ''}</h2>
-      ${s.items.map((it, ii) => { const fs = fieldsOf(s, it);
-        return `<div class="clitem"><div class="cln">${esc(it.name)}</div><div class="clf ${fs.length === 1 ? 'one' : ''}">${fs.map((f, fi) => `<label>${f.l ? `<span>${esc(f.l)}</span>` : ''}${input(f, `${si}.${ii}.${fi}`)}</label>`).join('')}</div></div>`; }).join('')}`).join('')}
+    ${t.sections.map((s, si) => `<h2 class="clsec">${esc(s.title)}</h2>
+      ${s.items.map((it, ii) => { const fs = it.cells.map((c, fi) => c ? fi : -1).filter(fi => fi >= 0);
+        return `<div class="clitem"><div class="cln">${esc(it.name)}</div><div class="clf ${fs.length === 1 ? 'one' : ''}">${fs.map(fi => { const ty = ftype(s, it, fi), l = (s.fields[fi] || {}).l || '';
+          return `<label>${l ? `<span>${esc(l)}</span>` : ''}${input(ty, `${si}.${ii}.${fi}`, l || it.name)}</label>`; }).join('')}</div></div>`; }).join('')}`).join('')}
     <div class="fld" style="margin-top:18px"><label for="clrem">Remarks</label><textarea id="clrem" rows="3" placeholder="Abnormality found, action taken…">${esc(dr.remarks || '')}</textarea></div>
-    <p class="hint" style="margin-top:12px">Inspected by ${esc(ME.name)}. Readings are kept on this phone until you submit.</p>
+    <p class="hint" style="margin-top:12px">Inspected by ${esc(ME.name)}. Temperatures above 100 are shown in red. Readings stay on this phone until you submit.</p>
   </div></main>
   <div class="actions"><button class="btn ghost" type="button" id="clclear">Clear</button><button class="btn pri" type="button" id="clsub">Submit</button></div>`;
   const upd = () => { const n = Object.values(V).filter(x => x).length; $('#pbar').style.width = (100 * n / total) + '%'; $('#clsub').innerHTML = `Submit <span style="font-size:15px;font-weight:600;opacity:.85">${n}/${total}</span>`; };
   const persist = () => { dr.remarks = $('#clrem').value; store.set(draftKey(code), dr); upd(); };
   upd();
   const f = $('#clf');
-  f.addEventListener('input', e => { const k = e.target.dataset.k; if (k) V[k] = e.target.value.trim(); persist(); });
+  f.addEventListener('input', e => { const k = e.target.dataset.k; if (!k) return; V[k] = e.target.value.trim();
+    e.target.classList.toggle('hot', isHot(e.target.dataset.t, V[k])); persist(); });
   f.addEventListener('click', e => { const b = e.target.closest('[data-ok]'); if (!b) return; const g = b.parentElement, k = g.dataset.k;
     V[k] = V[k] === b.dataset.ok ? '' : b.dataset.ok; $$('button', g).forEach(x => x.classList.toggle('on', V[k] === x.dataset.ok)); persist(); });
   $('#shs').onclick = e => { const b = e.target.closest('[data-s]'); if (!b) return; dr.shift = b.dataset.s;
@@ -826,16 +969,15 @@ async function viewChecklistFill(code) {
       const now = new Date();
       const body = { client_id: uid(), template_code: code, check_date: ymd(now), shift: dr.shift, filled_at: now.toISOString(),
         inspected_by: ME.username, inspected_name: ME.name, vals: clean, remarks: $('#clrem').value.trim() || null };
-      // 1) safe on the phone first  2) upload now if there is network, otherwise later by itself
       store.set(OBX, [...outbox(), { body, queued_at: now.toISOString() }]);
       store.del(draftKey(code));
       await flushOutbox();
       const pending = outbox().some(x => x.body.client_id === body.client_id);
       const row = { ...body, created_at: body.filled_at };
-      const nok = Object.values(clean).filter(v => v === 'NOT OK').length;
+      const { nok, hot } = countFlags(t, clean);
       const m = $('#modal');
       m.innerHTML = `<div class="sheet"><div class="status" style="padding:0"><div class="ring" style="background:${pending ? 'var(--amber-50,#FFF4E5);color:var(--amber)' : 'var(--green-50);color:var(--green)'}">${ic(pending ? 'clock' : 'ok', 40)}</div>
-        <h2>${pending ? 'Saved on this phone' : 'Check list submitted'}</h2><p>${esc(t.name)} · Shift ${esc(dr.shift)} · ${Object.keys(clean).length} readings${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}</p>
+        <h2>${pending ? 'Saved on this phone' : 'Check list submitted'}</h2><p>${esc(t.name)} · Shift ${esc(dr.shift)} · ${Object.keys(clean).length} readings${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--red)">${hot} above 100 °C</b>` : ''}</p>
         ${pending ? '<p style="margin-top:8px">No network here. It will upload by itself when the network is back – no need to fill it again.</p>' : ''}</div>
         <button class="btn pri block" id="mshare">${ic('share')} Share Excel by mail</button>
         <div class="two"><button class="btn" id="msave">${ic('download')} Save Excel</button><button class="btn ghost" id="mdone">Done</button></div></div>`;
@@ -856,8 +998,8 @@ async function viewChecklistHistory(code) {
     rows = [...obxEntries().filter(r => r.template_code === code), ...rows];
     const t = tpl.find(x => x.code === code);
     $('#hh').innerHTML = `<div class="pad"><div class="label">${esc(t ? t.name : code)} · last ${rows.length}</div>` + (rows.length ? `<div class="list">${rows.map(r => {
-      const vals = Object.values(r.vals || {}); const nok = vals.filter(v => v === 'NOT OK').length;
-      return `<button class="lrow" data-go="cle/${r.id}"><span class="tx"><span class="a">${fmtDay(fromYmd(r.check_date))} · Shift ${esc(r.shift || '-')}</span><span class="b">${r.local ? '<b style="color:var(--amber)">Waiting to upload</b> · ' : ''}${esc(r.inspected_name || '')} · ${vals.length} readings${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}</span></span><span class="chev">${ic('chev', 22)}</span></button>`; }).join('')}</div>`
+      const vals = Object.values(r.vals || {}); const { nok, hot } = t ? countFlags(t, r.vals || {}) : { nok: 0, hot: 0 };
+      return `<button class="lrow" data-go="cle/${r.id}"><span class="tx"><span class="a">${fmtDay(fromYmd(r.check_date))} · Shift ${esc(r.shift || '-')}</span><span class="b">${r.local ? '<b style="color:var(--amber)">Waiting to upload</b> · ' : ''}${esc(r.inspected_name || '')} · ${vals.length} readings${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--red)">${hot} &gt;100 °C</b>` : ''}</span></span><span class="chev">${ic('chev', 22)}</span></button>`; }).join('')}</div>`
       : '<div class="empty"><b>No records yet</b>Submitted check lists appear here.</div>') + '</div>';
   } catch (e) { netErr(e); }
 }
@@ -869,13 +1011,15 @@ async function viewChecklistEntry(id) {
     const r = rows[0]; const t = r && tpl.find(x => x.code === r.template_code);
     if (!r || !t) { $('#ce').innerHTML = '<div class="empty"><b>Record not found</b></div>'; return; }
     const V = r.vals || {};
-    const cell = v => !v ? '<span style="color:var(--muted)">—</span>' : v === 'NOT OK' ? '<b style="color:var(--red)">NOT OK</b>' : v === 'OK' ? '<span style="color:var(--green);font-weight:700">OK</span>' : esc(v);
+    const cell = (v, ty) => !v ? '<span style="color:var(--muted)">—</span>' : v === 'NOT OK' || v === 'OUT' ? `<b style="color:var(--red)">${esc(v)}</b>` : v === 'OK' || v === 'IN' ? `<span style="color:var(--green);font-weight:700">${esc(v)}</span>`
+      : isHot(ty, v) ? `<b style="color:var(--red)">${esc(v)}</b>` : esc(v);
     $('#ce').innerHTML = `<div class="dayhead"><div class="k">${esc(t.name)}</div><div class="v">${fmtDay(fromYmd(r.check_date))} · Shift ${esc(r.shift || '-')}</div><div style="font-size:15px;margin-top:2px">${esc(r.inspected_name || '')} · ${fmtStamp(r.filled_at || r.created_at)}${r.local ? ' · waiting to upload' : ''}</div></div>
       <div style="padding:12px 16px 0" class="two"><button class="btn" id="esave">${ic('download')} Save Excel</button><button class="btn pri" id="eshare">${ic('share')} Share</button></div>
       <div style="padding:4px 12px 24px">${t.sections.map((s, si) => {
-        const rowsH = s.items.map((it, ii) => { const fs = fieldsOf(s, it); const any = fs.some((f, fi) => V[`${si}.${ii}.${fi}`]);
-          return `<tr${any ? '' : ' class="dim"'}><td>${esc(it.name)}</td>${fs.map((f, fi) => `<td class="v">${cell(V[`${si}.${ii}.${fi}`])}</td>`).join('')}</tr>`; }).join('');
-        return `<h2 class="clsec">${esc(s.title)}</h2><div class="card" style="overflow-x:auto"><table class="rt"><thead><tr><th>Equipment</th>${(s.fields || [{ l: 'Value' }]).map(f => `<th>${esc(f.l)}</th>`).join('')}</tr></thead><tbody>${rowsH}</tbody></table></div>`; }).join('')}
+        const one = s.fields.length === 1;
+        const rowsH = s.items.map((it, ii) => { const any = it.cells.some((c, fi) => c && V[`${si}.${ii}.${fi}`]);
+          return `<tr${any ? '' : ' class="dim"'}><td>${esc(it.name)}</td>${s.fields.map((f, fi) => `<td class="v">${it.cells[fi] ? cell(V[`${si}.${ii}.${fi}`], ftype(s, it, fi)) : '<span style="color:var(--muted)">·</span>'}</td>`).join('')}</tr>`; }).join('');
+        return `<h2 class="clsec">${esc(s.title)}</h2><div class="card" style="overflow-x:auto"><table class="rt"><thead><tr><th>Equipment</th>${s.fields.map(f => `<th>${esc(f.l || (one ? 'Value' : ''))}</th>`).join('')}</tr></thead><tbody>${rowsH}</tbody></table></div>`; }).join('')}
       ${r.remarks ? `<h2 class="clsec">Remarks</h2><div class="card" style="padding:14px;font-size:17px;line-height:1.4">${esc(r.remarks)}</div>` : ''}</div>`;
     $('#esave').onclick = () => recordReport(t, r, false);
     $('#eshare').onclick = () => recordReport(t, r, true);
@@ -883,12 +1027,36 @@ async function viewChecklistEntry(id) {
 }
 
 /* ================= SPARES ================= */
+// Drop-down that opens right under the box: shows every option on tap, filters while typing,
+// and (free = true) also takes a new value, which then appears in the list for everyone.
+const combo = (id, value, free, ph = '') => `<div class="combo" data-combo="${id}"><input id="${id}" value="${esc(value || '')}" ${free ? '' : 'readonly'} autocomplete="off" placeholder="${esc(ph)}" role="combobox" aria-expanded="false"><button type="button" class="cbtn" tabindex="-1" aria-label="Show list">${ic('chev', 18)}</button><div class="cbl hidden" role="listbox"></div></div>`;
+function wireCombo(id, options, free) {
+  const box = $(`[data-combo="${id}"]`), inp = $('input', box), list = $('.cbl', box);
+  let all = false;
+  const show = () => {
+    const opts = typeof options === 'function' ? options() : options, q = inp.value.trim().toLowerCase();
+    const f = !free || all || !q || opts.some(o => o.toLowerCase() === q) ? opts : opts.filter(o => o.toLowerCase().includes(q));
+    list.innerHTML = f.length ? f.map(o => `<button type="button" role="option" class="${o === inp.value ? 'on' : ''}" data-v="${esc(o)}">${esc(o)}</button>`).join('')
+      : `<div class="cbe">${free && q ? `“${esc(inp.value.trim())}” will be added as a new location` : 'Nothing to show'}</div>`;
+    list.classList.remove('hidden'); inp.setAttribute('aria-expanded', 'true');
+    setTimeout(() => box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+  };
+  const hide = () => { list.classList.add('hidden'); inp.setAttribute('aria-expanded', 'false'); all = false; };
+  inp.addEventListener('focus', () => { all = true; show(); });
+  inp.addEventListener('click', () => { all = true; show(); });
+  inp.addEventListener('input', () => { all = false; show(); });
+  $('.cbtn', box).addEventListener('click', () => { if (list.classList.contains('hidden')) { all = true; show(); inp.focus(); } else hide(); });
+  list.addEventListener('mousedown', e => e.preventDefault());
+  list.addEventListener('click', e => { const o = e.target.closest('[data-v]'); if (!o) return; inp.value = o.dataset.v; inp.dispatchEvent(new Event('change', { bubbles: true })); hide(); inp.blur(); });
+  inp.addEventListener('blur', () => setTimeout(hide, 150));
+}
 function viewSpares() {
-  $('#app').innerHTML = `${bar('Spares', null, `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button><button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
-  <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="sq" type="search" placeholder="Search item, model, make, location" value="${esc(S.spareQuery)}" aria-label="Search spares"></div></div>
+  $('#app').innerHTML = `${bar('Spares', 'home', `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button><button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
+  <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="sq" type="search" placeholder="Search item, model, make, location, cupboard" value="${esc(S.spareQuery)}" aria-label="Search spares"></div></div>
   <div class="tabs" role="tablist" id="tabs"><button data-a="__low" class="${S.spareLow ? 'on' : ''}" style="${S.spareLow ? 'background:var(--red);border-color:var(--red)' : ''}">Out of stock</button>${SPARE_AREAS.map(a => `<button role="tab" data-a="${esc(a)}" class="${!S.spareLow && a === S.spareArea ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>
   <main class="scroll" id="list" style="padding-bottom:90px"><div class="spin">Loading…</div></main>
-  <button class="fab" data-go="spare/new">${ic('plus', 24)} Add spare</button>${nav('spares')}`;
+  <button class="fab" data-go="spare/new" style="bottom:24px">${ic('plus', 24)} Add spare</button>`;
+  if (!SPARE_AREAS.includes(S.spareArea)) S.spareArea = SPARE_AREAS[0];
   const on = $('#tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   $('#tabs').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === '__low') S.spareLow = !S.spareLow; else { S.spareLow = false; S.spareArea = b.dataset.a; } viewSpares(); };
   $('#rbtn').onclick = loadSpares;
@@ -900,33 +1068,44 @@ function viewSpares() {
 async function loadSpares() {
   const list = $('#list'); if (!list) return;
   const q = S.spareQuery.replace(/[,()*"]/g, ' ').trim(); const e = encodeURIComponent(q);
-  let path = 'spares?select=id,area,material,model,make,description,qty,location,rack&order=material,id';
-  if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*)`;
+  let path = 'spares?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key&order=material,id';
+  if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*,cupboard.ilike.*${e}*,cupboard_key.ilike.*${e}*)`;
   if (S.spareLow) path += '&qty=lte.0'; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
+  const item = (r, showArea) => `<button class="item" data-go="spare/${r.id}">
+      <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
+      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span></span>
+      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty <= 2 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
   try {
     const rows = await api(path);
     if (!rows.length) { list.innerHTML = `<div class="empty"><b>${q ? 'No match found' : S.spareLow ? 'Nothing out of stock' : 'No spares in this category yet'}</b>${q ? 'Try another word.' : S.spareLow ? '' : 'Tap “Add spare” to add one.'}</div>`; return; }
-    list.innerHTML = `<div class="hint" style="padding:10px 16px 6px;font-weight:600">${rows.length} item${rows.length > 1 ? 's' : ''}${q ? ' · all categories' : ''}</div>` + rows.map(r => `<button class="item" data-go="spare/${r.id}">
-      <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
-      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${(q || S.spareLow) ? ` · ${esc(r.area)}` : ''}</span></span>
-      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty <= 2 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`).join('');
+    if (S.spareLow) {
+      // out of stock, area-wise: each area sees its own list
+      const by = {}; rows.forEach(r => (by[r.area] = by[r.area] || []).push(r));
+      const order = [...SPARE_AREAS.filter(a => by[a]), ...Object.keys(by).filter(a => !SPARE_AREAS.includes(a))];
+      list.innerHTML = `<div class="hint" style="padding:10px 16px 6px;font-weight:600">${rows.length} item${rows.length > 1 ? 's' : ''} out of stock in ${order.length} area${order.length > 1 ? 's' : ''}</div>`
+        + order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => item(r, false)).join('')).join('');
+      return;
+    }
+    list.innerHTML = `<div class="hint" style="padding:10px 16px 6px;font-weight:600">${rows.length} item${rows.length > 1 ? 's' : ''}${q ? ' · all categories' : ''}</div>` + rows.map(r => item(r, !!q)).join('');
   } catch (err) { list.innerHTML = '<div class="empty"><b>Could not load spares</b>Check network and tap refresh.</div>'; netErr(err); }
 }
+let LOCS = null;
 async function viewSpare(id) {
   const isNew = id === 'new';
   $('#app').innerHTML = `${bar(isNew ? 'Add Spare' : 'Update Spare', 'spares')}<main class="scroll" id="sd"><div class="spin">Loading…</div></main>`;
-  let s = { area: S.spareArea, item_code: '', material: '', model: '', description: '', material_type: 'Spare', make: '', qty: 0, location: '', rack: '' }, log = [];
+  let s = { area: S.spareArea, item_code: '', material: '', model: '', description: '', material_type: 'Spare', make: '', qty: 0, location: '', rack: '', cupboard: '', cupboard_key: '' }, log = [];
+  try { const l = await rpc('hsm_spare_locations'); if (Array.isArray(l)) LOCS = l; } catch (e) { if (!isNet(e)) netErr(e); }
   if (!isNew) {
     try { const [r, l] = await Promise.all([api(`spares?id=eq.${encodeURIComponent(id)}&select=*`), api(`spare_log?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=6`)]);
       if (!r.length) { $('#sd').innerHTML = '<div class="empty"><b>Spare not found</b></div>'; return; } s = r[0]; log = l;
     } catch (e) { netErr(e); $('#sd').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
   }
+  const locs = () => [...new Set([...(LOCS || []), 'Basement Cupboard', 'FM TPS L1 Cupboard', 'Shift cupboard 1'])].sort((x, y) => x.localeCompare(y));
   const now = new Date(); let chg = 0;
-  const opt = (list, v) => list.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
   $('#app').innerHTML = `${bar(isNew ? 'Add Spare' : 'Update Spare', 'spares')}
   ${isNew ? '' : `<div class="cur"><span class="k">Current stock</span><span class="v">${s.qty} Nos</span></div>`}
-  <main class="scroll"><form class="f" id="sf">
-    <div class="fld"><label for="f-area">Area</label><select id="f-area">${opt(SPARE_AREAS, s.area)}</select></div>
+  <main class="scroll"><form class="f" id="sf" autocomplete="off">
+    <div class="fld"><label for="f-area">Area</label>${combo('f-area', s.area, false)}</div>
     <div class="fld"><label for="f-mat">Item</label><input id="f-mat" value="${esc(s.material)}" required></div>
     <div class="fld"><label for="f-model">Type / Model</label><input id="f-model" value="${esc(s.model || '')}"></div>
     <div class="fld"><label for="f-desc">Item description</label><textarea id="f-desc" rows="2">${esc(s.description || '')}</textarea></div>
@@ -935,15 +1114,20 @@ async function viewSpare(id) {
     <div class="fld"><label for="f-qty">${isNew ? 'Opening quantity' : 'Update quantity'}</label>
       <div class="step"><button type="button" id="dec" aria-label="Decrease">${ic('minus', 28)}</button><input id="f-qty" inputmode="numeric" value="0"><button type="button" class="plus" id="inc" aria-label="Increase">${ic('plus', 28)}</button></div>
       <span class="hint" id="qhint">${isNew ? 'Stock you are adding now' : 'Minus = issued / used · Plus = received'}</span></div>
-    <div class="two"><div class="fld"><label for="f-loc">Location</label><input id="f-loc" value="${esc(s.location || '')}" list="locs"></div>
-      <div class="fld"><label for="f-rack">Rack No.</label><input id="f-rack" value="${esc(s.rack || '')}"></div></div>
-    <datalist id="locs"><option>Basement Cupboard</option><option>FM TPS L1 Cupboard</option><option>Shift cupboard 1</option></datalist>
-    <div class="fld"><label for="f-type">Material type</label><select id="f-type">${opt(['Spare','Consumable','Tool'], s.material_type || 'Spare')}</select></div>
+    <div class="fld"><label for="f-loc">Location</label>${combo('f-loc', s.location, true, 'Tap to choose or type a new one')}</div>
+    <div class="two"><div class="fld"><label for="f-rack">Rack No.</label><input id="f-rack" value="${esc(s.rack || '')}"></div>
+      <div class="fld"><label for="f-type">Material type</label>${combo('f-type', s.material_type || 'Spare', false)}</div></div>
+    <div class="two"><div class="fld"><label for="f-cup">Cupboard No.</label><input id="f-cup" value="${esc(s.cupboard || '')}"></div>
+      <div class="fld"><label for="f-key">Cupboard Key No.</label><input id="f-key" value="${esc(s.cupboard_key || '')}"></div></div>
     <div class="fld"><label for="f-rem">Remark (used for)</label><textarea id="f-rem" rows="2" placeholder="e.g. Replaced faulty module in F1 panel"></textarea></div>
     <div class="two"><div class="fld"><label>Updated by</label><input readonly value="${esc(ME.name)}"></div><div class="fld"><label>Date · time</label><input readonly value="${fmtShort(now)} ${pad2(now.getHours())}:${pad2(now.getMinutes())}"></div></div>
     ${log.length ? `<div><div class="label" style="margin-top:6px">Recent updates</div><div class="list">${log.map(h => `<div class="lrow"><span class="tag ${h.change < 0 ? 'red' : h.change > 0 ? 'green' : ''}">${h.change > 0 ? '+' : ''}${h.change}</span><span class="tx"><span class="a" style="font-size:15.5px">${esc(h.remark || (h.change ? 'Stock updated' : 'Details edited'))}</span><span class="b">→ ${h.qty_after} Nos · ${esc(h.updated_by || '')} · ${fmtStamp(h.created_at)}</span></span></div>`).join('')}</div></div>` : ''}
+    <div style="height:40px"></div>
   </form></main>
   <div class="actions"><button class="btn ghost" type="button" id="cancel">Cancel</button><button class="btn pri" type="button" id="save">Save</button></div>`;
+  wireCombo('f-area', SPARE_AREAS.includes(s.area) ? SPARE_AREAS : [...SPARE_AREAS, s.area], false);
+  wireCombo('f-loc', locs, true);
+  wireCombo('f-type', ['Spare', 'Consumable', 'Tool'], false);
   const qi = $('#f-qty');
   const setQ = v => { chg = isNew ? Math.max(0, v) : Math.max(-s.qty, v); qi.value = (!isNew && chg > 0 ? '+' : '') + chg; if (!isNew) $('#qhint').textContent = chg ? `New stock will be ${s.qty + chg} Nos` : 'Minus = issued / used · Plus = received'; };
   $('#dec').onclick = () => setQ(chg - 1); $('#inc').onclick = () => setQ(chg + 1);
@@ -952,15 +1136,17 @@ async function viewSpare(id) {
   $('#save').onclick = async () => {
     const v = id => $(id).value.trim() || null;
     const f = { area: $('#f-area').value, material: v('#f-mat'), model: v('#f-model'), description: v('#f-desc'), make: v('#f-make'), item_code: v('#f-code'),
-      location: v('#f-loc'), rack: v('#f-rack'), material_type: $('#f-type').value };
+      location: v('#f-loc'), rack: v('#f-rack'), material_type: $('#f-type').value, cupboard: v('#f-cup'), cupboard_key: v('#f-key') };
     if (!f.material) { toast('Enter the item name'); $('#f-mat').focus(); return; }
     const remark = v('#f-rem'); const by = `${ME.name} (${ME.username})`;
     const btn = $('#save'); btn.disabled = true; btn.textContent = 'Saving…';
     try {
       let sid = s.id;
       if (isNew) { const [row] = await api('spares', { method: 'POST', body: { ...f, qty: 0, updated_by: by } }); sid = row.id; }
-      await rpc('adjust_spare', { p_id: sid, p_change: chg, p_location: f.location, p_remark: remark || (isNew ? 'New spare added' : null), p_by: by,
-        p_area: f.area, p_item_code: f.item_code, p_material: f.material, p_material_type: f.material_type, p_make: f.make, p_model: f.model, p_description: f.description, p_rack: f.rack });
+      await rpc('adjust_spare2', { p_id: sid, p_change: chg, p_location: f.location, p_remark: remark || (isNew ? 'New spare added' : null), p_by: by,
+        p_area: f.area, p_item_code: f.item_code, p_material: f.material, p_material_type: f.material_type, p_make: f.make, p_model: f.model, p_description: f.description, p_rack: f.rack,
+        p_cupboard: f.cupboard, p_cupboard_key: f.cupboard_key });
+      if (f.location && LOCS && !LOCS.includes(f.location)) LOCS.push(f.location);
       S.spareArea = f.area; S.spareLow = false; toast(isNew ? 'Spare added' : 'Saved');
       history.length > 1 ? history.back() : go('spares');
     } catch (e) { netErr(e); btn.disabled = false; btn.textContent = 'Save'; }
@@ -1059,15 +1245,17 @@ async function sopDocs() {
 
 /* ================= SOP's OF MILL PROCESS ================= */
 async function viewMillProcessSops() {
-  const admin = !!ME.is_admin;
+  const admin = isModAdmin('mill');
+  const areas = MILL_AREAS.filter(([f]) => canArea('mill', f));
   $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home')}<main class="scroll" id="ml" style="${admin ? 'padding-bottom:90px' : ''}"><div class="spin">Loading…</div></main>
     ${admin ? `<label class="fab" style="cursor:pointer;bottom:88px">${ic('upload', 22)} Add SOP<input type="file" id="mup" hidden accept=".docx,.pdf"></label>` : ''}${nav('mill')}`;
   const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
-  if (!MILL_AREAS.some(a => a[0] === S.millArea)) S.millArea = 'CB';
+  if (!areas.length) { $('#ml').innerHTML = `<div class="empty"><b>No areas for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access to your area's SOPs.</div>`; return; }
+  if (!areas.some(a => a[0] === S.millArea)) S.millArea = areas[0][0];
   const label = f => (MILL_AREAS.find(a => a[0] === f) || [f, f])[1];
   const draw = async () => {
     const btns = `<div class="label">Select area</div>
-      <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">${MILL_AREAS.map(([f, t]) => `<button class="card" data-area="${f}" style="padding:12px;text-align:center;font-weight:700;border:2px solid ${S.millArea === f ? 'var(--red, #C8102E)' : 'transparent'};border-radius:10px">${esc(t)}</button>`).join('')}</div>`;
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">${areas.map(([f, t]) => `<button class="card" data-area="${f}" style="padding:12px;text-align:center;font-weight:700;border:2px solid ${S.millArea === f ? 'var(--red, #C8102E)' : 'transparent'};border-radius:10px">${esc(t)}</button>`).join('')}</div>`;
     $('#ml').innerHTML = `<div class="pad">${btns}<div class="spin">Loading…</div></div>`;
     let items = [];
     try { items = (await storageList(`${S.millArea}/`, MILL_PROCESS_BUCKET)).filter(o => o.id && o.name && /\.(docx?|pdf)$/i.test(o.name)); }
@@ -1147,18 +1335,69 @@ function parseTeam(ws) {
     rows.push({ name, sap_id: /^n\/?a$/i.test(sap) ? '' : sap, plant: g('plant').toUpperCase(), company: g('company'), mobile: g('mobile').replace(/\.0$/, ''), email: g('email').replace(/,/g, '.') }); }
   return rows.length ? rows : null;
 }
+function parseContacts(ws) {
+  let hr = 0, cols = {};
+  for (let i = 1; i <= Math.min(ws.rowCount, 10) && !hr; i++) { const m = {};
+    ws.getRow(i).eachCell((c, ci) => { const t = xt(c.value).toLowerCase().replace(/[^a-z0-9#]/g, '');
+      if (t === 'detail' || t === 'details' || t === 'name') m.detail = ci; else if (/^ext/.test(t)) (m.ext1 ? (m.ext2 = m.ext2 || ci) : (m.ext1 = ci));
+      else if (/^mob/.test(t)) (m.mob1 ? (m.mob2 = m.mob2 || ci) : (m.mob1 = ci)); else if (/^sr/.test(t)) m.sr = ci; });
+    if (m.detail && (m.ext1 || m.mob1)) { hr = i; cols = m; } }
+  if (!hr) return null;
+  const rows = [], clean = v => { v = xt(v).replace(/\.0$/, ''); return v === '-' ? '' : v; };
+  for (let i = hr + 1; i <= ws.rowCount; i++) { const r = ws.getRow(i), g = k => cols[k] ? clean(r.getCell(cols[k]).value) : '';
+    const detail = g('detail'); if (!detail) continue;
+    rows.push({ sr: parseInt(g('sr'), 10) || rows.length + 1, detail, ext1: g('ext1'), ext2: g('ext2'), mob1: g('mob1'), mob2: g('mob2') }); }
+  return rows.length ? rows : null;
+}
+const TBT_NAMES = { SHIFT: 'Shift Group', INST: 'Instrument', RHF_RM: 'RM-RHF', CB_FM: 'CB-FM', COILER: 'Coiler', 'MD MOTOR': 'MD Motor', POWER: 'Power', CRANE: 'Crane' };
+function parseTbt(wb) {
+  const out = [];
+  wb.worksheets.forEach((ws, si) => {
+    const area = TBT_NAMES[ws.name.trim().toUpperCase()] || ws.name.trim(); let cur = null;
+    for (let i = 1; i <= ws.rowCount; i++) {
+      const row = ws.getRow(i), bc = row.getCell(2), c = xt(row.getCell(3).value);
+      const b = bc.isMerged && bc.master && bc.master.address !== bc.address ? null : xv(bc.value);   // Sr No. is merged down over the points
+      if (!c || (typeof b === 'string' && /^sr/i.test(b.trim()))) continue;
+      if (typeof b === 'number') { cur = { area, area_sort: si + 1, sr: b, topic: c.replace(/[:\-\s]+$/, ''), points: [] }; out.push(cur); }
+      else if (cur) String(xv(row.getCell(3).value) || '').replace(/\u00a0/g, ' ').split('\n').map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean).forEach(x => cur.points.push(x));
+    }
+  });
+  return out.length ? out : null;
+}
+const upCard = (icon, title, hint, input) => `<div class="card" style="padding:16px;margin-bottom:14px"><div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic(icon, 24)}</span><div><div style="font-size:18px;font-weight:700">${title}</div><div class="hint">${hint}</div></div></div>
+      <label class="btn block" style="margin-top:12px;cursor:pointer">${ic('upload')} Choose Excel file<input type="file" id="${input}" hidden accept=".xlsx"></label></div>`;
 function viewAdmin() {
-  if (!ME.is_admin) return go('home');
+  if (!ME.is_admin && !ADMIN_UPLOAD_MODS.some(isModAdmin)) return go('home');
   $('#app').innerHTML = `${bar('Admin uploads', 'profile')}<main class="scroll"><div class="pad">
-    <div class="card" style="padding:16px;margin-bottom:14px"><div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic('cal', 24)}</span><div><div style="font-size:18px;font-weight:700">Shift schedule</div><div class="hint">Monthly Excel (NAME, SAP ID, day columns 1–31, Area, Ranking). Replaces that month for everyone.</div></div></div>
-      <label class="btn block" style="margin-top:12px;cursor:pointer">${ic('upload')} Choose Excel file<input type="file" id="xr" hidden accept=".xlsx"></label></div>
-    <div class="card" style="padding:16px;margin-bottom:14px"><div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic('users', 24)}</span><div><div style="font-size:18px;font-weight:700">Team list</div><div class="hint">Team Members Excel (Full Name, SAP ID, Role, Mobile, Email, Plant). Replaces the whole Team list.</div></div></div>
-      <label class="btn block" style="margin-top:12px;cursor:pointer">${ic('upload')} Choose Excel file<input type="file" id="xtm" hidden accept=".xlsx"></label></div>
-    <div class="card" style="padding:16px"><div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic('doc', 24)}</span><div><div style="font-size:18px;font-weight:700">SOP's of Mill Process</div><div class="hint">Open an area and tap “Add SOP” (Word or PDF). Tap ✕ next to a SOP to delete it.</div></div></div>
-      <button class="btn block" data-go="mill" style="margin-top:12px">${ic('chev')} Open SOP's of Mill Process</button></div>
+    ${isModAdmin('schedule') ? upCard('cal', 'Shift schedule', 'Monthly Excel (NAME, SAP ID, day columns 1–31, Area, Ranking). Replaces that month for everyone. Single changes: Schedule → pick a date → Edit.', 'xr') : ''}
+    ${isModAdmin('team') ? upCard('users', 'Team list', 'Team Members Excel (Full Name, SAP ID, Role, Mobile, Email, Plant). Replaces the whole Team list.', 'xtm') : ''}
+    ${isModAdmin('contacts') ? upCard('phone', 'Contacts', 'AMNS Phone Numbers Excel (Detail, Ext#1, Ext#2, Mobile#1, Mobile#2). Replaces the whole list.', 'xct') : ''}
+    ${isModAdmin('tbt') ? upCard('talk', 'TBT – HSM Electrical', 'TBT Excel: one sheet per area, Sr No. + topic, then the points below it. Replaces all TBTs.', 'xtb') : ''}
+    ${isModAdmin('mill') ? `<div class="card" style="padding:16px"><div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic('doc', 24)}</span><div><div style="font-size:18px;font-weight:700">SOP's of Mill Process</div><div class="hint">Open an area and tap “Add SOP” (Word or PDF). Tap ✕ next to a SOP to delete it.</div></div></div>
+      <button class="btn block" data-go="mill" style="margin-top:12px">${ic('chev')} Open SOP's of Mill Process</button></div>` : ''}
     <div id="xprev"></div><div style="height:30px"></div></div></main>`;
   const prev = $('#xprev');
-  $('#xr').onchange = async e => {
+  const simpleUpload = (inputId, parse, label, fn, summary) => { const el = $('#' + inputId); if (!el) return;
+    el.onchange = async e => {
+      const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+      let wb; try { toast('Reading Excel…'); wb = await readBook(f); } catch (err) { return toast('Could not read this Excel file'); }
+      const rows = parse(wb); if (!rows) return toast(`No ${label} found in this file`);
+      prev.innerHTML = `<div class="card" style="padding:16px;margin-top:16px;border:2px solid var(--red)"><div class="label" style="margin:0 0 10px">Check before uploading</div>${summary(rows)}
+        <div class="two" style="margin-top:12px"><button class="btn ghost" id="xno">Cancel</button><button class="btn pri" id="xgo">${ic('upload')} Upload</button></div></div>`;
+      $('#xno').onclick = () => { prev.innerHTML = ''; };
+      $('#xgo').onclick = async () => {
+        if (!(await ask(`Replace ${label}?`, `${rows.length} rows. Everyone sees the new list at once.`, 'Upload'))) return;
+        $('#xgo').disabled = true;
+        try { const n = await rpc(fn, { p_rows: rows }); toast(`${label} uploaded (${n})`); prev.innerHTML = ''; }
+        catch (err) { netErr(err); $('#xgo').disabled = false; } };
+      prev.scrollIntoView({ behavior: 'smooth' });
+    }; };
+  simpleUpload('xct', wb => wb.worksheets.map(parseContacts).find(Boolean), 'the contacts', 'hsm_upload_contacts',
+    rows => `<div style="font-size:16px"><b>${rows.length} contacts</b></div><div class="hint" style="margin-top:4px">First: ${rows.slice(0, 3).map(r => esc(r.detail)).join(', ')}…</div>`);
+  simpleUpload('xtb', parseTbt, 'the TBTs', 'hsm_upload_tbt',
+    rows => { const by = {}; rows.forEach(r => by[r.area] = (by[r.area] || 0) + 1);
+      return `<div style="font-size:16px"><b>${rows.length} topics</b> · ${rows.reduce((n, r) => n + r.points.length, 0)} points</div><div class="hint" style="margin-top:4px">${Object.entries(by).map(([a, n]) => `${esc(a)} ${n}`).join(' · ')}</div>`; });
+  if ($('#xr')) $('#xr').onchange = async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     let wb; try { toast('Reading Excel…'); wb = await readBook(f); } catch (err) { return toast('Could not read this Excel file'); }
     const sheets = wb.worksheets.map(ws => ({ ws, r: parseRoster(ws) })).filter(x => x.r);
@@ -1193,7 +1432,7 @@ function viewAdmin() {
     };
     show(0);
   };
-  $('#xtm').onchange = async e => {
+  if ($('#xtm')) $('#xtm').onchange = async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     let wb; try { toast('Reading Excel…'); wb = await readBook(f); } catch (err) { return toast('Could not read this Excel file'); }
     const hit = wb.worksheets.map(ws => ({ ws, rows: parseTeam(ws) })).find(x => x.rows);
@@ -1235,11 +1474,113 @@ async function viewTeam() {
       const det = [r.sap_id ? `<span class="hint" style="margin-top:4px">SAP ID: <b style="color:var(--ink)">${esc(r.sap_id)}</b></span>` : '',
         r.mobile ? link('tel:' + r.mobile.replace(/[^0-9+]/g, ''), 'phone', r.mobile) : '',
         r.email ? link('mailto:' + r.email, 'mail', r.email) : ''].filter(Boolean).join('');
-      return `<div class="lrow" style="flex-wrap:wrap;align-items:flex-start">${avHtml(photoOf(r), r.name)}<span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span>${det ? `<span style="display:flex;flex-direction:column;align-items:flex-start;margin-top:2px;overflow-wrap:anywhere">${det}</span>` : ''}</span>${tagOf(shiftOf(r.name))}</div>`;
+      const ph = photoOf(r);
+      return `<div class="lrow" style="flex-wrap:wrap;align-items:flex-start">${ph ? `<button class="phbtn" data-ph="${esc(ph)}" data-nm="${esc(r.name)}" aria-label="Photo of ${esc(r.name)}">${avHtml(ph, r.name)}</button>` : avHtml(ph, r.name)}<span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span>${det ? `<span style="display:flex;flex-direction:column;align-items:flex-start;margin-top:2px;overflow-wrap:anywhere">${det}</span>` : ''}</span>${tagOf(shiftOf(r.name))}</div>`;
     }).join('') + '</div></div>';
   };
   draw();
   $('#tq').oninput = e => { S.teamQuery = e.target.value.trim(); draw(); };
+  $('#tl').onclick = e => { const b = e.target.closest('[data-ph]'); if (b) showPhoto(b.dataset.ph, b.dataset.nm); };
+}
+
+/* ================= CONTACTS (AMNS phone numbers) ================= */
+async function viewContacts() {
+  $('#app').innerHTML = `${bar('Contacts', 'home')}
+  <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="cq" type="search" placeholder="Search name or number" aria-label="Search contacts" value="${esc(S.contactQuery)}"></div></div>
+  <main class="scroll" id="ctl"><div class="spin">Loading…</div></main>`;
+  let rows = [];
+  try { rows = await api('contacts?select=sr,detail,ext1,ext2,mob1,mob2&order=sr'); } catch (e) { netErr(e); $('#ctl').innerHTML = '<div class="empty"><b>Could not load contacts</b></div>'; return; }
+  const tel = n => String(n || '').replace(/[^0-9+]/g, '');
+  // same four columns as the Excel sheet; a dash where the sheet has none; mobile numbers can be tapped to call
+  const val = (label, v) => { const d = tel(v), mob = d.length >= 10;
+    return `<span class="cv"><span class="k">${label}</span>${!v ? '<span class="v none">-</span>' : mob ? `<a href="tel:${d}" class="v call">${ic('phone', 16)}${esc(v)}</a>` : `<span class="v">${esc(v)}</span>`}</span>`; };
+  const draw = () => {
+    const q = S.contactQuery.toLowerCase();
+    const f = rows.filter(r => !q || [r.detail, r.ext1, r.ext2, r.mob1, r.mob2].some(v => (v || '').toLowerCase().includes(q)));
+    $('#ctl').innerHTML = `<div class="pad"><div class="label">${f.length} of ${rows.length} contacts · tap a mobile number to call</div>` + (f.length ? `<div class="list">${f.map(r => `<div class="lrow ctrow">
+      <span class="av" style="border-radius:12px;font-size:15px">${r.sr || ''}</span><span class="tx"><span class="a">${esc(r.detail)}</span>
+      <span class="cvs">${val('Ext#1', r.ext1)}${val('Ext#2', r.ext2)}${val('Mobile#1', r.mob1)}${val('Mobile#2', r.mob2)}</span></span></div>`).join('')}</div>`
+      : '<div class="empty"><b>No match found</b></div>') + '</div>';
+  };
+  draw();
+  $('#cq').oninput = e => { S.contactQuery = e.target.value.trim(); draw(); };
+}
+
+/* ================= TBT – HSM ELECTRICAL (tool box talks) ================= */
+async function viewTbt() {
+  $('#app').innerHTML = `${bar('TBT – HSM Electrical', 'home')}
+  <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="bq" type="search" placeholder="Search topic or point" aria-label="Search TBT" value="${esc(S.tbtQuery)}"></div></div>
+  <div class="tabs" id="btabs" role="tablist"></div>
+  <main class="scroll" id="btl"><div class="spin">Loading…</div></main>`;
+  let rows = [];
+  try { rows = await api('tbt?select=area,area_sort,sr,topic,points&order=area_sort,sr'); } catch (e) { netErr(e); $('#btl').innerHTML = '<div class="empty"><b>Could not load TBT</b></div>'; return; }
+  if (!rows.length) { $('#btl').innerHTML = '<div class="empty"><b>No TBT uploaded yet</b></div>'; return; }
+  const areas = [...new Set(rows.map(r => r.area))];
+  if (!areas.includes(S.tbtArea)) S.tbtArea = areas[0];
+  const shareText = r => `*TBT – ${r.area}*\n*${r.sr}. ${r.topic}*\n${(r.points || []).join('\n')}\n\n– HSM E&A`;
+  const draw = () => {
+    const q = S.tbtQuery.toLowerCase();
+    $('#btabs').innerHTML = areas.map(a => `<button role="tab" data-a="${esc(a)}" class="${!q && a === S.tbtArea ? 'on' : ''}">${esc(a)}</button>`).join('');
+    const f = rows.filter(r => q ? [r.topic, ...(r.points || [])].some(v => (v || '').toLowerCase().includes(q)) : r.area === S.tbtArea);
+    $('#btl').innerHTML = `<div class="pad"><div class="label">${q ? `${f.length} topic${f.length === 1 ? '' : 's'} found` : `Tool Box Talk · ${esc(S.tbtArea)} · Safety precautions &amp; work instructions`}</div>` + (f.length ? f.map((r, i) => `<div class="card tbtc">
+      <div class="tbth"><span class="no">${r.sr}</span><b>${esc(r.topic)}</b>${q ? `<span class="tag">${esc(r.area)}</span>` : ''}</div>
+      ${(r.points || []).length ? `<ul>${r.points.map(p => `<li>${esc(p.replace(/^\d+\.\s*/, ''))}</li>`).join('')}</ul>` : ''}
+      <button class="linkbtn" data-sh="${rows.indexOf(r)}">${ic('wa', 18)} Share on WhatsApp</button></div>`).join('') : '<div class="empty"><b>No match found</b></div>') + '</div>';
+    const on = $('#btabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+  };
+  draw();
+  $('#btabs').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; S.tbtArea = b.dataset.a; S.tbtQuery = ''; $('#bq').value = ''; draw(); $('#btl').scrollTo(0, 0); };
+  $('#bq').oninput = e => { S.tbtQuery = e.target.value.trim(); draw(); };
+  $('#btl').onclick = e => { const b = e.target.closest('[data-sh]'); if (!b) return; openLink('https://wa.me/?text=' + encodeURIComponent(shareText(rows[+b.dataset.sh]))); };
+}
+
+/* ================= SUGGESTIONS ================= */
+const SUG_MODULES = [...MODULES.map(m => m[1].replace(/&amp;/g, '&')), 'Whole app', 'New module idea'];
+async function viewSuggest() {
+  const admin = !!ME.is_admin;
+  if (!S.sugTab) S.sugTab = admin ? 'inbox' : 'new';
+  $('#app').innerHTML = `${bar('Suggestions')}
+    ${admin ? `<div class="seg" id="sgseg">${[['inbox','Inbox'],['new','Send']].map(([k, l]) => `<button data-t="${k}" class="${S.sugTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}
+    <main class="scroll" id="sg"><div class="spin">Loading…</div></main>${nav('suggest')}`;
+  if ($('#sgseg')) $('#sgseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.sugTab = b.dataset.t; viewSuggest(); } };
+  let rows = [];
+  try { rows = await api(`suggestions?select=*&order=created_at.desc&limit=200`); } catch (e) { if (!isNet(e)) netErr(e); }
+  const stTag = st => st === 'done' ? '<span class="tag green">Done</span>' : st === 'seen' ? '<span class="tag">Seen</span>' : '<span class="tag amber">New</span>';
+  const card = (r, act) => `<div class="card sugc"><div class="sgh"><b>${esc(r.module)}</b>${stTag(r.status)}</div><div class="sgd">${esc(r.description)}</div>
+    <div class="hint">${esc(r.name)}${r.sap_id ? ' · SAP ' + esc(r.sap_id) : ''}${r.area ? ' · ' + esc(r.area) : ''} · ${fmtStamp(r.created_at)}</div>
+    ${act ? `<div class="two" style="margin-top:10px">${r.status === 'new' ? `<button class="btn sm" data-st="seen" data-id="${r.id}">${ic('ok', 18)} Mark seen</button>` : '<span></span>'}${r.status !== 'done' ? `<button class="btn sm green" data-st="done" data-id="${r.id}">${ic('ok', 18)} Done</button>` : ''}</div>` : ''}</div>`;
+  if (admin && S.sugTab === 'inbox') {
+    const n = rows.filter(r => r.status === 'new').length;
+    $('#sg').innerHTML = `<div class="pad"><div class="label">${rows.length} suggestion${rows.length === 1 ? '' : 's'}${n ? ` · ${n} new` : ''}</div>${rows.length ? rows.map(r => card(r, true)).join('') : '<div class="empty"><b>No suggestions yet</b>What the team sends appears here.</div>'}</div>`;
+    $('#sg').onclick = async e => { const b = e.target.closest('[data-st]'); if (!b) return; b.disabled = true;
+      try { await api(`suggestions?id=eq.${b.dataset.id}`, { method: 'PATCH', body: { status: b.dataset.st }, prefer: 'return=minimal' }); viewSuggest(); } catch (err) { netErr(err); b.disabled = false; } };
+    return;
+  }
+  $('#sg').innerHTML = `<div class="pad"><form class="card f" id="sgf" style="padding:16px">
+      <div style="display:flex;gap:12px;align-items:center"><span class="ic">${ic('bulb', 24)}</span><div><div style="font-size:18px;font-weight:700">Share an idea</div><div class="hint">Your suggestion goes straight to ${esc(ADMIN_NAME)}.</div></div></div>
+      <div class="two"><div class="fld"><label for="sg-n">Name</label><input id="sg-n" value="${esc(ME.name)}" required></div><div class="fld"><label for="sg-s">SAP ID</label><input id="sg-s" value="${esc(ME.sap_id || '')}" inputmode="text"></div></div>
+      <div class="fld"><label for="sg-a">Area</label>${combo('sg-a', '', true, 'e.g. FM, RM, Power, Shift')}</div>
+      <div class="fld"><label for="sg-m">Suggestion for (module)</label>${combo('sg-m', '', false, 'Choose a module')}</div>
+      <div class="fld"><label for="sg-d">Description</label><textarea id="sg-d" rows="5" maxlength="2000" placeholder="What should be added or changed, and why?"></textarea></div>
+      <button class="btn pri block" type="submit" id="sg-go">${ic('ok')} Submit</button></form>
+    ${rows.length ? `<div class="label" style="margin-top:20px">${admin ? 'Sent by you' : 'Your suggestions'}</div>${(admin ? rows.filter(r => r.name === ME.name) : rows).map(r => card(r, false)).join('')}` : ''}</div>`;
+  wireCombo('sg-a', ['Automation (L1)', 'CB', 'Coiler / DC', 'Crane', 'FM', 'Instrument', 'Motor', 'Planning', 'Power', 'RHF', 'RM', 'Shift'], true);
+  wireCombo('sg-m', SUG_MODULES, false);
+  $('#sgf').onsubmit = async e => { e.preventDefault();
+    const body = { name: $('#sg-n').value.trim(), sap_id: $('#sg-s').value.trim() || null, area: $('#sg-a').value.trim() || null, module: $('#sg-m').value.trim(), description: $('#sg-d').value.trim() };
+    if (!body.name) return toast('Enter your name'); if (!body.module) return toast('Choose the module'); if (body.description.length < 3) return toast('Write your suggestion');
+    $('#sg-go').disabled = true;
+    try { await api('suggestions', { method: 'POST', body, prefer: 'return=minimal' }); toast('Thank you! Suggestion sent'); if (admin) S.sugTab = 'new'; viewSuggest(); }
+    catch (err) { netErr(err); $('#sg-go').disabled = false; } };
+}
+
+/* ================= ABOUT ================= */
+function viewAbout() {
+  $('#app').innerHTML = `${bar('About this app', 'home')}<main class="scroll"><div class="pad">
+    <div class="card about"><img src="img/coil.png" alt="" class="alogo"><h2>HSM E&amp;A App</h2><div class="hint">Version ${APP_VERSION} · build ${esc(window.HSM_APP_VERSION || 0)}</div>
+      <p>One app for the Electrical &amp; Automation team of the Hot Strip Mill: shift schedule, check lists, spares, SOPs, TBT and contacts – on Android and iPhone.</p>
+      <div class="by"><span class="k">Designed &amp; developed by</span><b>Shashank Agrawal</b><span>HSM – Electrical &amp; Automation</span></div></div>
+    <p class="hint" style="text-align:center;margin-top:18px">For ideas or problems use <a href="#suggest" style="color:var(--red);font-weight:700">Suggestions</a>.</p></div></main>`;
 }
 
 /* ================= START ================= */
