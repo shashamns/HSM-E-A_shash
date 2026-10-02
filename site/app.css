@@ -564,3 +564,9 @@ body{background:#F4F1F2}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
 
 .fab{bottom:104px}
+
+/* v3.2.1 · today's date stays visible on a red circle */
+.days button.today,.days button.today.hol,.days button.today.sun,.days button.sel.hol,.days button.sel.sun{color:#fff}
+.days button.today{background:var(--grad);box-shadow:var(--glow)}
+.days button.today.hol::before{background:#fff}
+.edmark{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--muted);margin-left:4px;vertical-align:middle}

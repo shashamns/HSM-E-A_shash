@@ -844,7 +844,7 @@ async function viewSchedule() {
   }
   const editable = isModAdmin('schedule') && +S.calSel >= +today, edit = editable && S.schedEdit;
   const by = s => rows.filter(r => r.shift === s);
-  const nm = r => `<div class="nm ${sameName(r.name, ME.name) ? 'me' : ''}${edit ? ' ed' : ''}" ${edit ? `data-p="${esc(r.name)}" role="button" tabindex="0"` : ''}>${esc(r.name)}${r.area ? ` <span class="hint">· ${esc(r.area)}</span>` : ''}${r.edited_by ? ` <span class="edmark" title="Changed in the app by ${esc(r.edited_by)}">${ic('edit', 13)}</span>` : ''}${edit ? `<span class="chev">${ic('chev', 18)}</span>` : ''}</div>`;
+  const nm = r => `<div class="nm ${sameName(r.name, ME.name) ? 'me' : ''}${edit ? ' ed' : ''}" ${edit ? `data-p="${esc(r.name)}" role="button" tabindex="0"` : ''}>${esc(r.name)}${r.area ? ` <span class="hint">· ${esc(r.area)}</span>` : ''}${r.edited_by ? ` <span class="edmark" title="Changed in the app by ${esc(r.edited_by)}">${ic('edit', 13)} ${esc(firstName(r.edited_by))}</span>` : ''}${edit ? `<span class="chev">${ic('chev', 18)}</span>` : ''}</div>`;
   // General shift people are shown area-wise below, so the shift list shows A, B, C, Leave and Weekly Off
   const grp = (b, cls, t, list) => list.length ? `<div class="grp g-${cls}"><span class="badge ${cls}">${b}</span><div style="flex:1;min-width:0"><div class="gt">${t}</div>${list.map(nm).join('')}</div></div>` : '';
   const general = by('G'), areaMap = {};
@@ -855,7 +855,7 @@ async function viewSchedule() {
       <div class="cal-h"><button class="ib" id="pm" aria-label="Previous month">${ic('back')}</button><h2>${MONTHS[mo]} ${y}</h2><button class="ib" id="nm" aria-label="Next month">${ic('chev')}</button></div>
       <div class="wk"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
       <div class="days">${cells}</div>
-      ${monthH.length ? `<div class="hlist"><div class="hl-t">${ic('star', 15)} Holidays &amp; festivals · ${MONTHS[mo]}</div>${monthH.map(k => hmap[k].map(h => `<button class="hl-r ${h.kind === 'r' ? 'soft' : ''}" data-day="${k}"><b>${+k.slice(8)} ${MON3[mo]}</b><span>${DAY3[fromYmd(k).getDay()]}</span><span class="hn">${esc(h.name)}</span></button>`).join('')).join('')}</div>` : ''}</section>
+    </section>
     <section class="card" style="overflow:hidden;margin-bottom:14px">
       <div class="dayhead" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px"><div style="flex:1 1 100%"><div class="k">${isToday ? 'Shift Schedule Today' : 'Shift Schedule'}</div><div class="v">${fmtDay(S.calSel)}</div></div>
         <div style="display:flex;gap:8px;margin-left:auto">${isModAdmin('schedule') ? `<button class="btn sm" id="shol" aria-label="Add holiday">${ic('star', 18)} Holiday</button>` : ''}
@@ -892,7 +892,7 @@ async function viewSchedule() {
   const day = ymd(S.calSel);
   const setShift = async (p, sh) => {
     try { await rpc('hsm_set_shift', { p_day: day, p_name: p.name, p_sap_id: p.sap_id || null, p_shift: sh, p_area: p.area || null });
-      logAct('schedule', sh ? 'Shift changed' : 'Removed from schedule', `${p.name} · ${fmtShort(S.calSel)} · ${sh ? SHIFT_NAME[sh] : ''}`);
+      if (!sh) logAct('schedule', 'Removed from schedule', `${p.name} · ${fmtShort(S.calSel)}`);
       toast(sh ? `${p.name}: ${SHIFT_NAME[sh]}` : `${p.name} removed from ${fmtShort(S.calSel)}`); viewSchedule(); }
     catch (e) { netErr(e); }
   };
