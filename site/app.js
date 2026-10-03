@@ -882,7 +882,8 @@ async function viewSchedule() {
   general.forEach(r => (areaMap[r.area || 'Other'] = areaMap[r.area || 'Other'] || []).push(r));
   const isToday = +S.calSel === +today;
   $('#sc').innerHTML = `<div class="pad">
-    <section class="card" style="padding:8px 12px 14px;margin-bottom:14px">
+    <button class="calpick ${S.calOpen ? 'open' : ''}" id="calt" aria-expanded="${!!S.calOpen}">${ic('cal', 22)}<span>${fmtDay(S.calSel)}</span><span class="cv">${ic('chev', 20)}</span></button>
+    <section class="card ${S.calOpen ? '' : 'hidden'}" id="calbox" style="padding:8px 12px 14px;margin-bottom:14px">
       <div class="cal-h"><button class="ib" id="pm" aria-label="Previous month">${ic('back')}</button><h2>${MONTHS[mo]} ${y}</h2><button class="ib" id="nm" aria-label="Next month">${ic('chev')}</button></div>
       <div class="wk"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
       <div class="days">${cells}</div>
@@ -902,7 +903,8 @@ async function viewSchedule() {
     </section>` : ''}</div>`;
   $('#pm').onclick = () => { S.calMonth = new Date(y, mo - 1, 1); viewSchedule(); };
   $('#nm').onclick = () => { S.calMonth = new Date(y, mo + 1, 1); viewSchedule(); };
-  $$('#sc [data-day]').forEach(b => b.onclick = () => { S.calSel = fromYmd(b.dataset.day); viewSchedule(); });
+  $('#calt').onclick = () => { S.calOpen = !S.calOpen; viewSchedule(); };
+  $$('#sc [data-day]').forEach(b => b.onclick = () => { S.calSel = fromYmd(b.dataset.day); S.calOpen = false; viewSchedule(); });
   if ($('#sedit')) $('#sedit').onclick = () => { S.schedEdit = !S.schedEdit; viewSchedule(); };
   if ($('#shol')) $('#shol').onclick = () => {
     const md = $('#modal');

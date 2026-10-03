@@ -579,3 +579,10 @@ body{background:#F4F1F2}
 .thought{margin:14px 16px 0;padding:14px 16px;background:var(--grad-soft,var(--red-50))}
 .thought .k{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--red)}
 .thought p{margin:6px 0 0;font-size:17px;font-style:italic;line-height:1.35}
+
+.calpick{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 14px;padding:14px 16px;border:0;border-radius:var(--r);background:#fff;box-shadow:var(--shadow);font:inherit;font-size:17px;font-weight:700;color:var(--ink);text-align:left}
+.calpick>span:first-of-type{flex:1}
+.calpick .i{color:var(--red)}
+.calpick .cv{display:flex;transform:rotate(90deg);transition:transform .25s}
+.calpick.open .cv{transform:rotate(-90deg)}
+#calbox.hidden{display:none}
