@@ -570,3 +570,12 @@ body{background:#F4F1F2}
 .days button.today{background:var(--grad);box-shadow:var(--glow)}
 .days button.today.hol::before{background:#fff}
 .edmark{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--muted);margin-left:4px;vertical-align:middle}
+
+/* v3.2.2 */
+.tile.ap .ic{background:var(--red);color:#fff;position:relative;overflow:visible}
+.bdg{position:absolute;top:-8px;right:-8px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:#fff;color:var(--red);border:2px solid var(--red);font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.bdg.hidden{display:none}
+.apic{background:var(--red);color:#fff;border-radius:12px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex:none}
+.thought{margin:14px 16px 0;padding:14px 16px;background:var(--grad-soft,var(--red-50))}
+.thought .k{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--red)}
+.thought p{margin:6px 0 0;font-size:17px;font-style:italic;line-height:1.35}

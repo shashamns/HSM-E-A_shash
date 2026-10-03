@@ -10,8 +10,8 @@ android {
         applicationId 'com.hsm.ea'
         minSdk 26
         targetSdk 34
-        versionCode 12
-        versionName '3.1'
+        versionCode 13
+        versionName '3.2'
     }
 
     signingConfigs {
@@ -47,4 +47,5 @@ android {
 dependencies {
     implementation 'androidx.webkit:webkit:1.11.0'
     implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.work:work-runtime:2.9.1'
 }

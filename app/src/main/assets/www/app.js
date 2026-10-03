@@ -9,8 +9,8 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.1';
-const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane'];
+const APP_VERSION = '3.2';
+const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
   ['sop','SOP & HIRAC','shield','Numbers, hazards, docs'],['mill',"SOP's of Mill Process",'doc','Operational procedures'],['team','Team','users','E&amp;A directory'],
@@ -243,6 +243,8 @@ setInterval(() => { if (outbox().length && navigator.onLine !== false) flushOutb
 const obxEntries = day => outbox().map(x => ({ ...x.body, id: 'local:' + x.body.client_id, created_at: x.body.filled_at, local: true })).filter(r => !day || r.check_date === day);
 
 function logout(expired) {
+  try { if (window.HSMNative && HSMNative.disableNotifications) HSMNative.disableNotifications(); } catch (e) {}
+  notifyDone = false;
   SESSION = null; ME = null; store.del('hsm_session'); store.del('hsm_me');
   if (expired) toast('Please sign in again');
   location.hash = ''; render();
@@ -401,7 +403,7 @@ async function hiracData() {
   }
   return HIRAC;
 }
-async function team() { if (!TEAM) TEAM = await api('team?select=name,area,role,plant,company,mobile,email,sap_id&order=name'); return TEAM; }
+async function team() { if (!TEAM) TEAM = await api('team?select=id,name,area,role,plant,company,mobile,email,sap_id&order=name'); return TEAM; }
 const itemCount = t => t.sections.reduce((n, s) => n + s.items.reduce((m, it) => m + it.cells.filter(Boolean).length, 0), 0);
 const ftype = (s, it, fi) => window.HSMXL ? HSMXL.fieldType(s, it, fi) : (it.t || (s.fields[fi] || {}).t || 's');
 const isHot = (t, v) => t === 't' && v != null && v !== '' && !isNaN(parseFloat(v)) && parseFloat(v) > 100;
@@ -423,6 +425,13 @@ window.hsmBack = () => {
 };
 
 let meFresh = false;
+let notifyDone = false;
+async function initNotify() {
+  if (notifyDone || !SESSION || !ME || ME.need_pin) return;
+  if (!(window.HSMNative && HSMNative.enableNotifications)) return;
+  notifyDone = true;
+  try { const k = await rpc('hsm_notify_key'); if (k) HSMNative.enableNotifications(k); } catch (e) { notifyDone = false; }
+}
 async function refreshMe() {
   if (meFresh || !SESSION || !ME) return; meFresh = true;
   try {
@@ -437,14 +446,14 @@ function render() {
   window.scrollTo(0, 0);
   const md = $('#modal'); if (md && !md.classList.contains('hidden')) { md.classList.add('hidden'); md.onclick = null; }
   if (!SESSION || !ME) return viewLogin();
-  refreshMe();
+  refreshMe(); initNotify();
   if (ME.need_pin) return viewSetPin(false);
   const h = location.hash.replace(/^#\/?/, '') || 'home';
   const [page, ...rest] = h.split('/'); const arg = decodeURIComponent(rest.join('/'));
   const routes = { home: viewHome, schedule: viewSchedule, checklist: viewChecklist, cl: () => viewChecklistFill(arg), clh: () => viewChecklistHistory(arg),
     cle: () => viewChecklistEntry(arg), actions: viewActions, activity: viewActivity, spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
     approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, admin: viewAdmin,
-    contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout };
+    contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
   (routes[page] || viewHome)();
 }
@@ -561,6 +570,7 @@ async function viewHome() {
   const now = new Date(); const sh = curShift(now);
   const cS = can('schedule'), cC = can('checklist'), cP = can('spares');
   const mods = MODULES.filter(m => can(m[0]));
+  const canAp = !!ME.is_admin || isModAdmin('leave');
   $('#app').innerHTML = `<main class="scroll">
     <div class="hero"><div class="row"><div><div class="brand">HSM · Electrical &amp; Automation</div>
       <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div>
@@ -569,12 +579,13 @@ async function viewHome() {
     ${cS ? `<div class="lift card shiftcard" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div><div class="t1">Shift on duty now</div><div class="t2">Shift ${sh} · ${SHIFT_TIME[sh]}</div></div></div>
       <div class="chips" id="hcrew"><span class="hint">Loading crew…</span></div></div>` : '<div style="height:16px"></div>'}
     <div id="hadmin"></div><div id="hleave"></div>
+    <div class="card thought"><span class="k">Thought of the day</span><p>“${esc(QUOTES[Math.floor(Date.now() / 864e5) % QUOTES.length])}”</p></div>
     ${cC || cP ? `<div class="stats" style="${cC && cP ? '' : 'grid-template-columns:1fr'}">
       ${cC ? `<button class="card stat" data-go="checklist"><span class="k">Check lists today</span><span class="v" id="hcl">–</span><span class="bar2"><i id="hclb" style="width:0"></i></span></button>` : ''}
       ${cP ? `<button class="card stat" id="hlow"><span class="k">Spares out of stock</span><span class="v" id="hsp">–</span><span class="hint">Tap to view</span></button>` : ''}
     </div>` : ''}
     <div class="sec-h">Apps</div>
-    ${mods.length ? `<div class="grid">${mods.map(([k, t, i, sub]) => tile(k, i, t.replace(/'/g, '&#39;'), sub)).join('')}</div>`
+    ${mods.length || canAp ? `<div class="grid">${canAp ? `<button class="card tile ap" data-go="approval"><span class="ic">${ic('key', 26)}<b class="bdg hidden" id="apb"></b></span><span><span class="tt">Approval</span></span><span class="ts" id="aps">Pending requests</span></button>` : ''}${mods.map(([k, t, i, sub]) => tile(k, i, t.replace(/'/g, '&#39;'), sub)).join('')}</div>`
       : `<div class="empty"><b>No modules yet</b>Ask ${esc(ADMIN_NAME)} to give you access.</div>`}
     <button class="aboutlink" data-go="about">${ic('info', 18)} About this app</button>
     <div style="height:24px"></div>
@@ -603,19 +614,38 @@ async function viewHome() {
     }
     if (cP && $('#hsp')) $('#hsp').textContent = low ? low.length : '–';
   } catch (e) { netErr(e); }
-  if (ME.is_admin) {
-    try { const [req, sug] = await Promise.all([rpc('hsm_users'), api('suggestions?select=id&status=eq.new').catch(() => [])]);
-      const p = req.filter(r => r.status === 'pending' || (r.status === 'approved' && r.pending_device_name)).length; const bad = req.reduce((n, r) => n + (r.fails_24h || 0), 0);
-      const sn = (sug || []).length;
-      $('#hadmin').innerHTML = `<button class="alert" data-go="approvals" style="${p ? '' : 'background:#fff;color:var(--ink-2);box-shadow:var(--shadow)'}">${ic('key')}<span style="flex:1">${p ? `${p} request${p > 1 ? 's' : ''} waiting for your approval` : 'Approvals & sign-ins – nothing pending'}${bad ? ` · ${bad} wrong login${bad > 1 ? 's' : ''} today` : ''}</span>${ic('chev')}</button>`
-        + (sn ? `<button class="alert" data-go="suggest" style="margin-top:10px;background:var(--amber-50,#FFF4E5);color:#8a4b00">${ic('bulb')}<span style="flex:1">${sn} new suggestion${sn > 1 ? 's' : ''} from the team</span>${ic('chev')}</button>` : '');
-    } catch (e) {}
+  if (canAp) {
+    try { const c = await approvalCounts(); const b = $('#apb');
+      if (b) { b.textContent = c.total > 99 ? '99+' : c.total; b.classList.toggle('hidden', !c.total); }
+      if ($('#aps')) $('#aps').textContent = c.total ? `${c.total} waiting for you` : 'Nothing pending'; } catch (e) {}
   }
+}
+async function approvalCounts() {
+  const c = { acc: 0, bad: 0, sug: 0, leave: 0, total: 0 }, jobs = [];
+  if (ME.is_admin) {
+    jobs.push(rpc('hsm_users').then(req => { c.acc = req.filter(r => r.status === 'pending' || (r.status === 'approved' && r.pending_device_name)).length; c.bad = req.reduce((n, r) => n + (r.fails_24h || 0), 0); }).catch(() => {}));
+    jobs.push(api('suggestions?select=id&status=eq.new').then(r => { c.sug = (r || []).length; }).catch(() => {}));
+  }
+  if (isModAdmin('leave')) jobs.push(api('leave_requests?select=id&status=eq.pending').then(r => { c.leave = (r || []).length; }).catch(() => {}));
+  await Promise.all(jobs); c.total = c.acc + c.sug + c.leave; return c;
+}
+async function viewApprovalHub() {
+  if (!(ME.is_admin || isModAdmin('leave'))) return go('home');
+  $('#app').innerHTML = `${bar('Approval', 'home', `<button class="ib" id="aprf" aria-label="Refresh">${ic('refresh', 26)}</button>`)}<main class="scroll" id="aph"><div class="spin">Loading…</div></main>${nav('')}`;
+  $('#aprf').onclick = viewApprovalHub;
+  const c = await approvalCounts();
+  const row = (id, icon, t, sub, n) => `<button class="lrow aprow" data-ap="${id}"><span class="ic apic">${ic(icon, 24)}</span><span class="tx"><span class="a">${t}</span><span class="b">${sub}</span></span><span class="tag ${n ? 'red' : ''}">${n}</span><span class="chev">${ic('chev', 20)}</span></button>`;
+  const rows = [];
+  if (ME.is_admin) rows.push(row('acc', 'users', 'New users &amp; phone changes', c.acc ? `${c.acc} waiting for approval${c.bad ? ` · ${c.bad} wrong login${c.bad > 1 ? 's' : ''} today` : ''}` : `Nothing pending${c.bad ? ` · ${c.bad} wrong login${c.bad > 1 ? 's' : ''} today` : ''}`, c.acc));
+  if (isModAdmin('leave')) rows.push(row('leave', 'plane', 'Leave requests', c.leave ? `${c.leave} waiting for your decision` : 'Nothing pending', c.leave));
+  if (ME.is_admin) rows.push(row('sug', 'bulb', 'Suggestions from the team', c.sug ? `${c.sug} new` : 'No new suggestions', c.sug));
+  $('#aph').innerHTML = `<div class="pad"><div class="label">${c.total ? `${c.total} item${c.total > 1 ? 's' : ''} waiting` : 'All clear – nothing pending'}</div><div class="list">${rows.join('')}</div></div>`;
+  $('#aph').onclick = e => { const b = e.target.closest('[data-ap]'); if (!b) return; const k = b.dataset.ap;
+    if (k === 'acc') { S.reqTab = 'pending'; go('approvals'); } else if (k === 'leave') { S.leaveTab = 'approve'; go('leave'); } else { S.sugTab = 'inbox'; go('suggest'); } };
 }
 async function homeAlerts() {
   const box = $('#hleave'); if (!box) return; let html = '';
-  if (isModAdmin('leave')) { try { const n = (await api('leave_requests?select=id&status=eq.pending')).length;
-    if (n) html += `<button class="alert" data-go="leave" style="margin-top:10px;background:#E8F1FB;color:#14529C">${ic('plane')}<span style="flex:1">${n} leave request${n > 1 ? 's' : ''} waiting for your approval</span>${ic('chev')}</button>`; } catch (e) {} }
+  if (isModAdmin('leave')) { /* pending leave requests are inside the Approval module */ }
   else if (can('leave')) { try { const mineR = await api(`leave_requests?select=id,status,decided_at&auth_id=eq.${uidOfToken()}&status=in.(approved,rejected)&decided_at=gte.${new Date(Date.now() - 3 * 864e5).toISOString()}`);
     const seen = store.get('hsm_leave_seen', 0), fresh = mineR.filter(r => new Date(r.decided_at).getTime() > seen);
     if (fresh.length) html += `<button class="alert" data-go="leave" style="margin-top:10px;background:#E8F1FB;color:#14529C">${ic('plane')}<span style="flex:1">Your leave request was ${fresh.some(r => r.status === 'rejected') ? 'decided' : 'approved'} – tap to see</span>${ic('chev')}</button>`; } catch (e) {} }
@@ -819,7 +849,8 @@ async function viewSchedule() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (!S.calMonth) S.calMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   if (!S.calSel) S.calSel = new Date(today);
-  $('#app').innerHTML = `${bar('Shift Schedule')}<main class="scroll" id="sc"><div class="spin">Loading…</div></main>${nav('schedule')}`;
+  $('#app').innerHTML = `${bar('Shift Schedule', 'home', (ME.is_admin || isModAdmin('schedule')) ? `<button class="ib" id="schlog" aria-label="Change log">${ic('list', 24)}</button>` : '')}<main class="scroll" id="sc"><div class="spin">Loading…</div></main>${nav('schedule')}`;
+  if ($('#schlog')) $('#schlog').onclick = () => { S.actMod = 'schedule'; go('activity'); };
   const m = S.calMonth, y = m.getFullYear(), mo = m.getMonth();
   let marked = new Set(), rows = [], extraH = [];
   try {
@@ -928,7 +959,7 @@ async function viewSchedule() {
 /* ================= CHECK LISTS ================= */
 const draftKey = code => `hsm_cl2_${code}`;
 async function viewChecklist() {
-  $('#app').innerHTML = `${bar('Check List')}<main class="scroll" id="cl"><div class="spin">Loading…</div></main>${nav('checklist')}`;
+  $('#app').innerHTML = `${bar('Check List', 'home')}<main class="scroll" id="cl"><div class="spin">Loading…</div></main>${nav('checklist')}`;
   const today = ymd(new Date()); S.reportDate = S.reportDate || today;
   try {
     const tpl = await templates();
@@ -1467,21 +1498,26 @@ const cleanName = n => String(n || '').replace(/ /g, ' ').trim().replace(/^(mr|
   .split(' ').map(w => /^[A-Z]\.$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 const cleanArea = a => { a = String(a || '').trim(); if (!a) return ''; return a.length <= 3 || /\d/.test(a) ? a.toUpperCase() : a.charAt(0).toUpperCase() + a.slice(1).toLowerCase(); };
 async function readBook(file) { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); return wb; }
+const ROSTER_CODES = { A: 'A', B: 'B', C: 'C', G: 'G', L: 'L', WO: 'WO', O: 'WO', OFF: 'WO', 'W/O': 'WO', 'W.O': 'WO', 'W.O.': 'WO', WOFF: 'WO', LEAVE: 'L', CL: 'L', SL: 'L', EL: 'L', PL: 'L', GEN: 'G', GENERAL: 'G' };
 function parseRoster(ws) {
-  let hr = 0; for (let i = 1; i <= Math.min(ws.rowCount, 15) && !hr; i++) ws.getRow(i).eachCell(c => { if (xt(c.value).toUpperCase() === 'NAME') hr = i; });
+  const norm = c => xt(c).toUpperCase().replace(/[:\n]/g, ' ').replace(/\s+/g, ' ').trim();
+  const isName = t => /^(NAME|EMPLOYEE NAME|EMP\.? NAME|FULL NAME|NAME OF (THE )?(EMPLOYEE|PERSON|ENGINEER|EMP\.?)|ENGINEER NAME)$/.test(t.replace(/\.$/, ''));
+  const dayOf = v => { if (v instanceof Date) return v.getUTCDate(); if (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 31) return v;
+    const m = /^0?(\d{1,2})(ST|ND|RD|TH)?$/i.exec(String(v == null ? '' : v).trim()); const n = m ? +m[1] : 0; return n >= 1 && n <= 31 ? n : 0; };
+  let hr = 0; for (let i = 1; i <= Math.min(ws.rowCount, 20) && !hr; i++) ws.getRow(i).eachCell(c => { if (isName(norm(c.value))) hr = i; });
   if (!hr) return null;
   const cols = { days: {} };
-  ws.getRow(hr).eachCell((c, ci) => { const v = xv(c.value), t = xt(c.value).toUpperCase();
-    if (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 31) cols.days[ci] = v;
-    else if (t === 'NAME') cols.name = ci; else if (t.startsWith('SAP')) cols.sap = ci; else if (t === 'AREA') cols.area = ci; else if (t.startsWith('RANK')) cols.rank = ci; });
+  ws.getRow(hr).eachCell((c, ci) => { const v = xv(c.value), t = norm(c.value), d = dayOf(v);
+    if (d && !isName(t)) cols.days[ci] = d;
+    else if (isName(t)) { if (!cols.name) cols.name = ci; } else if (t.startsWith('SAP') || /^(EMP(LOYEE)? ?(ID|NO|CODE)|PERS(ONNEL)? ?(NO|ID)|TICKET)/.test(t)) cols.sap = ci; else if (t === 'AREA' || t === 'SECTION' || t === 'DEPARTMENT' || t === 'DEPT') cols.area = ci; else if (t.startsWith('RANK')) cols.rank = ci; });
   if (!cols.name || Object.keys(cols.days).length < 28) return null;
   let month = null; for (let i = 1; i <= hr && !month; i++) ws.getRow(i).eachCell(c => { const v = xv(c.value); if (!month && v instanceof Date) month = v; });
   const people = [], bad = {};
   for (let i = hr + 1; i <= ws.rowCount; i++) {
     const row = ws.getRow(i), name = cleanName(xt(row.getCell(cols.name).value)); if (!name || /^\d+$/.test(name) || /^(name|sr\.? ?no)$/i.test(name)) continue;
     const shifts = {};
-    for (const [ci, d] of Object.entries(cols.days)) { let sh = xt(row.getCell(+ci).value).toUpperCase(); if (!sh) continue;
-      if (/^(MON|TUE|WED|THU|FRI|SAT|SUN)/.test(sh)) continue; if (sh === 'O' || sh === 'OFF') sh = 'WO'; if (!['A', 'B', 'C', 'G', 'L', 'WO'].includes(sh)) { bad[sh] = (bad[sh] || 0) + 1; continue; } shifts[d] = sh; }
+    for (const [ci, d] of Object.entries(cols.days)) { let sh = xt(row.getCell(+ci).value).toUpperCase().replace(/\s+/g, ''); if (!sh) continue;
+      if (/^(MON|TUE|WED|THU|FRI|SAT|SUN)/.test(sh)) continue; sh = ROSTER_CODES[sh] || sh; if (!['A', 'B', 'C', 'G', 'L', 'WO'].includes(sh)) { bad[sh] = (bad[sh] || 0) + 1; continue; } shifts[d] = sh; }
     if (!Object.keys(shifts).length) continue;
     people.push({ name, sap_id: cols.sap ? xt(row.getCell(cols.sap).value).replace(/\.0$/, '') : '', area: cols.area ? cleanArea(xt(row.getCell(cols.area).value)) : '',
       ranking: cols.rank ? (parseInt(xt(row.getCell(cols.rank).value), 10) || null) : null, shifts });
@@ -1536,7 +1572,7 @@ const upCard = (icon, title, hint, input) => `<div class="card" style="padding:1
 function viewAdmin() {
   if (!ME.is_admin && !ADMIN_UPLOAD_MODS.some(isModAdmin)) return go('home');
   $('#app').innerHTML = `${bar('Admin uploads', 'profile')}<main class="scroll"><div class="pad">
-    ${isModAdmin('schedule') ? upCard('cal', 'Shift schedule', 'Monthly Excel (NAME, SAP ID, day columns 1–31, Area, Ranking). Replaces that month for everyone. Single changes: Schedule → pick a date → Edit.', 'xr') : ''}
+    ${isModAdmin('schedule') ? upCard('cal', 'Shift schedule', 'Any Excel layout works if one header row has a NAME column and day columns 1–31; SAP ID, Area, Rank are optional. Each row is matched to the person by name. Shift codes: A, B, C, G, L, WO (O / OFF also accepted). Replaces that month for everyone. Single changes: Schedule → pick a date → Edit.', 'xr') : ''}
     ${isModAdmin('team') ? upCard('users', 'Team list', 'Team Members Excel (Full Name, SAP ID, Role, Mobile, Email, Plant). Replaces the whole Team list.', 'xtm') : ''}
     ${isModAdmin('contacts') ? upCard('phone', 'Contacts', 'AMNS Phone Numbers Excel (Detail, Ext#1, Ext#2, Mobile#1, Mobile#2). Replaces the whole list.', 'xct') : ''}
     ${isModAdmin('tbt') ? upCard('talk', 'TBT – HSM Electrical', 'TBT Excel: one sheet per area, Sr No. + topic, then the points below it. Replaces all TBTs.', 'xtb') : ''}
@@ -1568,7 +1604,7 @@ function viewAdmin() {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     let wb; try { toast('Reading Excel…'); wb = await readBook(f); } catch (err) { return toast('Could not read this Excel file'); }
     const sheets = wb.worksheets.map(ws => ({ ws, r: parseRoster(ws) })).filter(x => x.r);
-    if (!sheets.length) return toast('No shift schedule found. The sheet needs a NAME column and day columns 1–31.');
+    if (!sheets.length) return toast('No shift schedule found. The sheet needs a NAME column and day columns 1–31 (see the format shown on this screen).');
     const show = k => {
       const { ws, r } = sheets[k];
       const m = r.month || new Date(); const mv = `${m.getUTCFullYear()}-${String(m.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -1633,6 +1669,7 @@ async function viewTeam() {
   const shiftOf = n => (today.find(r => r.name === n) || today.find(r => sameName(r.name, n)) || {}).shift;
   const tagOf = s => !s ? '' : s === 'WO' ? '<span class="tag">Off</span>' : s === 'L' ? '<span class="tag amber">Leave</span>' : s === 'G' ? '<span class="tag">G</span>' : `<span class="tag red">${s}</span>`;
   const link = (href, icon, txt) => `<a href="${href}" style="display:inline-flex;align-items:center;gap:6px;margin:4px 14px 0 0;color:var(--red, #C8102E);font-weight:600;text-decoration:none">${ic(icon, 18)}${esc(txt)}</a>`;
+  const canEdit = isModAdmin('team');
   const draw = () => {
     const q = S.teamQuery.toLowerCase();
     const f = rows.filter(r => !q || [r.name, r.area, r.company, r.mobile, r.sap_id, r.email].some(v => (v || '').toLowerCase().includes(q)));
@@ -1642,12 +1679,24 @@ async function viewTeam() {
         r.mobile ? link('tel:' + r.mobile.replace(/[^0-9+]/g, ''), 'phone', r.mobile) : '',
         r.email ? link('mailto:' + r.email, 'mail', r.email) : ''].filter(Boolean).join('');
       const ph = photoOf(r);
-      return `<div class="lrow" style="flex-wrap:wrap;align-items:flex-start">${ph ? `<button class="phbtn" data-ph="${esc(ph)}" data-nm="${esc(r.name)}" aria-label="Photo of ${esc(r.name)}">${avHtml(ph, r.name)}</button>` : avHtml(ph, r.name)}<span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span>${det ? `<span style="display:flex;flex-direction:column;align-items:flex-start;margin-top:2px;overflow-wrap:anywhere">${det}</span>` : ''}</span>${tagOf(shiftOf(r.name))}</div>`;
+      return `<div class="lrow" style="flex-wrap:wrap;align-items:flex-start">${ph ? `<button class="phbtn" data-ph="${esc(ph)}" data-nm="${esc(r.name)}" aria-label="Photo of ${esc(r.name)}">${avHtml(ph, r.name)}</button>` : avHtml(ph, r.name)}<span class="tx"><span class="a">${esc(r.name)}</span><span class="b">${esc(sub)}</span>${canEdit ? `<button class="linkbtn" data-area="${r.id}" style="align-self:flex-start;margin-top:4px">${ic('edit', 18)} Change area</button>` : ''}${det ? `<span style="display:flex;flex-direction:column;align-items:flex-start;margin-top:2px;overflow-wrap:anywhere">${det}</span>` : ''}</span>${tagOf(shiftOf(r.name))}</div>`;
     }).join('') + '</div></div>';
   };
   draw();
   $('#tq').oninput = e => { S.teamQuery = e.target.value.trim(); draw(); };
-  $('#tl').onclick = e => { const b = e.target.closest('[data-ph]'); if (b) showPhoto(b.dataset.ph, b.dataset.nm); };
+  $('#tl').onclick = e => { const b = e.target.closest('[data-ph]'); if (b) return showPhoto(b.dataset.ph, b.dataset.nm);
+    const a = e.target.closest('[data-area]'); if (!a) return; const r = rows.find(x => String(x.id) === a.dataset.area); if (!r) return;
+    const areas = [...new Set([...rows.map(x => x.area), 'Shift', 'Instrument', 'Power', 'FM', 'RM', 'DC', 'Crane', 'Drive', 'L1', 'Motor', 'Planning'].filter(Boolean))];
+    const m = $('#modal');
+    m.innerHTML = `<div class="sheet" onclick="event.stopPropagation()"><h3>Change area</h3><p>${esc(r.name)} · now: <b>${esc(r.area || 'not set')}</b></p>
+      <div class="fld"><label for="ar-in">New area (pick or type)</label><input id="ar-in" list="ar-dl" value="" placeholder="${esc(r.area || 'e.g. Instrument')}" autocomplete="off"><datalist id="ar-dl">${areas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
+      <p class="hint">Applies from today onwards in the shift schedule too.</p>
+      <div class="two"><button class="btn ghost" id="ar-x">Cancel</button><button class="btn pri" id="ar-ok">Save</button></div></div>`;
+    m.classList.remove('hidden'); m.onclick = null; $('#ar-x').onclick = () => m.classList.add('hidden');
+    $('#ar-ok').onclick = async () => { const v = $('#ar-in').value.trim(); if (!v) return toast('Type or pick the new area'); $('#ar-ok').disabled = true;
+      try { await rpc('hsm_set_area', { p_id: r.id, p_area: v }); r.area = v || null; TEAM = null; m.classList.add('hidden'); toast(`${r.name}: area ${v || 'cleared'}`); draw(); }
+      catch (err) { netErr(err); $('#ar-ok').disabled = false; } };
+  };
 }
 
 /* ================= CONTACTS (AMNS phone numbers) ================= */
@@ -1706,7 +1755,7 @@ const SUG_MODULES = [...MODULES.map(m => m[1].replace(/&amp;/g, '&')), 'Whole ap
 async function viewSuggest() {
   const admin = !!ME.is_admin;
   if (!S.sugTab) S.sugTab = admin ? 'inbox' : 'new';
-  $('#app').innerHTML = `${bar('Suggestions')}
+  $('#app').innerHTML = `${bar('Suggestions', 'home')}
     ${admin ? `<div class="seg" id="sgseg">${[['inbox','Inbox'],['new','Send']].map(([k, l]) => `<button data-t="${k}" class="${S.sugTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}
     <main class="scroll" id="sg"><div class="spin">Loading…</div></main>${nav('suggest')}`;
   if ($('#sgseg')) $('#sgseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.sugTab = b.dataset.t; viewSuggest(); } };
@@ -1746,7 +1795,6 @@ function viewAbout() {
   $('#app').innerHTML = `${bar('About this app', 'home')}<main class="scroll"><div class="pad">
     <div class="card about"><img src="img/coil.png" alt="" class="alogo"><h2>HSM E&amp;A App</h2><div class="motto">One action, multiple solutions.</div><div class="hint">Version ${APP_VERSION} · build ${esc(window.HSM_APP_VERSION || 0)}</div>
       <p>One app for the Electrical &amp; Automation team of the Hot Strip Mill: shift schedule, check lists, spares, SOPs, TBT and contacts – on Android and iPhone.</p>
-      <blockquote class="quote">“${esc(QUOTES[Math.floor(Date.now() / 864e5) % QUOTES.length])}”<span>Thought of the day</span></blockquote>
       <div class="by"><span class="k">Designed &amp; developed by</span><b>Shashank Agrawal</b><span>HSM – Electrical &amp; Automation</span></div></div>
     <p class="hint" style="text-align:center;margin-top:18px">For ideas or problems use <a href="#suggest" style="color:var(--red);font-weight:700">Suggestions</a>.</p></div></main>`;
 }

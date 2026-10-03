@@ -21,6 +21,16 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import android.Manifest;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
+import java.util.concurrent.TimeUnit;
+
 import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 
@@ -94,6 +104,12 @@ public class MainActivity extends Activity {
 
         if (savedInstanceState != null) webView.restoreState(savedInstanceState);
         else webView.loadUrl(START_URL);
+    }
+
+    private void askNotifyPermission() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 77);
+        }
     }
 
     private void openExternal(Uri uri) {
@@ -172,6 +188,33 @@ public class MainActivity extends Activity {
             String model = Build.MODEL == null ? "" : Build.MODEL;
             String n = model.toLowerCase().startsWith(m.toLowerCase()) ? model : (m + " " + model);
             return n.substring(0, 1).toUpperCase() + n.substring(1) + " (Android " + Build.VERSION.RELEASE + ")";
+        }
+
+        /** Called after sign-in: remembers this person's notification key and starts the background check. */
+        @JavascriptInterface
+        public void enableNotifications(String key) {
+            try {
+                SharedPreferences sp = getSharedPreferences(NotifyWorker.PREFS, MODE_PRIVATE);
+                sp.edit().putString("key", key == null ? "" : key).apply();
+                if (key == null || key.length() < 32) {
+                    WorkManager.getInstance(getApplicationContext()).cancelUniqueWork("hsm_notify");
+                    return;
+                }
+                Constraints cons = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
+                PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(NotifyWorker.class, 15, TimeUnit.MINUTES)
+                        .setConstraints(cons).build();
+                WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork("hsm_notify", ExistingPeriodicWorkPolicy.KEEP, req);
+                runOnUiThread(() -> askNotifyPermission());
+            } catch (Exception ignored) { }
+        }
+
+        /** Sign-out: stop notifications and forget the key. */
+        @JavascriptInterface
+        public void disableNotifications() {
+            try {
+                getSharedPreferences(NotifyWorker.PREFS, MODE_PRIVATE).edit().clear().apply();
+                WorkManager.getInstance(getApplicationContext()).cancelUniqueWork("hsm_notify");
+            } catch (Exception ignored) { }
         }
 
         @JavascriptInterface
