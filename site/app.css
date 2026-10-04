@@ -618,3 +618,6 @@ body{background:#F4F1F2}
 .pnote{display:block;margin-top:4px;font-size:13.5px;font-weight:600;color:#14529C;background:#E8F1FB;border-radius:8px;padding:3px 8px;width:fit-content;max-width:100%}
 .pln{padding:14px}.plh{font-family:'Poppins','Inter',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pln .chip{height:auto;min-height:34px;padding:6px 12px;border:1.5px solid var(--line-2);background:#fff;text-align:left}
+.planrow .n{font-size:17px}
+.pnone{display:block;margin-top:4px;font-size:13.5px;color:var(--muted)}
+.planrow .pnote small{font-weight:500;color:#4a6a90}

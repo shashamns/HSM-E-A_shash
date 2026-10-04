@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.4.1';
+const APP_VERSION = '3.5';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -449,7 +449,7 @@ function render() {
   const h = location.hash.replace(/^#\/?/, '') || 'home';
   const [page, ...rest] = h.split('/'); const arg = decodeURIComponent(rest.join('/'));
   const routes = { home: viewHome, schedule: viewSchedule, checklist: viewChecklist, cl: () => viewChecklistFill(arg), clh: () => viewChecklistHistory(arg),
-    cle: () => viewChecklistEntry(arg), actions: viewActions, activity: viewActivity, spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
+    cle: () => viewChecklistEntry(arg), actions: viewActions, activity: viewActivity, clearlogs: viewClearLogs, spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
     approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, admin: viewAdmin,
     contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
@@ -679,6 +679,7 @@ function viewProfile() {
       <button class="btn block" data-go="pin">${ic('key')} Change PIN</button>
       ${ME.is_admin ? `<button class="btn block" data-go="approvals">${ic('users')} App approvals &amp; sign-ins</button>` : ''}
       ${ME.is_admin || (ME.admin_modules || []).length ? `<button class="btn block" data-go="activity">${ic('list')} Activity log (who changed what)</button>` : ''}
+      ${ME.is_admin ? `<button class="btn block" data-go="clearlogs">${ic('x')} Clear logs (admin only)</button>` : ''}
       ${upl ? `<button class="btn block" data-go="admin">${ic('upload')} Admin uploads</button>` : ''}
       ${ME.is_admin ? `<button class="btn block" data-go="suggest">${ic('bulb')} Suggestions from the team</button>
         <button class="btn block" id="pxl">${ic('xls')} Master spares Excel (cloud)</button>` : ''}
@@ -711,11 +712,12 @@ let REQ = [];
 const RESULT = { ok: ['Signed in', 'green'], first_login: ['First sign-in', 'green'], new_device: ['New phone tried', 'amber'], wrong_password: ['Wrong SAP ID / PIN', 'red'],
   locked: ['Locked (too many tries)', 'red'], not_approved: ['Not approved yet', 'amber'], unknown_user: ['Unknown username', 'red'] };
 // Access editor: module ticks, area ticks inside Check List / Mill SOPs, and "Admin" per module
-const accessEditor = (r, key, withAdmin = true) => `<div class="acc" data-ak="${key}">${MODULES.map(([k, t, i]) => {
+const ACC_MODS = [...MODULES, ['planning', 'Planning – Out of stock status', 'box']];
+const accessEditor = (r, key, withAdmin = true) => `<div class="acc" data-ak="${key}">${ACC_MODS.map(([k, t, i]) => {
   const on = (r.modules || ALL_MODS).includes(k), adm = (r.admin_modules || []).includes(k);
-  const areas = AREA_MODS[k], sel = r.areas && Array.isArray(r.areas[k]) ? r.areas[k] : null;
+  const areas = k === 'planning' ? SPARE_AREAS.map(a => [a, a]) : AREA_MODS[k], sel = r.areas && Array.isArray(r.areas[k]) ? r.areas[k] : null;
   return `<div class="accm ${on ? 'on' : ''}" data-m="${k}"><div class="accr"><label class="modchk"><input type="checkbox" class="am" value="${k}" ${on ? 'checked' : ''}><span class="mi">${ic(i, 18)}</span><span>${t}</span></label>
-    ${withAdmin ? `<label class="admchk"><input type="checkbox" class="ad" ${adm ? 'checked' : ''}><span>Admin</span></label>` : ''}</div>
+    ${withAdmin ? `<label class="admchk"><input type="checkbox" class="ad" ${adm ? 'checked' : ''}><span>${k === 'planning' ? 'All areas' : 'Admin'}</span></label>` : ''}</div>${k === 'planning' ? '<div class="hint" style="padding:0 4px 6px">Can write Planning status in Spares → Out / low stock. Tick “All areas” or pick areas below.</div>' : ''}
     ${areas ? `<div class="areas"><span class="hint">Areas</span>${areas.map(([a, l]) => `<label class="chipchk"><input type="checkbox" class="aa" value="${a}" ${!sel || sel.includes(a) ? 'checked' : ''}><span>${esc(l)}</span></label>`).join('')}</div>` : ''}</div>`; }).join('')}</div>`;
 function wireAccess(key) {
   const box = $(`[data-ak="${key}"]`); if (!box) return;
@@ -728,7 +730,7 @@ function readAccess(key) {
   const box = $(`[data-ak="${key}"]`), out = { modules: [], admin_modules: [], areas: {} };
   $$('.accm', box).forEach(m => { const k = m.dataset.m, on = $('.am', m).checked, ad = $('.ad', m);
     if (on) out.modules.push(k); if (ad && ad.checked) out.admin_modules.push(k);
-    const aa = $$('.aa', m); if (on && aa.length) { const sel = aa.filter(x => x.checked).map(x => x.value); if (sel.length < aa.length) out.areas[k] = sel; } });
+    const aa = $$('.aa', m); if (on && aa.length && !(k === 'planning' && ad && ad.checked)) { const sel = aa.filter(x => x.checked).map(x => x.value); if (sel.length < aa.length) out.areas[k] = sel; } });
   return out;
 }
 async function viewApprovals() {
@@ -758,7 +760,7 @@ async function viewApprovals() {
         <div class="two" style="width:100%;margin-top:8px"><button class="btn ghost" data-d="${r.id}" data-a="0">${ic('x')} Reject</button><button class="btn green" data-d="${r.id}" data-a="1">${ic('ok')} Approve</button></div></div>`; }).join('')
     : list.map(r => `<button class="lrow" data-go="user/${r.id}">${avHtml(r.avatar_url, r.full_name)}
         <span class="tx"><span class="a">${esc(r.full_name)}</span><span class="b">${esc(r.username || 'No username / SAP ID in list')}${r.device_name ? ' · ' + esc(r.device_name) : ''}</span>
-        <span class="b">${r.last_login ? 'Last sign-in ' + fmtStamp(r.last_login) : r.status === 'approved' ? 'Not signed in yet' : esc(r.company_role || '')}${r.status === 'approved' && !r.has_pin ? ' · no PIN yet' : ''}${r.status === 'approved' ? ' · ' + (r.is_admin ? 'all modules (admin)' : `${(r.modules || []).length} of ${MODULES.length} modules`) : ''}</span></span>
+        <span class="b">${r.last_login ? 'Last sign-in ' + fmtStamp(r.last_login) : r.status === 'approved' ? 'Not signed in yet' : esc(r.company_role || '')}${r.status === 'approved' && !r.has_pin ? ' · no PIN yet' : ''}${r.status === 'approved' ? ' · ' + (r.is_admin ? 'all modules (admin)' : `${(r.modules || []).filter(x => ALL_MODS.includes(x)).length} of ${MODULES.length} modules`) : ''}</span></span>
         ${r.fails_24h ? `<span class="tag red">${r.fails_24h} wrong</span>` : r.status === 'rejected' ? '<span class="tag red">Rejected</span>' : r.status === 'none' ? '<span class="tag">Not requested</span>' : ''}<span class="chev">${ic('chev', 20)}</span></button>`).join('');
   $('#al').innerHTML = list.length ? `<div class="pad">${S.reqTab === 'users' ? '<div class="label">Tap a person to see their sign-ins and phone</div>' : ''}<div class="list">${body}</div></div>`
     : `<div class="empty"><b>${S.reqTab === 'pending' ? 'Nothing waiting' : 'Nobody here'}</b>${S.reqTab === 'pending' ? 'New users and phone changes appear here.' : ''}</div>`;
@@ -1255,14 +1257,19 @@ async function loadSpares() {
   let path = 'spares?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden&order=qty,material,id';
   if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*,cupboard.ilike.*${e}*,cupboard_key.ilike.*${e}*)`;
   if (S.spareLow) path += `&qty=lt.5&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
-  let notes = {};
+  let notes = {}, lowRows = {};
   const item = (r, showArea) => `<button class="item" data-go="spare/${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
       <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span>${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
       <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < 5 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
+  const planItem = r => `<button class="item" data-plan="${r.id}">
+      <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
+      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}</span>
+      ${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
+      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < 5 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
   try {
     const rows = await api(path);
-    if (S.spareLow && rows.length) { try { const cm = await api(`spare_comments?select=spare_id,body&spare_id=in.(${rows.map(r => r.id).join(',')})&order=created_at.desc`); (cm || []).forEach(x => { if (!notes[x.spare_id] && !String(x.body).startsWith('[')) notes[x.spare_id] = x; }); } catch (e) {} }
+    if (S.spareLow && rows.length) { try { const cm = await api(`spare_comments?select=spare_id,body,name,created_at&spare_id=in.(${rows.map(r => r.id).join(',')})&order=created_at.desc`); (cm || []).forEach(x => { if (!notes[x.spare_id]) notes[x.spare_id] = x; }); } catch (e) {} }
     if (S.spareLow) {
       // out of stock (red, qty 0) and low stock (orange, qty below 5), area-wise; items removed by Planning/area admin are in the "Removed" view
       const tog = `<button class="linkbtn" id="shid" style="margin:0 16px 6px">${S.spareHid ? '← Back to out-of-stock list' : 'Show items removed by Planning'}</button>`;
@@ -1276,7 +1283,10 @@ async function loadSpares() {
       list.innerHTML = `<div class="lachips" id="lach">${chip('all', 'All areas', rows)}${order.map(a => chip(a, a, by[a])).join('')}</div>
         <div class="areahead"><b>${sel === 'all' ? 'All areas' : esc(sel)}</b><span>${shown.length} item${shown.length > 1 ? 's' : ''}</span></div>
         <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => r.qty <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => r.qty > 0).length} low (below 5) <span style="color:#E8710A">●</span></div>${tog}`
-        + (sel === 'all' ? order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => item(r, false)).join('')).join('') : shown.map(r => item(r, false)).join(''));
+        + (sel === 'all' ? order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => planItem(r)).join('')).join('') : shown.map(r => planItem(r)).join(''));
+      rows.forEach(r => { lowRows[r.id] = r; });
+      try { S.planAreas = await rpc('hsm_plan_areas'); } catch (e) { S.planAreas = S.planAreas || { all: false, areas: [] }; }
+      list.onclick = e => { const b = e.target.closest('[data-plan]'); if (b) { e.preventDefault(); e.stopPropagation(); planSheet(lowRows[b.dataset.plan], notes, loadSpares); } };
       centerOn('#lach .on');
       $('#lach').onclick = e => { const b = e.target.closest('[data-la]'); if (b) { S.lowArea = b.dataset.la; loadSpares(); } };
       $('#shid').onclick = () => { S.spareHid = !S.spareHid; loadSpares(); };
@@ -1286,16 +1296,41 @@ async function loadSpares() {
     list.innerHTML = `<div class="areahead"><b>${q ? 'Search results' : esc(S.spareArea)}</b><span>${rows.length} item${rows.length > 1 ? 's' : ''}${q ? ' · all categories' : ''}</span></div>` + rows.map(r => item(r, !!q)).join('');
   } catch (err) { list.innerHTML = '<div class="empty"><b>Could not load spares</b>Check network and tap refresh.</div>'; netErr(err); }
 }
+// Planning sheet for one out-of-stock / low item (opened from the Out / low stock tab)
+async function planSheet(r, notes, refresh) {
+  if (!r) return;
+  const pa = S.planAreas || { all: false, areas: [] }, can = pa.all || (pa.areas || []).includes(r.area), md = $('#modal');
+  md.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><h3>${esc(r.material)}</h3><div id="plbody"><div class="spin">Loading…</div></div></div>`;
+  md.classList.remove('hidden'); md.onclick = e => { if (e.target === md) md.classList.add('hidden'); };
+  let cm = []; try { cm = await api(`spare_comments?select=*&spare_id=eq.${r.id}&order=created_at.desc&limit=100`) || []; } catch (e) { netErr(e); }
+  const hist = (all) => { const list = all ? cm : cm.slice(0, 5);
+    return (list.length ? list.map(c => `<div class="pcmt"><b>${esc(c.name || '')}</b> <span class="hint">${fmtStamp(c.created_at)}</span><div>${esc(c.body)}</div></div>`).join('') : '<div class="hint">No planning update yet.</div>')
+      + (!all && cm.length > 5 ? `<button class="linkbtn" id="plold">Show older (${cm.length - 5})</button>` : ''); };
+  const quick = ['PR generated', 'Quotation requested from vendor', 'PO placed', 'Material in transit', 'High-value spare – kept below 5'];
+  $('#plbody').innerHTML = `${can ? `<div class="label" style="margin:0 0 6px">Tap to write quickly</div><div class="chips" id="pq">${quick.map(t => `<button type="button" class="chip" data-q="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <div class="fld" style="margin-top:10px"><label for="pt">Planning status / comment</label><textarea id="pt" rows="2" maxlength="450" placeholder="Type here"></textarea></div>
+      <label class="admchk" style="margin:4px 0 12px"><input type="checkbox" id="ph"><span>${r.low_hidden ? 'Add back to out-of-stock list' : 'Remove from out-of-stock list'}</span></label>
+      <div class="two"><button class="btn ghost" id="plx">Close</button><button class="btn pri" id="pls">Save</button></div>` : `<div class="hint" style="margin-bottom:8px">Only the Planning team can write here.</div><button class="btn ghost block" id="plx">Close</button>`}
+    <div class="label" style="margin:16px 0 4px">Planning history</div><div id="phist">${hist(false)}</div>`;
+  $('#plx').onclick = () => md.classList.add('hidden');
+  const rewire = () => { if ($('#plold')) $('#plold').onclick = () => { $('#phist').innerHTML = hist(true); }; }; rewire();
+  if (can) {
+    $('#pq').onclick = e => { const b = e.target.closest('[data-q]'); if (b) { $('#pt').value = b.dataset.q; $('#pt').focus(); } };
+    $('#pls').onclick = async () => { const t = $('#pt').value.trim(), h = $('#ph').checked;
+      if (!t && !h) return toast('Write a status or tick the remove option');
+      $('#pls').disabled = true;
+      try { await rpc('hsm_spare_comment', { p_spare: r.id, p_body: t, p_hide: h ? !r.low_hidden : null }); md.classList.add('hidden'); toast('Saved'); refresh(); } catch (e) { $('#pls').disabled = false; netErr(e); } };
+  }
+}
 let LOCS = null;
 async function viewSpare(id) {
   const isNew = id === 'new';
   $('#app').innerHTML = `${bar(isNew ? 'Add Spare' : 'Update Spare', 'spares')}<main class="scroll" id="sd"><div class="spin">Loading…</div></main>`;
-  let s = { area: S.spareArea, item_code: '', material: '', model: '', description: '', material_type: 'Spare', make: '', qty: 0, location: '', rack: '', cupboard: '', cupboard_key: '' }, log = [], cmts = [], isPlan = false;
+  let s = { area: S.spareArea, item_code: '', material: '', model: '', description: '', material_type: 'Spare', make: '', qty: 0, location: '', rack: '', cupboard: '', cupboard_key: '' }, log = [];
   try { const l = await rpc('hsm_spare_locations'); if (Array.isArray(l)) LOCS = l; } catch (e) { if (!isNet(e)) netErr(e); }
   if (!isNew) {
-    try { const [r, l, cm, pl] = await Promise.all([api(`spares?id=eq.${encodeURIComponent(id)}&select=*`), api(`spare_log?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=6`),
-        api(`spare_comments?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=30`).catch(() => []), rpc('hsm_is_planning').catch(() => false)]);
-      if (!r.length) { $('#sd').innerHTML = '<div class="empty"><b>Spare not found</b></div>'; return; } s = r[0]; log = l; cmts = cm || []; isPlan = pl === true;
+    try { const [r, l] = await Promise.all([api(`spares?id=eq.${encodeURIComponent(id)}&select=*`), api(`spare_log?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=6`)]);
+      if (!r.length) { $('#sd').innerHTML = '<div class="empty"><b>Spare not found</b></div>'; return; } s = r[0]; log = l;
     } catch (e) { netErr(e); $('#sd').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
   }
   const locs = () => [...new Set([...(LOCS || []), 'Basement Cupboard', 'FM TPS L1 Cupboard', 'Shift cupboard 1'])].sort((x, y) => x.localeCompare(y));
@@ -1320,26 +1355,9 @@ async function viewSpare(id) {
     <div class="fld"><label for="f-rem">Remark (used for)</label><textarea id="f-rem" rows="2" placeholder="e.g. Replaced faulty module in F1 panel"></textarea></div>
     <div class="two"><div class="fld"><label>Updated by</label><input readonly value="${esc(ME.name)}"></div><div class="fld"><label>Date · time</label><input readonly value="${fmtShort(now)} ${pad2(now.getHours())}:${pad2(now.getMinutes())}"></div></div>
     ${log.length ? `<div><div class="label" style="margin-top:6px">Recent updates</div><div class="list">${log.map(h => `<div class="lrow"><span class="tag ${h.change < 0 ? 'red' : h.change > 0 ? 'green' : ''}">${h.change > 0 ? '+' : ''}${h.change}</span><span class="tx"><span class="a" style="font-size:15.5px">${esc(h.remark || (h.change ? 'Stock updated' : 'Details edited'))}</span><span class="b">→ ${h.qty_after} Nos · ${esc(h.updated_by || '')} · ${fmtStamp(h.created_at)}</span></span></div>`).join('')}</div></div>` : ''}
-    ${isNew || !(s.qty < 5 || cmts.length || isPlan) ? '' : `<div class="card pln" id="pcm"><div class="plh">Planning status${s.low_hidden ? ' <span class="tag amber">Removed from out-of-stock list</span>' : ''}</div>
-      ${cmts.length ? cmts.map(c => `<div class="pcmt"><b>${esc(c.name || '')}</b> <span class="hint">${fmtStamp(c.created_at)}</span><div>${esc(c.body)}</div></div>`).join('') : '<div class="hint">No planning update yet.</div>'}
-      ${isPlan ? `<div class="label" style="margin:12px 0 6px">Tap to write quickly</div><div class="chips" id="pc-q">${['PR generated', 'Quotation requested from vendor', 'PO placed', 'Material in transit', 'High-value spare – kept below 5'].map(t => `<button type="button" class="chip" data-q="${esc(t)}">${esc(t)}</button>`).join('')}</div>
-        <div class="fld" style="margin-top:10px"><label for="pc-t">Your comment</label><textarea id="pc-t" rows="2" maxlength="500" placeholder="Type here"></textarea></div>
-        <button class="btn pri block" type="button" id="pc-go">Post comment</button>
-        <button class="btn block" type="button" id="pc-h" style="margin-top:8px">${s.low_hidden ? 'Add back to out-of-stock list' : 'Remove from out-of-stock list'}</button>
-        <div class="hint" style="margin-top:6px">Remove is for high-value spares that are always kept below 5. A comment is saved with it.</div>` : ''}</div>`}
     <div style="height:40px"></div>
   </form></main>
   <div class="actions"><button class="btn ghost" type="button" id="cancel">Cancel</button><button class="btn pri" type="button" id="save">Save</button></div>`;
-  if ($('#pc-go')) {
-    $('#pc-q').onclick = e => { const b = e.target.closest('[data-q]'); if (b) { $('#pc-t').value = b.dataset.q; $('#pc-t').focus(); } };
-    const send = async (hide, btn) => { let t = $('#pc-t').value.trim();
-      if (hide === null && !t) return toast('Write a comment first');
-      if (hide !== null && !t) t = hide ? 'High-value spare – kept below 5' : 'Added back to list';
-      btn.disabled = true;
-      try { await rpc('hsm_spare_comment', { p_spare: s.id, p_body: t, p_hide: hide }); toast(hide === true ? 'Removed from out-of-stock list' : hide === false ? 'Added back to list' : 'Comment saved'); viewSpare(id); } catch (e) { btn.disabled = false; netErr(e); } };
-    $('#pc-go').onclick = () => send(null, $('#pc-go'));
-    $('#pc-h').onclick = () => send(!s.low_hidden, $('#pc-h'));
-  }
   wireCombo('f-area', SPARE_AREAS.includes(s.area) ? SPARE_AREAS : [...SPARE_AREAS, s.area], false);
   wireCombo('f-loc', locs, true);
   wireCombo('f-type', ['Spare', 'Consumable', 'Tool'], false);
@@ -1838,6 +1856,48 @@ function viewAbout() {
     <p class="hint" style="text-align:center;margin-top:18px">For ideas or problems use <a href="#suggest" style="color:var(--red);font-weight:700">Suggestions</a>.</p></div></main>`;
 }
 
+
+
+/* ================= CLEAR LOGS (app admin only) ================= */
+async function viewClearLogs() {
+  if (!ME.is_admin) return go('home');
+  S.clAge = S.clAge || '0';
+  $('#app').innerHTML = `${bar('Clear logs', 'profile')}<main class="scroll" id="clg"><div class="spin">Loading…</div></main>`;
+  let acts = [], users = [];
+  try { [acts, users] = await Promise.all([api('activity_log?select=module&limit=5000'), rpc('hsm_users')]); } catch (e) { netErr(e); }
+  users = (users || []).filter(u => u.status === 'approved');
+  const byMod = {}; (acts || []).forEach(r => { const k = r.module || 'other'; byMod[k] = (byMod[k] || 0) + 1; });
+  const modName = k => (MODULES.find(m => m[0] === k) || [k, { admin: 'Admin', suggest: 'Suggestions', profile: 'Profile', other: 'Other' }[k] || k])[1].replace(/&amp;/g, '&').replace(/&#39;/g, '’');
+  const age = () => S.clAge;
+  const ageTxt = () => age() === '0' ? 'ALL entries' : `entries older than ${age()} days`;
+  const cutoff = () => age() === '0' ? '' : new Date(Date.now() - (+age()) * 864e5).toISOString();
+  const chip = (kind, v, label, n) => `<button class="chip clchip" data-k="${kind}" data-v="${esc(v)}">${esc(label)}${n != null ? ` <b>${n}</b>` : ''}</button>`;
+  $('#clg').innerHTML = `<div class="pad"><div class="card" style="padding:14px"><div style="font-weight:700;font-size:17px">What to clear</div>
+      <div class="hint" style="margin:4px 0 8px">Only you can see this page. Clearing cannot be undone. Tap a chip to clear that part only.</div>
+      <div class="fld"><label for="clage">Clear</label><select id="clage"><option value="0">Everything</option><option value="7">Older than 7 days</option><option value="30">Older than 30 days</option><option value="90">Older than 90 days</option><option value="365">Older than 1 year</option></select></div></div>
+    <div class="label" style="margin-top:14px">Activity log – by module (who changed what, shift schedule log)</div><div class="chips">${Object.keys(byMod).sort().map(k => chip('act', k, modName(k), byMod[k])).join('') || '<span class="hint">Empty</span>'}${Object.keys(byMod).length ? chip('act', '*', 'All modules') : ''}</div>
+    <div class="label" style="margin-top:14px">Spares – stock history, by area</div><div class="chips">${SPARE_AREAS.map(a => chip('slog', a, a)).join('')}${chip('slog', '*', 'All areas')}</div>
+    <div class="label" style="margin-top:14px">Spares – Planning comments, by area</div><div class="chips">${SPARE_AREAS.map(a => chip('scm', a, a)).join('')}${chip('scm', '*', 'All areas')}</div>
+    <div class="label" style="margin-top:14px">Sign-in log</div><div class="chips">${chip('login', '*', 'All users')}</div>
+    <div class="fld" style="margin-top:8px"><label for="clu">Or one person</label><select id="clu"><option value="">Choose person…</option>${users.map(u => `<option value="${u.id}">${esc(u.full_name)}</option>`).join('')}</select></div>
+    <div style="height:30px"></div></div>`;
+  $('#clage').value = S.clAge; $('#clage').onchange = () => { S.clAge = $('#clage').value; };
+  const del = async (path, tcol) => { const c = cutoff(); return (await api(`${path}${c ? `${path.includes('?') ? '&' : '?'}${tcol}=lt.${encodeURIComponent(c)}` : ''}${path.includes('?') || c ? '&' : '?'}select=id`, { method: 'DELETE' })) || []; };
+  const spareIds = async a => { const r = await api(a === '*' ? 'spares?select=id&limit=5000' : `spares?select=id&area=eq.${encodeURIComponent(a)}&limit=5000`); return (r || []).map(x => x.id); };
+  const run = async (kind, v, label) => {
+    if (!(await ask(`Clear ${label}?`, `This removes ${ageTxt()}. It cannot be undone.`, 'Clear', 'Cancel', true))) return;
+    let n = 0;
+    try {
+      if (kind === 'act') n = (await del(v === '*' ? 'activity_log?id=gt.0' : `activity_log?module=eq.${encodeURIComponent(v)}`, 'at')).length;
+      else if (kind === 'login') n = (await del(v === '*' ? 'login_log?id=gt.0' : `login_log?user_id=eq.${encodeURIComponent(v)}`, 'at')).length;
+      else { const ids = await spareIds(v), tbl = kind === 'slog' ? 'spare_log' : 'spare_comments';
+        for (let i = 0; i < ids.length; i += 150) n += (await del(`${tbl}?spare_id=in.(${ids.slice(i, i + 150).join(',')})`, 'created_at')).length; }
+      toast(n ? `Cleared ${n} entr${n > 1 ? 'ies' : 'y'}` : 'Nothing to clear', 3500); if (kind === 'act') viewClearLogs();
+    } catch (e) { netErr(e); }
+  };
+  $('#clg').onclick = e => { const b = e.target.closest('.clchip'); if (b) run(b.dataset.k, b.dataset.v, `${{ act: 'activity log', slog: 'stock history', scm: 'Planning comments', login: 'sign-in log' }[b.dataset.k]} – ${b.textContent.replace(/\s*\d+$/, '').trim()}`); };
+  $('#clu').onchange = () => { const id = $('#clu').value; if (!id) return; const u = users.find(x => String(x.id) === id); $('#clu').value = ''; run('login', id, `sign-in log – ${u ? u.full_name : ''}`); };
+}
 
 /* ================= ACTIVITY LOG ================= */
 async function viewActivity() {
