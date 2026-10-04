@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.3';
+const APP_VERSION = '3.4';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -39,9 +39,7 @@ const HOLIDAYS = [
 ['2027-01-14','Makar Sankranti / Uttarayan','r'],['2027-01-26','Republic Day','n'],['2027-03-10','Id-ul-Fitr (Eid)','f'],['2027-03-23','Holi','f'],['2027-03-26','Good Friday','f'],['2027-04-14','Ambedkar Jayanti','n'],
 ['2027-04-15','Ram Navami','f'],['2027-04-19','Mahavir Jayanti','f'],['2027-05-17','Id-ul-Zuha (Bakrid)','f'],['2027-05-20','Buddha Purnima','f'],['2027-06-16','Muharram','f'],['2027-08-15','Independence Day','n'],
 ['2027-08-25','Janmashtami','f'],['2027-09-17','Vishwakarma Puja','r'],['2027-10-02','Gandhi Jayanti','n'],['2027-10-09','Dussehra','f'],['2027-10-29','Diwali','f'],['2027-11-14','Guru Nanak Jayanti','f'],['2027-12-25','Christmas','f']];
-const QUOTES = ['One action, multiple solutions.','Safety first, production next – never the other way round.','A small check today prevents a big breakdown tomorrow.','Teamwork makes the toughest shutdown feel easy.',
-  'Do it right the first time, every time.','Discipline in the small things builds reliability in the big ones.','Every reading you record is a breakdown you may prevent.','Alone we repair, together we improve.',
-  'Stay curious. Every fault is a lesson.','Go home safe – that is the real target.'];
+const QUOTES = ['One action, multiple solutions.','Safety first, production next – never the other way round.','A small check today prevents a big breakdown tomorrow.','Teamwork makes the toughest shutdown feel easy.','Do it right the first time, every time.','Discipline in the small things builds reliability in the big ones.','Every reading you record is a breakdown you may prevent.','Alone we repair, together we improve.','Stay curious. Every fault is a lesson.','Go home safe – that is the real target.','No job is so urgent that we cannot take time to do it safely.','Lock out, tag out, try out – then touch.','If you are not sure, stop and ask. Asking is strength.','A shortcut today can become a lifelong regret.','Your family is waiting for you – work safely for them.','Wear your PPE like you wear your pride.','Isolate. Verify. Then work. Every single time.','Near-miss reported today is an accident prevented tomorrow.','Be the reason your colleague goes home safe.','Hot strip, cool head.','Housekeeping is the first step of safety.','Look up, look down, look around – before you step in.','Safe work is smart work.','Never assume a panel is dead – test it.','Stand clear of the line when the mill is running.','Safety is not a department, it is everyone\'s duty.','Speak up for safety – it takes one second.','Good habits in safety are built on ordinary days.','The best repair is the one that never needs repeating.','Predict, prevent, perform.','Preventive maintenance is cheaper than breakdown maintenance.','A tidy panel is a reliable panel.','Measure twice, trip never.','Small leaks sink big ships – fix the small fault now.','Quality is remembering what to do when nobody is watching.','Trust the process, check the data.','Learn something new on every shift.','Consistency beats intensity.','Today\'s effort is tomorrow\'s uptime.','Ownership turns a job into a responsibility.','Respect the machine and it will respect your time.','Every shutdown completed safely is a team victory.','Great teams share knowledge, not just tasks.','Handover well – the next shift inherits your work.','Write down what you learn, so the next person starts higher.','Challenges are what make the shift interesting.','Keep calm in a breakdown – clear mind fixes faster.','Fix the root cause, not just the symptom.','Be proud of the steel you help make.','Steel is forged in heat – so is character.','Progress, not perfection.','Start where you are, use what you have, do what you can.','The only way to do great work is to love what you do.','Hard work beats talent when talent does not work hard.','Success is the sum of small efforts repeated daily.','Take pride in the quality of your work.','A positive mind keeps the whole shift running.','Never stop improving – even 1% a day adds up.','Let us make today safer than yesterday.','Courage is calling a stop when something looks wrong.','Respect every colleague – the plant runs on all of us.','Help a new joiner today – you were one once.','Think before you act, check before you start.','Compliance today, confidence tomorrow.','Zero harm is possible when everyone cares.','Work to a plan, and plan for safety.','Fatigue is a hazard – take your rest, stay alert.','Mobile in pocket, eyes on the job.','Use the right tool for the right job.','Keep walkways clear – the next step may be yours.','Gas, heat, height, voltage – respect them all.','Confined space, clear permit, trained person – no compromise.','Working at height? Harness on, hook on.','Hydraulic energy stored is energy waiting – release it safely.','Never bypass an interlock – it was put there for a reason.','A calm shift is a well-prepared shift.','Your signature on a permit is your promise of safety.','When in doubt, find out.','Every day is a new chance to get it right.','Gratitude for the team makes the work lighter.','Be the calm in the breakdown storm.','Technology changes, discipline stays.','Reliability is built one inspection at a time.','Sharing a lesson saves someone else a mistake.','Honest reporting builds a safe plant.','Think safe, act safe, be safe.','Live to work another day – follow the rules.','Courtesy on the shop floor costs nothing and saves a lot.','Great things in business are never done by one person.','What gets measured gets improved.','Be early, be prepared, be professional.','A strong team has no weak shift.','Learning never exhausts the mind.','Keep your tools clean and your mind clear.','The mill never sleeps – and neither does the need for safety.','Do not walk past a hazard – fix it or report it.','Work smart, stay safe, finish strong.','Your attention today protects someone tomorrow.','Every safe shift is a gift to your family.','Make safety a habit, not a reaction.','Energy isolation is life insurance.','It is okay to say "I need help".','Better to be late than to be hurt.','Check your own safety first, then help others.','The strength of the team is each individual member.','Respect time, respect process, respect people.','Simple actions, repeated daily, make great results.','Improve one thing today.','Finish what you start – and start it safely.'];
 // activity log: every change in any module is written to the cloud (fire and forget)
 const logAct = (module, action, detail) => { try { if (typeof rpc === 'function' && SESSION) rpc('hsm_log', { p_module: module, p_action: action, p_detail: detail || null }).catch(() => {}); } catch (e) {} };
 
@@ -580,7 +578,7 @@ async function viewHome() {
     ${cS ? `<div class="lift card shiftcard" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div><div class="t1">Shift on duty now</div><div class="t2">Shift ${sh} · ${SHIFT_TIME[sh]}</div></div></div>
       <div class="chips" id="hcrew"><span class="hint">Loading crew…</span></div></div>` : '<div style="height:16px"></div>'}
     <div id="hadmin"></div><div id="hleave"></div>
-    <div class="card thought"><span class="k">Thought of the day</span><p>“${esc(QUOTES[Math.floor(Date.now() / 864e5) % QUOTES.length])}”</p></div>
+    <div class="card thought"><span class="k">Thought of the day</span><p>“${esc(QUOTES[Math.floor((Date.now() + 19800000) / 864e5) % QUOTES.length])}”</p></div>
     ${cC || cP ? `<div class="stats" style="${cC && cP ? '' : 'grid-template-columns:1fr'}">
       ${cC ? `<button class="card stat" data-go="checklist"><span class="k">Check lists today</span><span class="v" id="hcl">–</span><span class="bar2"><i id="hclb" style="width:0"></i></span></button>` : ''}
       ${cP ? `<button class="card stat" id="hlow"><span class="k">Spares out / low stock</span><span class="v" id="hsp">–</span><span class="hint" id="hspz">Tap to view</span></button>` : ''}
@@ -734,7 +732,7 @@ function readAccess(key) {
 async function viewApprovals() {
   if (!ME.is_admin) return go('home');
   $('#app').innerHTML = `${bar('Approvals & Sign-ins', 'home', `<button class="ib" id="arf" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
-    <div class="seg" id="aseg">${[['pending','Pending'],['users','Users'],['log','Sign-ins'],['other','Others']].map(([k, l]) => `<button data-t="${k}" class="${S.reqTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg" id="aseg">${[['pending','Pending'],['users','Users'],['approvers','Approvers'],['log','Sign-ins'],['other','Others']].map(([k, l]) => `<button data-t="${k}" class="${S.reqTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <main class="scroll" id="al"><div class="spin">Loading…</div></main>`;
   $('#arf').onclick = viewApprovals;
   $('#aseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.reqTab = b.dataset.t; viewApprovals(); } };
@@ -743,6 +741,7 @@ async function viewApprovals() {
   const groups = { pending: REQ.filter(isPend), users: REQ.filter(r => r.status === 'approved'), other: REQ.filter(r => !['pending','approved'].includes(r.status)) };
   $$('#aseg button').forEach(b => { if (groups[b.dataset.t]) b.textContent = `${b.textContent.replace(/ \(\d+\)$/, '')} (${groups[b.dataset.t].length})`; });
   if (S.reqTab === 'log') return drawLog($('#al'), null);
+  if (S.reqTab === 'approvers') return drawApproverSetup($('#al'));
   const list = groups[S.reqTab] || [];
   const body = S.reqTab === 'pending' ? list.map(r => {
       const phone = r.status === 'approved';
@@ -1264,9 +1263,14 @@ async function loadSpares() {
       if (!rows.length) { list.innerHTML = `<div class="empty"><b>${S.spareHid ? 'No removed items' : 'Nothing out of stock or low'}</b></div>${tog}`; $('#shid').onclick = () => { S.spareHid = !S.spareHid; loadSpares(); }; return; }
       const by = {}; rows.forEach(r => (by[r.area] = by[r.area] || []).push(r));
       const order = [...SPARE_AREAS.filter(a => by[a]), ...Object.keys(by).filter(a => !SPARE_AREAS.includes(a))];
-      const z = rows.filter(r => r.qty <= 0).length;
-      list.innerHTML = `<div class="hint" style="padding:10px 16px 6px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${z} out of stock <span style="color:var(--red)">●</span> · ${rows.length - z} low (below 5) <span style="color:#E8710A">●</span> · ${order.length} area${order.length > 1 ? 's' : ''}</div>${tog}`
-        + order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => item(r, false)).join('')).join('');
+      if (S.lowArea !== 'all' && !by[S.lowArea]) S.lowArea = 'all';
+      const sel = S.lowArea || 'all', z = rows.filter(r => r.qty <= 0).length;
+      const shown = sel === 'all' ? rows : by[sel];
+      const chip = (k, lbl, list) => `<button data-la="${esc(k)}" class="lachip ${sel === k ? 'on' : ''}">${esc(lbl)}<b class="${list.some(r => r.qty <= 0) ? '' : 'or'}">${list.length}</b></button>`;
+      list.innerHTML = `<div class="lachips" id="lach">${chip('all', 'All areas', rows)}${order.map(a => chip(a, a, by[a])).join('')}</div>
+        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => r.qty <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => r.qty > 0).length} low (below 5) <span style="color:#E8710A">●</span>${sel === 'all' ? '' : ' · ' + esc(sel)}</div>${tog}`
+        + (sel === 'all' ? order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => item(r, false)).join('')).join('') : shown.map(r => item(r, false)).join(''));
+      $('#lach').onclick = e => { const b = e.target.closest('[data-la]'); if (b) { S.lowArea = b.dataset.la; loadSpares(); } };
       $('#shid').onclick = () => { S.spareHid = !S.spareHid; loadSpares(); };
       return;
     }
@@ -1308,7 +1312,7 @@ async function viewSpare(id) {
     <div class="fld"><label for="f-rem">Remark (used for)</label><textarea id="f-rem" rows="2" placeholder="e.g. Replaced faulty module in F1 panel"></textarea></div>
     <div class="two"><div class="fld"><label>Updated by</label><input readonly value="${esc(ME.name)}"></div><div class="fld"><label>Date · time</label><input readonly value="${fmtShort(now)} ${pad2(now.getHours())}:${pad2(now.getMinutes())}"></div></div>
     ${log.length ? `<div><div class="label" style="margin-top:6px">Recent updates</div><div class="list">${log.map(h => `<div class="lrow"><span class="tag ${h.change < 0 ? 'red' : h.change > 0 ? 'green' : ''}">${h.change > 0 ? '+' : ''}${h.change}</span><span class="tx"><span class="a" style="font-size:15.5px">${esc(h.remark || (h.change ? 'Stock updated' : 'Details edited'))}</span><span class="b">→ ${h.qty_after} Nos · ${esc(h.updated_by || '')} · ${fmtStamp(h.created_at)}</span></span></div>`).join('')}</div></div>` : ''}
-    ${isNew || !(s.qty < 5 || cmts.length) ? '' : `<div class="card" style="padding:14px" id="pcm"><div class="label" style="margin:0 0 6px">Planning comments${s.low_hidden ? ' · <span style="color:var(--amber)">removed from out-of-stock list</span>' : ''}</div>
+    ${isNew || !(s.qty < 5 || cmts.length || isPlan) ? '' : `<div class="card" style="padding:14px" id="pcm"><div class="label" style="margin:0 0 6px">Planning comments${s.low_hidden ? ' · <span style="color:var(--amber)">removed from out-of-stock list</span>' : ''}</div>
       ${cmts.length ? cmts.map(c => `<div class="pcmt"><b>${esc(c.name || '')}</b> <span class="hint">${fmtStamp(c.created_at)}</span><div>${esc(c.body)}</div></div>`).join('') : '<div class="hint">No comments yet</div>'}
       ${isPlan ? `<div class="fld" style="margin-top:10px"><label for="pc-t">Add comment</label><textarea id="pc-t" rows="2" maxlength="500" placeholder="e.g. PR generated · Quote requested from vendor"></textarea></div>
         <label class="admchk" style="margin:4px 0 10px"><input type="checkbox" id="pc-h" ${s.low_hidden ? 'checked' : ''}><span>Keep this item out of the out-of-stock / low list (high-value spare, always kept below 5)</span></label>
@@ -1865,21 +1869,25 @@ function scRequestSheet() {
     <div class="label" style="margin:10px 0 6px">What do you need?</div><div class="ltypes" id="sck">${Object.entries(SC_KINDS).map(([k, n]) => `<button type="button" data-k="${k}" class="${k === kind ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>
     <div class="fld" style="margin-top:12px"><label for="scd">Date</label><input type="date" id="scd" value="${tom}"></div>
     <div class="scinfo" id="scinfo"><div class="hint">Loading…</div></div>
-    <div class="fld" id="scwf"><label for="scw" id="scwl">Swap with</label><select id="scw"></select></div>
+    <div class="fld" id="scwf"><label for="scw" id="scwl">Swap with</label><div class="ltypes" id="scft" style="margin-bottom:8px"></div><select id="scw"></select></div>
     <div class="fld" id="scc" style="display:none"><label class="admchk"><input type="checkbox" id="scck" checked><span>Colleague takes comp-off on</span></label><input type="date" id="sccd"></div>
     <div class="sceff" id="scpv"></div>
     <div class="fld"><label for="scre">Reason / message to approver</label><textarea id="scre" rows="2" maxlength="400" placeholder="Short reason"></textarea></div>
     <div class="two"><button class="btn ghost" id="scx">Cancel</button><button class="btn pri" id="scg">Send request</button></div></div>`;
   md.classList.remove('hidden'); md.onclick = null;
-  let crew = [], me = null, others = [];
+  let crew = [], me = null, others = [], fsh = 'all';
   const peek = () => { const w = others.find(r => r.name === $('#scw').value); return { w }; };
   const preview = () => { const pv = $('#scpv'); if (!me || kind === 'other') { pv.textContent = ''; return; } const { w } = peek(); if (!w) { pv.textContent = ''; return; }
     const r = { kind, name: ME.name, my_shift: me.shift, with_name: w.name, with_shift: w.shift, comp_day: kind === 'cover' && $('#scck').checked ? $('#sccd').value : null };
     pv.innerHTML = `<b>After approval:</b><br>${esc(scEffect(r)).replace(/ {2}· {2}/g, '<br>')}`; };
   const draw = () => { $('#scwf').style.display = kind === 'other' ? 'none' : ''; $('#scc').style.display = kind === 'cover' ? '' : 'none';
     $('#scwl').textContent = kind === 'swap' ? 'Swap with' : 'Colleague who will cover your shift';
-    others = crew.filter(r => me && r.area === me.area && r.name !== me.name && (kind === 'swap' ? r.shift !== me.shift && !['L'].includes(r.shift) : !['L', 'COFF'].includes(r.shift)));
-    $('#scw').innerHTML = others.map(r => `<option value="${esc(r.name)}">${esc(r.name)} — ${esc(SC_SH[r.shift] || r.shift)}</option>`).join('') || '<option value="">No colleague available</option>'; preview(); };
+    const SHT = [['all', 'All'], ['A', 'A'], ['B', 'B'], ['C', 'C'], ['G', 'G'], ['WO', 'W-Off'], ['L', 'L']];
+    $('#scft').innerHTML = SHT.map(([k, l]) => `<button type="button" data-f="${k}" class="${k === fsh ? 'on' : ''}">${l}${k === 'all' ? ` (${crew.filter(r => !me || r.name !== me.name).length})` : ` (${crew.filter(r => r.shift === k && (!me || r.name !== me.name)).length})`}</button>`).join('');
+    const ord = ['A', 'B', 'C', 'G', 'WO', 'L'];
+    others = crew.filter(r => me && r.name !== me.name && (fsh === 'all' || r.shift === fsh)).sort((x, y) => (ord.indexOf(x.shift) + 1 || 9) - (ord.indexOf(y.shift) + 1 || 9) || x.name.localeCompare(y.name));
+    $('#scw').innerHTML = others.map(r => `<option value="${esc(r.name)}">${esc(r.name)} — ${esc(SC_SH[r.shift] || r.shift)}${r.area ? ' · ' + esc(r.area) : ''}</option>`).join('') || '<option value="">No colleague in this shift</option>'; preview(); };
+  $('#scft').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; fsh = b.dataset.f; draw(); };
   const load = async () => { const d = $('#scd').value; $('#scinfo').innerHTML = '<div class="hint">Loading…</div>';
     try { crew = await scCrew(d); } catch (e) { crew = []; netErr(e); }
     me = crew.find(r => sameName(r.name, ME.name)) || null;
@@ -1897,6 +1905,32 @@ function scRequestSheet() {
       md.classList.add('hidden'); toast('Sent to your area approver'); S.leaveTab = 'shift'; viewLeave(); }
     catch (err) { btn.disabled = false; netErr(err); } };
   load();
+}
+async function drawApproverSetup(box) {
+  let people = [], scApprs = [];
+  try { [people, scApprs] = await Promise.all([rpc('hsm_leave_people'), rpc('hsm_sc_approvers')]); people = people || []; scApprs = scApprs || []; } catch (e) { netErr(e); }
+  const names = id => (people.find(x => x.id === id) || {}).full_name;
+  let body = '';
+  {
+    const opt = cur => `<option value="">Any approver / admin</option>${people.map(x => `<option value="${x.id}" ${cur === x.id ? 'selected' : ''}>${esc(x.full_name)}</option>`).join('')}`;
+    body = `<div class="card" style="padding:14px;margin-bottom:12px"><div style="font-weight:700;font-size:17px">Who approves whose leave?</div><div class="hint" style="margin:4px 0 10px">Pick an approver for each person – anybody can be an approver. Picking someone gives them the approver right automatically. Without a choice, any approver or the app admin can decide.</div>
+      <div class="fld" style="margin-bottom:8px"><label for="lball">Set one approver for everyone</label><select id="lball">${opt(null)}</select></div><button class="btn block" id="lballgo">Apply to everyone</button></div>
+      ${people.map(x => `<div class="card lpers"><div class="tx"><div class="a">${esc(x.full_name)}</div><div class="b">${esc(x.sap_id || '')}${x.is_approver ? ' · approver' : ''}</div></div><select data-p="${x.id}" aria-label="Approver for ${esc(x.full_name)}">${opt(x.leave_approver)}</select></div>`).join('')}`;
+        body += `<div class="card" style="padding:14px;margin:18px 0 12px"><div style="font-weight:700;font-size:17px">Shift change approvers (area-wise)</div><div class="hint" style="margin:4px 0 10px">Shift change requests go only to the approvers of the person’s area. “All areas” approvers (shift schedule managers) can decide for every area. Anybody can be added.</div>
+      ${SC_AREAS.map(([k, lbl]) => { const mem = scApprs.filter(x => x.area === k);
+        return `<div class="scarea"><div class="a">${esc(lbl)}</div><div class="chips">${mem.map(x => `<span class="chip">${esc(x.name)}<button class="scx" data-scx="${esc(k)}|${x.user_id}" aria-label="Remove ${esc(x.name)}">✕</button></span>`).join('') || '<span class="hint">No approver – only app admin can decide</span>'}</div>
+        <select data-scadd="${esc(k)}" aria-label="Add approver for ${esc(lbl)}"><option value="">+ Add approver…</option>${people.filter(p => !mem.some(x => x.user_id === p.id)).map(p => `<option value="${p.id}">${esc(p.full_name)}</option>`).join('')}</select></div>`; }).join('')}</div>`;
+  }
+  box.innerHTML = `<div class="pad">${body}</div>`;
+  const again = () => drawApproverSetup(box);
+  box.onchange = async e => { const s = e.target.closest('[data-scadd]'); if (!s || !s.value) return;
+    try { await rpc('hsm_sc_set_approver', { p_area: s.dataset.scadd, p_user: +s.value, p_on: true }); toast('Approver added'); again(); } catch (err) { netErr(err); } };
+  box.onclick = async e => { const x = e.target.closest('[data-scx]'); if (!x) return; const [a, u] = x.dataset.scx.split('|');
+    try { await rpc('hsm_sc_set_approver', { p_area: a, p_user: +u, p_on: false }); toast('Approver removed'); again(); } catch (err) { netErr(err); } };
+  $$('select[data-p]', box).forEach(sel => sel.onchange = async () => { try { await rpc('hsm_leave_set_approver', { p_ids: [+sel.dataset.p], p_approver: sel.value ? +sel.value : null }); toast('Approver saved'); } catch (e) { netErr(e); } });
+  $('#lballgo', box).onclick = async () => { const v = $('#lball', box).value; if (!v) return toast('Choose the approver first');
+    if (!(await ask('Set this approver for everyone?', `${names(+v)} will approve leave for all ${people.length} people.`, 'Apply'))) return;
+    try { await rpc('hsm_leave_set_approver', { p_ids: people.map(x => x.id), p_approver: +v }); toast('Approver set for everyone'); again(); } catch (e) { netErr(e); } };
 }
 async function viewLeave() {
   const admin = isModAdmin('leave'); store.set('hsm_leave_seen', Date.now()); Object.keys(scCrewCache).forEach(k => delete scCrewCache[k]);
@@ -1916,30 +1950,20 @@ async function viewLeave() {
       ${r.reason ? `<div class="lr">“${esc(r.reason)}”</div>` : ''}
       ${r.decided_by && r.status !== 'pending' ? `<div class="hint" style="margin-top:6px">${r.status === 'cancelled' ? 'Withdrawn' : LSTAT[r.status][0]} by ${esc(r.decided_by)} · ${fmtStamp(r.decided_at)}${r.decision_note ? ' · ' + esc(r.decision_note) : ''}${r.roster_marked ? ' · marked L in schedule' : ''}</div>` : ''}
       ${r.status === 'pending' && !who ? `<button class="linkbtn" data-cancel="${r.id}">${ic('x', 18)} Withdraw request</button>` : ''}
+      ${r.status === 'approved' && r.to_day >= ymd(new Date()) && (!who || admin) ? `<button class="linkbtn" data-lrev="${r.id}">${ic('x', 18)} Cancel approved leave</button>` : ''}
       ${r.status === 'pending' && who && admin ? `<div class="two" style="margin-top:10px"><button class="btn" data-rej="${r.id}">${ic('x')} Reject</button><button class="btn pri" data-app="${r.id}">${ic('ok')} Approve</button></div>${clash(r)}` : ''}</div>`;
   const clash = r => { const o = rows.filter(x => x.id !== r.id && ['approved', 'pending'].includes(x.status) && x.from_day <= r.to_day && x.to_day >= r.from_day); return o.length ? `<div class="hint" style="color:var(--amber);margin-top:8px">⚠ ${o.length} other${o.length > 1 ? 's' : ''} on leave in these dates: ${esc(o.slice(0, 4).map(x => firstName(x.name)).join(', '))}${o.length > 4 ? '…' : ''}</div>` : ''; };
   let body = '', people = [], scMine = [], scPend = [], scAll = [], scApprs = [];
   if (tab === 'shift') { try { [scMine, scPend, scAll] = await Promise.all([rpc('hsm_sc_list', { p_scope: 'mine' }), rpc('hsm_sc_list', { p_scope: 'approve' }), rpc('hsm_sc_list', { p_scope: 'all' })]);
     scMine = scMine || []; scPend = scPend || []; scAll = (scAll || []).filter(r => r.status !== 'pending' && r.auth_id !== (SESSION && uidOfToken())); } catch (e) { netErr(e); } }
-  if (tab === 'setup') { try { [people, scApprs] = await Promise.all([rpc('hsm_leave_people'), rpc('hsm_sc_approvers')]); people = people || []; scApprs = scApprs || []; } catch (e) { netErr(e); } }
-  const names = id => (people.find(x => x.id === id) || {}).full_name;
-  if (tab === 'setup') {
-    const opt = cur => `<option value="">Any approver / admin</option>${people.map(x => `<option value="${x.id}" ${cur === x.id ? 'selected' : ''}>${esc(x.full_name)}</option>`).join('')}`;
-    body = `<div class="card" style="padding:14px;margin-bottom:12px"><div style="font-weight:700;font-size:17px">Who approves whose leave?</div><div class="hint" style="margin:4px 0 10px">Pick an approver for each person – anybody can be an approver. Picking someone gives them the approver right automatically. Without a choice, any approver or the app admin can decide.</div>
-      <div class="fld" style="margin-bottom:8px"><label for="lball">Set one approver for everyone</label><select id="lball">${opt(null)}</select></div><button class="btn block" id="lballgo">Apply to everyone</button></div>
-      ${people.map(x => `<div class="card lpers"><div class="tx"><div class="a">${esc(x.full_name)}</div><div class="b">${esc(x.sap_id || '')}${x.is_approver ? ' · approver' : ''}</div></div><select data-p="${x.id}" aria-label="Approver for ${esc(x.full_name)}">${opt(x.leave_approver)}</select></div>`).join('')}`;
-    const nm = id => (people.find(x => x.id === id) || {}).full_name || '';
-    body += `<div class="card" style="padding:14px;margin:18px 0 12px"><div style="font-weight:700;font-size:17px">Shift change approvers (area-wise)</div><div class="hint" style="margin:4px 0 10px">Shift change requests go only to the approvers of the person’s area. “All areas” approvers (shift schedule managers) can decide for every area. Anybody can be added.</div>
-      ${SC_AREAS.map(([k, lbl]) => { const mem = scApprs.filter(x => x.area === k);
-        return `<div class="scarea"><div class="a">${esc(lbl)}</div><div class="chips">${mem.map(x => `<span class="chip">${esc(x.name)}<button class="scx" data-scx="${esc(k)}|${x.user_id}" aria-label="Remove ${esc(x.name)}">✕</button></span>`).join('') || '<span class="hint">No approver – only app admin can decide</span>'}</div>
-        <select data-scadd="${esc(k)}" aria-label="Add approver for ${esc(lbl)}"><option value="">+ Add approver…</option>${people.filter(p => !mem.some(x => x.user_id === p.id)).map(p => `<option value="${p.id}">${esc(p.full_name)}</option>`).join('')}</select></div>`; }).join('')}</div>`;
-  } else if (tab === 'shift') {
+  if (tab === 'shift') {
     const scCard = (r, mode) => `<div class="card lcard ${r.status}"><div class="lt"><span class="ltype">SC</span><div class="tx"><div class="a">${mode === 'mine' ? esc(SC_KINDS[r.kind]) : esc(r.name)}</div><div class="b">${fmtShort(fromYmd(r.day))}${mode === 'mine' ? '' : ' · ' + esc(SC_KINDS[r.kind])}${r.area ? ' · ' + esc(r.area) : ''}</div></div>${pill(r.status)}</div>
       ${r.kind === 'other' ? '' : `<div class="sceff">${esc(scEffect(r))}</div>`}
       ${r.reason ? `<div class="lr">“${esc(r.reason)}”</div>` : ''}
       ${r.status !== 'pending' && r.decided_by ? `<div class="hint" style="margin-top:6px">${r.status === 'cancelled' ? 'Withdrawn' : LSTAT[r.status][0]} by ${esc(r.decided_by)} · ${fmtStamp(r.decided_at)}${r.decision_note ? ' · ' + esc(r.decision_note) : ''}${r.applied ? ' · schedule updated' : ''}</div>` : ''}
       ${r.status === 'pending' ? `<div class="scw" data-day="${r.day}" data-comp="${r.comp_day || ''}" data-area="${esc(r.area || '')}" data-hi="${esc([r.name, r.with_name].filter(Boolean).join('|'))}"></div>` : ''}
       ${r.status === 'pending' && mode === 'mine' ? `<button class="linkbtn" data-sccx="${r.id}">${ic('x', 18)} Withdraw request</button>` : ''}
+      ${r.status === 'approved' && r.applied && (r.comp_day || r.day) >= ymd(new Date()) && (mode === 'mine' || r.can_decide) ? `<button class="linkbtn" data-scrv="${r.id}">${ic('x', 18)} Cancel approved change (restore schedule)</button>` : ''}
       ${r.status === 'pending' && mode === 'dec' ? `<div class="two" style="margin-top:10px"><button class="btn" data-scr="${r.id}">${ic('x')} Reject</button><button class="btn pri" data-sca="${r.id}">${ic('ok')} Approve</button></div>` : ''}</div>`;
     body = `${scPend.length ? `<div class="label">${scPend.length} shift change${scPend.length > 1 ? 's' : ''} waiting for your decision</div>${scPend.map(r => scCard(r, 'dec')).join('')}` : ''}
       <div class="label">My shift change requests</div>${scMine.length ? scMine.map(r => scCard(r, 'mine')).join('') : '<div class="empty"><b>No shift change requests</b>Tap the red “Shift change request” button.</div>'}
@@ -1957,24 +1981,23 @@ async function viewLeave() {
       ${rows.length ? `<button class="btn block" id="lxl" style="margin-bottom:12px">${ic('xls')} Excel of ${MONTHS[mo]}</button>` : ''}
       ${rows.length ? rows.map(r => card(r, true)).join('') : `<div class="empty"><b>No leave in ${MONTHS[mo]}</b></div>`}`;
   }
-  $('#lv').innerHTML = `<div class="pad"><div class="seg" id="lseg" style="margin:0 0 12px">${[['mine', 'My leave'], ['shift', 'Shift change'], ...(admin ? [['approve', `Approve${pend.length ? ` (${pend.length})` : ''}`], ['all', 'Report']] : []), ...(ME.is_admin ? [['setup', 'Approvers']] : [])].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>${body}</div>`;
+  $('#lv').innerHTML = `<div class="pad"><div class="seg" id="lseg" style="margin:0 0 12px">${[['mine', 'My leave'], ['shift', 'Shift change'], ...(admin ? [['approve', `Approve${pend.length ? ` (${pend.length})` : ''}`], ['all', 'Report']] : [])].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>${body}</div>`;
   if (tab === 'shift') { $$('#lv .scw').forEach(async el => { try {
       const days = [el.dataset.day, ...(el.dataset.comp ? [el.dataset.comp] : [])], hi = el.dataset.hi.split('|');
       const cr = await Promise.all(days.map(scCrew));
       el.innerHTML = days.map((d, i) => `<div class="scd">${i ? 'Comp-off day' : 'Shift crew'} · ${fmtShort(fromYmd(d))}</div>${scCrewHtml(cr[i], el.dataset.area, hi)}`).join(''); } catch (e) {} }); }
-  if (tab === 'setup') {
-    $('#lv').addEventListener('change', async e => { const s = e.target.closest('[data-scadd]'); if (!s || !s.value) return;
-      try { await rpc('hsm_sc_set_approver', { p_area: s.dataset.scadd, p_user: +s.value, p_on: true }); toast('Approver added'); viewLeave(); } catch (err) { netErr(err); } });
-    $('#lv').addEventListener('click', async e => { const x = e.target.closest('[data-scx]'); if (!x) return; const [a, u] = x.dataset.scx.split('|');
-      try { await rpc('hsm_sc_set_approver', { p_area: a, p_user: +u, p_on: false }); toast('Approver removed'); viewLeave(); } catch (err) { netErr(err); } });
-    $$('#lv select[data-p]').forEach(sel => sel.onchange = async () => { try { await rpc('hsm_leave_set_approver', { p_ids: [+sel.dataset.p], p_approver: sel.value ? +sel.value : null }); toast('Approver saved'); } catch (e) { netErr(e); } });
-    $('#lballgo').onclick = async () => { const v = $('#lball').value; if (!v) return toast('Choose the approver first');
-      if (!(await ask('Set this approver for everyone?', `${names(+v)} will approve leave for all ${people.length} people.`, 'Apply'))) return;
-      try { await rpc('hsm_leave_set_approver', { p_ids: people.map(x => x.id), p_approver: +v }); toast('Approver set for everyone'); viewLeave(); } catch (e) { netErr(e); } };
-  }
   if ($('#lseg')) $('#lseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.leaveTab = b.dataset.t; viewLeave(); } };
   if ($('#lpm')) { $('#lpm').onclick = () => { S.leaveMonth = new Date(y, mo - 1, 1); viewLeave(); }; $('#lnm').onclick = () => { S.leaveMonth = new Date(y, mo + 1, 1); viewLeave(); }; }
   $('#lv').onclick = async e => {
+    const rv = e.target.closest('[data-lrev],[data-scrv]'); if (rv) { const isL = !!rv.dataset.lrev, rid = +(rv.dataset.lrev || rv.dataset.scrv), md = $('#modal');
+      md.innerHTML = `<div class="sheet"><h3>Cancel approved ${isL ? 'leave' : 'shift change'}?</h3><p>The shift schedule goes back to what it was before${isL ? ' (from today onwards)' : ''}.</p>
+        <div class="fld"><label for="rvn">Reason (optional)</label><input id="rvn" maxlength="200" placeholder="e.g. Need to attend duty" autocomplete="off"></div>
+        <div class="two"><button class="btn ghost" id="rvx">Keep it</button><button class="btn pri" id="rvg">Yes, cancel</button></div></div>`;
+      md.classList.remove('hidden'); md.onclick = null; $('#rvx').onclick = () => md.classList.add('hidden');
+      $('#rvg').onclick = async () => { const note = $('#rvn').value.trim(); $('#rvg').disabled = true;
+        try { const n = await rpc(isL ? 'hsm_leave_revoke' : 'hsm_sc_revoke', { p_id: rid, p_note: note }); md.classList.add('hidden');
+          toast(n > 0 ? `Cancelled – schedule restored for ${n} entr${n > 1 ? 'ies' : 'y'}` : 'Cancelled – old entry not saved, please set the shift in the schedule manually', 5000); viewLeave(); } catch (err) { $('#rvg').disabled = false; netErr(err); } };
+      return; }
     const sx = e.target.closest('[data-sccx]'); if (sx) { if (!(await ask('Withdraw this request?', '', 'Withdraw'))) return;
       try { await rpc('hsm_sc_cancel', { p_id: +sx.dataset.sccx }); toast('Request withdrawn'); viewLeave(); } catch (err) { netErr(err); } return; }
     const sd = e.target.closest('[data-sca],[data-scr]'); if (sd) { const sid = +(sd.dataset.sca || sd.dataset.scr), sok = !!sd.dataset.sca, sr = scPend.find(x => x.id === sid); if (!sr) return;
@@ -2002,7 +2025,7 @@ async function viewLeave() {
       try { await rpc('hsm_leave_decide', { p_id: id, p_approve: ok, p_note: note, p_mark: ok }); md.classList.add('hidden'); toast(ok ? 'Leave approved' : 'Leave rejected'); viewLeave(); } catch (err) { netErr(err); } };
   };
   if ($('#lxl')) $('#lxl').onclick = async () => { try { toast('Preparing Excel…', 6000); const buf = await xl().leaveWorkbook(rows, `${MONTHS[mo]} ${y}`, leaveName, fmtShort, fromYmd); deliver(buf, `HSM E&A Leave ${MONTHS[mo]} ${y}.xlsx`, false); } catch (err) { netErr(err); } };
-  if (tab === 'setup' || tab === 'approve' || tab === 'all') { $('#lnew').style.display = 'none'; $('#scnew').style.display = 'none'; }
+  if (tab === 'approve' || tab === 'all') { $('#lnew').style.display = 'none'; $('#scnew').style.display = 'none'; }
   if (tab === 'shift') $('#lnew').style.display = 'none';
   if (tab === 'shift') $('#scnew').style.bottom = '88px';
   $('#scnew').onclick = () => scRequestSheet();

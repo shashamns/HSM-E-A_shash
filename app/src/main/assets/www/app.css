@@ -599,3 +599,8 @@ body{background:#F4F1F2}
 .scarea select{margin-top:8px;width:100%;height:44px;border:1.5px solid var(--line-2);border-radius:10px;background:#fff;font-size:15px;padding:0 8px}
 .scx{border:0;background:none;color:var(--red-700);font-weight:800;margin-left:4px;font-size:14px;padding:0 2px}
 .pcmt{padding:8px 0;border-top:1px solid var(--line-2);font-size:15px}
+.lachips{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 4px;scrollbar-width:none}.lachips::-webkit-scrollbar{display:none}
+.lachip{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 8px 0 14px;border-radius:21px;border:1.5px solid var(--line-2);background:#fff;font-size:15px;font-weight:700;color:var(--ink-2)}
+.lachip b{min-width:26px;height:26px;border-radius:13px;background:var(--red);color:#fff;font-size:13.5px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.lachip b.or{background:#E8710A}
+.lachip.on{background:var(--red-50);border-color:var(--red);color:var(--red-700)}
