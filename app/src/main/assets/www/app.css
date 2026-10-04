@@ -586,3 +586,16 @@ body{background:#F4F1F2}
 .calpick .cv{display:flex;transform:rotate(90deg);transition:transform .25s}
 .calpick.open .cv{transform:rotate(-90deg)}
 #calbox.hidden{display:none}
+
+/* v3.3 shift change + low stock */
+.qty.low{background:#FFE3C4;color:#B34700}
+.sceff{margin:8px 0;padding:10px 12px;border-radius:10px;background:var(--red-50);color:var(--red-700);font-size:14.5px;font-weight:600;line-height:1.5}
+.scw{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line-2)}
+.scd{font-size:12.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin:6px 0 4px}
+.scs{display:flex;flex-direction:column;gap:4px;margin:6px 0}.scs>b{font-size:13.5px;color:var(--ink-2)}
+.scs .chip{height:28px;font-size:14px;padding:0 10px}
+.scinfo{margin:10px 0}.scme{font-size:15.5px;margin-bottom:4px}
+.scarea{padding:10px 0;border-top:1px solid var(--line-2)}.scarea .a{font-weight:700;font-size:15.5px;margin-bottom:6px}
+.scarea select{margin-top:8px;width:100%;height:44px;border:1.5px solid var(--line-2);border-radius:10px;background:#fff;font-size:15px;padding:0 8px}
+.scx{border:0;background:none;color:var(--red-700);font-weight:800;margin-left:4px;font-size:14px;padding:0 2px}
+.pcmt{padding:8px 0;border-top:1px solid var(--line-2);font-size:15px}

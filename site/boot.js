@@ -3,7 +3,7 @@
  * New versions are downloaded in the background and used from the next start (or at once via the banner). */
 (function () {
   'use strict';
-  var BUILT = Number('19') || 0;             // version bundled in this APK (set by the build)
+  var BUILT = Number('20') || 0;             // version bundled in this APK (set by the build)
   var URL = 'https://jqxabsioebndhslyagxc.supabase.co/rest/v1/rpc/';
   var KEY = 'sb_publishable_iemA7-rKgs1VdZSH9hd2Kw__8458frU';
   var SLOT = 'hsm_bundle';

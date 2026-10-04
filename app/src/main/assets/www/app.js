@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.2';
+const APP_VERSION = '3.3';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -570,7 +570,8 @@ async function viewHome() {
   const now = new Date(); const sh = curShift(now);
   const cS = can('schedule'), cC = can('checklist'), cP = can('spares');
   const mods = MODULES.filter(m => can(m[0]));
-  const canAp = !!ME.is_admin || isModAdmin('leave');
+  const canAp = !!ME.is_admin || isModAdmin('leave') || store.get('hsm_scap', false);
+  if (!ME.is_admin && !isModAdmin('leave')) rpc('hsm_sc_is_approver').then(v => { v = v === true; if (v !== !!store.get('hsm_scap', false)) { store.set('hsm_scap', v); if (location.hash.replace('#', '') === '' || location.hash === '#home') viewHome(); } }).catch(() => {});
   $('#app').innerHTML = `<main class="scroll">
     <div class="hero"><div class="row"><div><div class="brand">HSM · Electrical &amp; Automation</div>
       <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div>
@@ -582,7 +583,7 @@ async function viewHome() {
     <div class="card thought"><span class="k">Thought of the day</span><p>“${esc(QUOTES[Math.floor(Date.now() / 864e5) % QUOTES.length])}”</p></div>
     ${cC || cP ? `<div class="stats" style="${cC && cP ? '' : 'grid-template-columns:1fr'}">
       ${cC ? `<button class="card stat" data-go="checklist"><span class="k">Check lists today</span><span class="v" id="hcl">–</span><span class="bar2"><i id="hclb" style="width:0"></i></span></button>` : ''}
-      ${cP ? `<button class="card stat" id="hlow"><span class="k">Spares out of stock</span><span class="v" id="hsp">–</span><span class="hint">Tap to view</span></button>` : ''}
+      ${cP ? `<button class="card stat" id="hlow"><span class="k">Spares out / low stock</span><span class="v" id="hsp">–</span><span class="hint" id="hspz">Tap to view</span></button>` : ''}
     </div>` : ''}
     <div class="sec-h">Apps</div>
     ${mods.length || canAp ? `<div class="grid">${canAp ? `<button class="card tile ap" data-go="approval"><span class="ic">${ic('key', 26)}<b class="bdg hidden" id="apb"></b></span><span><span class="tt">Approval</span></span><span class="ts" id="aps">Pending requests</span></button>` : ''}${mods.map(([k, t, i, sub]) => tile(k, i, t.replace(/'/g, '&#39;'), sub)).join('')}</div>`
@@ -599,7 +600,7 @@ async function viewHome() {
       cS ? soft(api(`shift_roster?select=name,shift,area,ranking&day=eq.${today}&order=ranking,name`)) : null,
       cC ? templates() : [],
       cC ? soft(api(`checklist_entries?select=template_code&check_date=eq.${today}`)) : null,
-      cP ? soft(api('spares?select=id&qty=lte.0')) : null]);
+      cP ? soft(api('spares?select=id,qty&qty=lt.5&low_hidden=eq.false')) : null]);
     if (cS && $('#hcrew')) {
       roster = roster || [];
       const crew = roster.filter(r => r.shift === sh);
@@ -612,7 +613,7 @@ async function viewHome() {
       const n = new Set(done.map(d => d.template_code)).size;
       $('#hcl').innerHTML = `${n}<small>/${tpl.length}</small>`; $('#hclb').style.width = (tpl.length ? 100 * n / tpl.length : 0) + '%';
     }
-    if (cP && $('#hsp')) $('#hsp').textContent = low ? low.length : '–';
+    if (cP && $('#hsp')) { $('#hsp').textContent = low ? low.length : '–'; const z = low ? low.filter(x => x.qty <= 0).length : 0; if ($('#hspz')) $('#hspz').textContent = low ? `${z} nil · ${low.length - z} below 5` : 'Tap to view'; }
   } catch (e) { netErr(e); }
   if (canAp) {
     try { const c = await approvalCounts(); const b = $('#apb');
@@ -621,16 +622,17 @@ async function viewHome() {
   }
 }
 async function approvalCounts() {
-  const c = { acc: 0, bad: 0, sug: 0, leave: 0, total: 0 }, jobs = [];
+  const c = { acc: 0, bad: 0, sug: 0, leave: 0, sc: 0, total: 0 }, jobs = [];
+  if (ME.is_admin || store.get('hsm_scap', false) || isModAdmin('leave')) jobs.push(rpc('hsm_sc_list', { p_scope: 'approve' }).then(r => { c.sc = (r || []).length; }).catch(() => {}));
   if (ME.is_admin) {
     jobs.push(rpc('hsm_users').then(req => { c.acc = req.filter(r => r.status === 'pending' || (r.status === 'approved' && r.pending_device_name)).length; c.bad = req.reduce((n, r) => n + (r.fails_24h || 0), 0); }).catch(() => {}));
     jobs.push(api('suggestions?select=id&status=eq.new').then(r => { c.sug = (r || []).length; }).catch(() => {}));
   }
   if (isModAdmin('leave')) jobs.push(api('leave_requests?select=id&status=eq.pending').then(r => { c.leave = (r || []).length; }).catch(() => {}));
-  await Promise.all(jobs); c.total = c.acc + c.sug + c.leave; return c;
+  await Promise.all(jobs); c.total = c.acc + c.sug + c.leave + c.sc; return c;
 }
 async function viewApprovalHub() {
-  if (!(ME.is_admin || isModAdmin('leave'))) return go('home');
+  if (!(ME.is_admin || isModAdmin('leave') || store.get('hsm_scap', false))) return go('home');
   $('#app').innerHTML = `${bar('Approval', 'home', `<button class="ib" id="aprf" aria-label="Refresh">${ic('refresh', 26)}</button>`)}<main class="scroll" id="aph"><div class="spin">Loading…</div></main>${nav('')}`;
   $('#aprf').onclick = viewApprovalHub;
   const c = await approvalCounts();
@@ -638,10 +640,11 @@ async function viewApprovalHub() {
   const rows = [];
   if (ME.is_admin) rows.push(row('acc', 'users', 'New users &amp; phone changes', c.acc ? `${c.acc} waiting for approval${c.bad ? ` · ${c.bad} wrong login${c.bad > 1 ? 's' : ''} today` : ''}` : `Nothing pending${c.bad ? ` · ${c.bad} wrong login${c.bad > 1 ? 's' : ''} today` : ''}`, c.acc));
   if (isModAdmin('leave')) rows.push(row('leave', 'plane', 'Leave requests', c.leave ? `${c.leave} waiting for your decision` : 'Nothing pending', c.leave));
+  if (ME.is_admin || store.get('hsm_scap', false) || isModAdmin('leave')) rows.push(row('sc', 'cal', 'Shift change requests', c.sc ? `${c.sc} waiting for your decision` : 'Nothing pending', c.sc));
   if (ME.is_admin) rows.push(row('sug', 'bulb', 'Suggestions from the team', c.sug ? `${c.sug} new` : 'No new suggestions', c.sug));
   $('#aph').innerHTML = `<div class="pad"><div class="label">${c.total ? `${c.total} item${c.total > 1 ? 's' : ''} waiting` : 'All clear – nothing pending'}</div><div class="list">${rows.join('')}</div></div>`;
   $('#aph').onclick = e => { const b = e.target.closest('[data-ap]'); if (!b) return; const k = b.dataset.ap;
-    if (k === 'acc') { S.reqTab = 'pending'; go('approvals'); } else if (k === 'leave') { S.leaveTab = 'approve'; go('leave'); } else { S.sugTab = 'inbox'; go('suggest'); } };
+    if (k === 'acc') { S.reqTab = 'pending'; go('approvals'); } else if (k === 'leave') { S.leaveTab = 'approve'; go('leave'); } else if (k === 'sc') { S.leaveTab = 'shift'; go('leave'); } else { S.sugTab = 'inbox'; go('suggest'); } };
 }
 async function homeAlerts() {
   const box = $('#hleave'); if (!box) return; let html = '';
@@ -1231,7 +1234,7 @@ function wireCombo(id, options, free) {
 function viewSpares() {
   $('#app').innerHTML = `${bar('Spares', 'home', `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button><button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="sq" type="search" placeholder="Search item, model, make, location, cupboard" value="${esc(S.spareQuery)}" aria-label="Search spares"></div></div>
-  <div class="tabs" role="tablist" id="tabs"><button data-a="__low" class="${S.spareLow ? 'on' : ''}" style="${S.spareLow ? 'background:var(--red);border-color:var(--red)' : ''}">Out of stock</button>${SPARE_AREAS.map(a => `<button role="tab" data-a="${esc(a)}" class="${!S.spareLow && a === S.spareArea ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>
+  <div class="tabs" role="tablist" id="tabs"><button data-a="__low" class="${S.spareLow ? 'on' : ''}" style="${S.spareLow ? 'background:var(--red);border-color:var(--red)' : ''}">Out / low stock</button>${SPARE_AREAS.map(a => `<button role="tab" data-a="${esc(a)}" class="${!S.spareLow && a === S.spareArea ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>
   <main class="scroll" id="list" style="padding-bottom:90px"><div class="spin">Loading…</div></main>
   <button class="fab" data-go="spare/new" style="bottom:24px">${ic('plus', 24)} Add spare</button>`;
   if (!SPARE_AREAS.includes(S.spareArea)) S.spareArea = SPARE_AREAS[0];
@@ -1246,24 +1249,28 @@ function viewSpares() {
 async function loadSpares() {
   const list = $('#list'); if (!list) return;
   const q = S.spareQuery.replace(/[,()*"]/g, ' ').trim(); const e = encodeURIComponent(q);
-  let path = 'spares?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key&order=material,id';
+  let path = 'spares?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden&order=qty,material,id';
   if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*,cupboard.ilike.*${e}*,cupboard_key.ilike.*${e}*)`;
-  if (S.spareLow) path += '&qty=lte.0'; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
+  if (S.spareLow) path += `&qty=lt.5&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
   const item = (r, showArea) => `<button class="item" data-go="spare/${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
       <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span></span>
-      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty <= 2 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
+      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < 5 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
   try {
     const rows = await api(path);
-    if (!rows.length) { list.innerHTML = `<div class="empty"><b>${q ? 'No match found' : S.spareLow ? 'Nothing out of stock' : 'No spares in this category yet'}</b>${q ? 'Try another word.' : S.spareLow ? '' : 'Tap “Add spare” to add one.'}</div>`; return; }
     if (S.spareLow) {
-      // out of stock, area-wise: each area sees its own list
+      // out of stock (red, qty 0) and low stock (orange, qty below 5), area-wise; items removed by Planning/area admin are in the "Removed" view
+      const tog = `<button class="linkbtn" id="shid" style="margin:0 16px 6px">${S.spareHid ? '← Back to out-of-stock list' : 'Show items removed by Planning'}</button>`;
+      if (!rows.length) { list.innerHTML = `<div class="empty"><b>${S.spareHid ? 'No removed items' : 'Nothing out of stock or low'}</b></div>${tog}`; $('#shid').onclick = () => { S.spareHid = !S.spareHid; loadSpares(); }; return; }
       const by = {}; rows.forEach(r => (by[r.area] = by[r.area] || []).push(r));
       const order = [...SPARE_AREAS.filter(a => by[a]), ...Object.keys(by).filter(a => !SPARE_AREAS.includes(a))];
-      list.innerHTML = `<div class="hint" style="padding:10px 16px 6px;font-weight:600">${rows.length} item${rows.length > 1 ? 's' : ''} out of stock in ${order.length} area${order.length > 1 ? 's' : ''}</div>`
+      const z = rows.filter(r => r.qty <= 0).length;
+      list.innerHTML = `<div class="hint" style="padding:10px 16px 6px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${z} out of stock <span style="color:var(--red)">●</span> · ${rows.length - z} low (below 5) <span style="color:#E8710A">●</span> · ${order.length} area${order.length > 1 ? 's' : ''}</div>${tog}`
         + order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => item(r, false)).join('')).join('');
+      $('#shid').onclick = () => { S.spareHid = !S.spareHid; loadSpares(); };
       return;
     }
+    if (!rows.length) { list.innerHTML = `<div class="empty"><b>${q ? 'No match found' : 'No spares in this category yet'}</b>${q ? 'Try another word.' : 'Tap “Add spare” to add one.'}</div>`; return; }
     list.innerHTML = `<div class="hint" style="padding:10px 16px 6px;font-weight:600">${rows.length} item${rows.length > 1 ? 's' : ''}${q ? ' · all categories' : ''}</div>` + rows.map(r => item(r, !!q)).join('');
   } catch (err) { list.innerHTML = '<div class="empty"><b>Could not load spares</b>Check network and tap refresh.</div>'; netErr(err); }
 }
@@ -1271,11 +1278,12 @@ let LOCS = null;
 async function viewSpare(id) {
   const isNew = id === 'new';
   $('#app').innerHTML = `${bar(isNew ? 'Add Spare' : 'Update Spare', 'spares')}<main class="scroll" id="sd"><div class="spin">Loading…</div></main>`;
-  let s = { area: S.spareArea, item_code: '', material: '', model: '', description: '', material_type: 'Spare', make: '', qty: 0, location: '', rack: '', cupboard: '', cupboard_key: '' }, log = [];
+  let s = { area: S.spareArea, item_code: '', material: '', model: '', description: '', material_type: 'Spare', make: '', qty: 0, location: '', rack: '', cupboard: '', cupboard_key: '' }, log = [], cmts = [], isPlan = false;
   try { const l = await rpc('hsm_spare_locations'); if (Array.isArray(l)) LOCS = l; } catch (e) { if (!isNet(e)) netErr(e); }
   if (!isNew) {
-    try { const [r, l] = await Promise.all([api(`spares?id=eq.${encodeURIComponent(id)}&select=*`), api(`spare_log?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=6`)]);
-      if (!r.length) { $('#sd').innerHTML = '<div class="empty"><b>Spare not found</b></div>'; return; } s = r[0]; log = l;
+    try { const [r, l, cm, pl] = await Promise.all([api(`spares?id=eq.${encodeURIComponent(id)}&select=*`), api(`spare_log?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=6`),
+        api(`spare_comments?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=30`).catch(() => []), rpc('hsm_is_planning').catch(() => false)]);
+      if (!r.length) { $('#sd').innerHTML = '<div class="empty"><b>Spare not found</b></div>'; return; } s = r[0]; log = l; cmts = cm || []; isPlan = pl === true;
     } catch (e) { netErr(e); $('#sd').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
   }
   const locs = () => [...new Set([...(LOCS || []), 'Basement Cupboard', 'FM TPS L1 Cupboard', 'Shift cupboard 1'])].sort((x, y) => x.localeCompare(y));
@@ -1300,9 +1308,17 @@ async function viewSpare(id) {
     <div class="fld"><label for="f-rem">Remark (used for)</label><textarea id="f-rem" rows="2" placeholder="e.g. Replaced faulty module in F1 panel"></textarea></div>
     <div class="two"><div class="fld"><label>Updated by</label><input readonly value="${esc(ME.name)}"></div><div class="fld"><label>Date · time</label><input readonly value="${fmtShort(now)} ${pad2(now.getHours())}:${pad2(now.getMinutes())}"></div></div>
     ${log.length ? `<div><div class="label" style="margin-top:6px">Recent updates</div><div class="list">${log.map(h => `<div class="lrow"><span class="tag ${h.change < 0 ? 'red' : h.change > 0 ? 'green' : ''}">${h.change > 0 ? '+' : ''}${h.change}</span><span class="tx"><span class="a" style="font-size:15.5px">${esc(h.remark || (h.change ? 'Stock updated' : 'Details edited'))}</span><span class="b">→ ${h.qty_after} Nos · ${esc(h.updated_by || '')} · ${fmtStamp(h.created_at)}</span></span></div>`).join('')}</div></div>` : ''}
+    ${isNew || !(s.qty < 5 || cmts.length) ? '' : `<div class="card" style="padding:14px" id="pcm"><div class="label" style="margin:0 0 6px">Planning comments${s.low_hidden ? ' · <span style="color:var(--amber)">removed from out-of-stock list</span>' : ''}</div>
+      ${cmts.length ? cmts.map(c => `<div class="pcmt"><b>${esc(c.name || '')}</b> <span class="hint">${fmtStamp(c.created_at)}</span><div>${esc(c.body)}</div></div>`).join('') : '<div class="hint">No comments yet</div>'}
+      ${isPlan ? `<div class="fld" style="margin-top:10px"><label for="pc-t">Add comment</label><textarea id="pc-t" rows="2" maxlength="500" placeholder="e.g. PR generated · Quote requested from vendor"></textarea></div>
+        <label class="admchk" style="margin:4px 0 10px"><input type="checkbox" id="pc-h" ${s.low_hidden ? 'checked' : ''}><span>Keep this item out of the out-of-stock / low list (high-value spare, always kept below 5)</span></label>
+        <button class="btn block" type="button" id="pc-go">Post comment</button>` : '<div class="hint" style="margin-top:8px">Only the Planning team or area admin can comment.</div>'}</div>`}
     <div style="height:40px"></div>
   </form></main>
   <div class="actions"><button class="btn ghost" type="button" id="cancel">Cancel</button><button class="btn pri" type="button" id="save">Save</button></div>`;
+  if ($('#pc-go')) $('#pc-go').onclick = async () => { const t = $('#pc-t').value.trim(), h = $('#pc-h').checked;
+    if (!t) return toast('Write a comment first'); const btn = $('#pc-go'); btn.disabled = true;
+    try { await rpc('hsm_spare_comment', { p_spare: s.id, p_body: t, p_hide: h === !!s.low_hidden ? null : h }); toast('Comment saved'); viewSpare(id); } catch (e) { btn.disabled = false; netErr(e); } };
   wireCombo('f-area', SPARE_AREAS.includes(s.area) ? SPARE_AREAS : [...SPARE_AREAS, s.area], false);
   wireCombo('f-loc', locs, true);
   wireCombo('f-type', ['Spare', 'Consumable', 'Tool'], false);
@@ -1827,12 +1843,68 @@ const leaveName = c => (LEAVE_TYPES.find(x => x[0] === c) || [c, c])[1];
 const LSTAT = { pending: ['Pending', 'amber'], approved: ['Approved', 'green'], rejected: ['Rejected', 'red'], cancelled: ['Withdrawn', 'grey'] };
 const fmtRange = r => r.from_day === r.to_day ? fmtShort(fromYmd(r.from_day)) : `${fmtShort(fromYmd(r.from_day))} → ${fmtShort(fromYmd(r.to_day))}`;
 const dayN = n => `${n} day${n === 1 ? '' : 's'}`;
+/* ---- shift change request ---- */
+const SC_KINDS = { swap: 'Swap shift with colleague', cover: 'Leave + colleague covers', other: 'Other request' };
+const SC_AREAS = [['*', 'All areas (shift schedule managers)'], ['L1', 'L1'], ['RM', 'RM'], ['FM', 'FM'], ['DC', 'DC'], ['Power', 'Power'], ['Drive', 'Drive'], ['Motor', 'Motor'], ['Crane', 'Crane'], ['Instrument', 'Instrument'], ['Shift', 'Shift'], ['Planning', 'Planning']];
+const SC_SH = { A: 'A shift', B: 'B shift', C: 'C shift', G: 'General', WO: 'Weekly off', L: 'On leave', COFF: 'Comp-off' };
+const scCrewCache = {};
+async function scCrew(day) { if (!scCrewCache[day]) scCrewCache[day] = (await rpc('hsm_sc_crew', { p_day: day })) || []; return scCrewCache[day]; }
+function scCrewHtml(crew, area, hi) {
+  hi = hi || []; let rows = crew; if (area && crew.some(r => r.area === area)) rows = crew.filter(r => r.area === area);
+  if (!rows.length) return '<div class="hint">No schedule uploaded for this date</div>';
+  const by = {}; rows.forEach(r => (by[r.shift] = by[r.shift] || []).push(r));
+  const order = [...['A', 'B', 'C', 'G'].filter(k => by[k]), ...Object.keys(by).filter(k => !['A', 'B', 'C', 'G'].includes(k)).sort()];
+  return order.map(k => `<div class="scs"><b>${esc(SC_SH[k] || k)}</b><span class="chips">${by[k].map(r => `<span class="chip ${hi.some(h => h && sameName(h, r.name)) ? 'me' : ''}">${esc(r.name)}</span>`).join('')}</span></div>`).join('');
+}
+const scCombo = (c, s) => (!c || ['WO', 'L', 'G', 'COFF'].includes(c)) ? s : (c < s ? c + '+' + s : s + '+' + c);
+const scEffect = r => r.kind === 'swap' ? `${firstName(r.name)}: ${r.my_shift} → ${r.with_shift}  ·  ${firstName(r.with_name)}: ${r.with_shift} → ${r.my_shift}`
+  : r.kind === 'cover' ? `${firstName(r.name)}: ${r.my_shift} → Leave  ·  ${firstName(r.with_name)}: ${r.with_shift} → ${scCombo(r.with_shift, r.my_shift)}${r.comp_day ? `  ·  ${firstName(r.with_name)} comp-off on ${fmtShort(fromYmd(r.comp_day))}` : ''}` : '';
+function scRequestSheet() {
+  const md = $('#modal'); let kind = 'swap'; const tom = ymd(new Date(Date.now() + 864e5));
+  md.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><h3>Shift change request</h3>
+    <div class="label" style="margin:10px 0 6px">What do you need?</div><div class="ltypes" id="sck">${Object.entries(SC_KINDS).map(([k, n]) => `<button type="button" data-k="${k}" class="${k === kind ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>
+    <div class="fld" style="margin-top:12px"><label for="scd">Date</label><input type="date" id="scd" value="${tom}"></div>
+    <div class="scinfo" id="scinfo"><div class="hint">Loading…</div></div>
+    <div class="fld" id="scwf"><label for="scw" id="scwl">Swap with</label><select id="scw"></select></div>
+    <div class="fld" id="scc" style="display:none"><label class="admchk"><input type="checkbox" id="scck" checked><span>Colleague takes comp-off on</span></label><input type="date" id="sccd"></div>
+    <div class="sceff" id="scpv"></div>
+    <div class="fld"><label for="scre">Reason / message to approver</label><textarea id="scre" rows="2" maxlength="400" placeholder="Short reason"></textarea></div>
+    <div class="two"><button class="btn ghost" id="scx">Cancel</button><button class="btn pri" id="scg">Send request</button></div></div>`;
+  md.classList.remove('hidden'); md.onclick = null;
+  let crew = [], me = null, others = [];
+  const peek = () => { const w = others.find(r => r.name === $('#scw').value); return { w }; };
+  const preview = () => { const pv = $('#scpv'); if (!me || kind === 'other') { pv.textContent = ''; return; } const { w } = peek(); if (!w) { pv.textContent = ''; return; }
+    const r = { kind, name: ME.name, my_shift: me.shift, with_name: w.name, with_shift: w.shift, comp_day: kind === 'cover' && $('#scck').checked ? $('#sccd').value : null };
+    pv.innerHTML = `<b>After approval:</b><br>${esc(scEffect(r)).replace(/ {2}· {2}/g, '<br>')}`; };
+  const draw = () => { $('#scwf').style.display = kind === 'other' ? 'none' : ''; $('#scc').style.display = kind === 'cover' ? '' : 'none';
+    $('#scwl').textContent = kind === 'swap' ? 'Swap with' : 'Colleague who will cover your shift';
+    others = crew.filter(r => me && r.area === me.area && r.name !== me.name && (kind === 'swap' ? r.shift !== me.shift && !['L'].includes(r.shift) : !['L', 'COFF'].includes(r.shift)));
+    $('#scw').innerHTML = others.map(r => `<option value="${esc(r.name)}">${esc(r.name)} — ${esc(SC_SH[r.shift] || r.shift)}</option>`).join('') || '<option value="">No colleague available</option>'; preview(); };
+  const load = async () => { const d = $('#scd').value; $('#scinfo').innerHTML = '<div class="hint">Loading…</div>';
+    try { crew = await scCrew(d); } catch (e) { crew = []; netErr(e); }
+    me = crew.find(r => sameName(r.name, ME.name)) || null;
+    $('#scinfo').innerHTML = me ? `<div class="scme">Your shift on ${fmtShort(fromYmd(d))}: <b>${esc(SC_SH[me.shift] || me.shift)}</b></div>${scCrewHtml(crew, me.area, [ME.name])}` : `<div class="hint" style="color:var(--amber)">${crew.length ? 'You are not in the shift schedule on this date.' : 'No shift schedule uploaded for this date.'}${kind === 'other' ? '' : ' Choose another date.'}</div>`;
+    const nx = new Date(fromYmd(d).getTime() + 864e5); $('#sccd').value = ymd(nx); draw(); };
+  $('#sck').onclick = e => { const b = e.target.closest('[data-k]'); if (!b) return; kind = b.dataset.k; $$('#sck button').forEach(x => x.classList.toggle('on', x === b)); draw(); };
+  $('#scd').onchange = load; $('#scw').onchange = preview; $('#scck').onchange = preview; $('#sccd').onchange = preview;
+  $('#scx').onclick = () => md.classList.add('hidden');
+  $('#scg').onclick = async () => { const btn = $('#scg'); const { w } = peek();
+    if (kind !== 'other' && !w) return toast('Select the colleague');
+    if (kind === 'other' && !$('#scre').value.trim()) return toast('Please write what you need');
+    btn.disabled = true;
+    try { await rpc('hsm_sc_apply', { p_kind: kind, p_day: $('#scd').value, p_with_name: kind === 'other' ? null : w.name, p_with_sap: kind === 'other' ? null : (w.sap_id || null),
+        p_comp_day: kind === 'cover' && $('#scck').checked ? $('#sccd').value : null, p_reason: $('#scre').value });
+      md.classList.add('hidden'); toast('Sent to your area approver'); S.leaveTab = 'shift'; viewLeave(); }
+    catch (err) { btn.disabled = false; netErr(err); } };
+  load();
+}
 async function viewLeave() {
-  const admin = isModAdmin('leave'); store.set('hsm_leave_seen', Date.now());
-  S.leaveTab = admin ? (S.leaveTab || 'mine') : 'mine';
+  const admin = isModAdmin('leave'); store.set('hsm_leave_seen', Date.now()); Object.keys(scCrewCache).forEach(k => delete scCrewCache[k]);
+  S.leaveTab = admin ? (S.leaveTab || 'mine') : (S.leaveTab === 'shift' ? 'shift' : 'mine');
   if (!S.leaveMonth) { const t = new Date(); S.leaveMonth = new Date(t.getFullYear(), t.getMonth(), 1); }
   const m = S.leaveMonth, y = m.getFullYear(), mo = m.getMonth(), first = ymd(m), last = ymd(new Date(y, mo + 1, 0));
   $('#app').innerHTML = `${bar('Leave Request', 'home')}<main class="scroll" id="lv" style="padding-bottom:96px"><div class="spin">Loading…</div></main>
+    <button class="fab" id="scnew" style="bottom:160px">${ic('cal', 22)} Shift change request</button>
     <button class="fab" id="lnew" style="bottom:88px">${ic('plus', 22)} Request leave</button>${nav('')}`;
   let rows = []; try { rows = await api(`leave_requests?select=*&from_day=lte.${last}&to_day=gte.${first}&order=from_day,id`); } catch (e) { $('#lv').innerHTML = '<div class="empty"><b>Could not load</b>Check network and try again.</div>'; netErr(e); return; }
   let pend = []; if (admin) { try { pend = await api('leave_requests?select=*&status=eq.pending&order=created_at'); } catch (e) {} }
@@ -1846,14 +1918,32 @@ async function viewLeave() {
       ${r.status === 'pending' && !who ? `<button class="linkbtn" data-cancel="${r.id}">${ic('x', 18)} Withdraw request</button>` : ''}
       ${r.status === 'pending' && who && admin ? `<div class="two" style="margin-top:10px"><button class="btn" data-rej="${r.id}">${ic('x')} Reject</button><button class="btn pri" data-app="${r.id}">${ic('ok')} Approve</button></div>${clash(r)}` : ''}</div>`;
   const clash = r => { const o = rows.filter(x => x.id !== r.id && ['approved', 'pending'].includes(x.status) && x.from_day <= r.to_day && x.to_day >= r.from_day); return o.length ? `<div class="hint" style="color:var(--amber);margin-top:8px">⚠ ${o.length} other${o.length > 1 ? 's' : ''} on leave in these dates: ${esc(o.slice(0, 4).map(x => firstName(x.name)).join(', '))}${o.length > 4 ? '…' : ''}</div>` : ''; };
-  let body = '', people = [];
-  if (tab === 'setup') { try { people = await rpc('hsm_leave_people') || []; } catch (e) { netErr(e); } }
+  let body = '', people = [], scMine = [], scPend = [], scAll = [], scApprs = [];
+  if (tab === 'shift') { try { [scMine, scPend, scAll] = await Promise.all([rpc('hsm_sc_list', { p_scope: 'mine' }), rpc('hsm_sc_list', { p_scope: 'approve' }), rpc('hsm_sc_list', { p_scope: 'all' })]);
+    scMine = scMine || []; scPend = scPend || []; scAll = (scAll || []).filter(r => r.status !== 'pending' && r.auth_id !== (SESSION && uidOfToken())); } catch (e) { netErr(e); } }
+  if (tab === 'setup') { try { [people, scApprs] = await Promise.all([rpc('hsm_leave_people'), rpc('hsm_sc_approvers')]); people = people || []; scApprs = scApprs || []; } catch (e) { netErr(e); } }
   const names = id => (people.find(x => x.id === id) || {}).full_name;
   if (tab === 'setup') {
     const opt = cur => `<option value="">Any approver / admin</option>${people.map(x => `<option value="${x.id}" ${cur === x.id ? 'selected' : ''}>${esc(x.full_name)}</option>`).join('')}`;
     body = `<div class="card" style="padding:14px;margin-bottom:12px"><div style="font-weight:700;font-size:17px">Who approves whose leave?</div><div class="hint" style="margin:4px 0 10px">Pick an approver for each person – anybody can be an approver. Picking someone gives them the approver right automatically. Without a choice, any approver or the app admin can decide.</div>
       <div class="fld" style="margin-bottom:8px"><label for="lball">Set one approver for everyone</label><select id="lball">${opt(null)}</select></div><button class="btn block" id="lballgo">Apply to everyone</button></div>
       ${people.map(x => `<div class="card lpers"><div class="tx"><div class="a">${esc(x.full_name)}</div><div class="b">${esc(x.sap_id || '')}${x.is_approver ? ' · approver' : ''}</div></div><select data-p="${x.id}" aria-label="Approver for ${esc(x.full_name)}">${opt(x.leave_approver)}</select></div>`).join('')}`;
+    const nm = id => (people.find(x => x.id === id) || {}).full_name || '';
+    body += `<div class="card" style="padding:14px;margin:18px 0 12px"><div style="font-weight:700;font-size:17px">Shift change approvers (area-wise)</div><div class="hint" style="margin:4px 0 10px">Shift change requests go only to the approvers of the person’s area. “All areas” approvers (shift schedule managers) can decide for every area. Anybody can be added.</div>
+      ${SC_AREAS.map(([k, lbl]) => { const mem = scApprs.filter(x => x.area === k);
+        return `<div class="scarea"><div class="a">${esc(lbl)}</div><div class="chips">${mem.map(x => `<span class="chip">${esc(x.name)}<button class="scx" data-scx="${esc(k)}|${x.user_id}" aria-label="Remove ${esc(x.name)}">✕</button></span>`).join('') || '<span class="hint">No approver – only app admin can decide</span>'}</div>
+        <select data-scadd="${esc(k)}" aria-label="Add approver for ${esc(lbl)}"><option value="">+ Add approver…</option>${people.filter(p => !mem.some(x => x.user_id === p.id)).map(p => `<option value="${p.id}">${esc(p.full_name)}</option>`).join('')}</select></div>`; }).join('')}</div>`;
+  } else if (tab === 'shift') {
+    const scCard = (r, mode) => `<div class="card lcard ${r.status}"><div class="lt"><span class="ltype">SC</span><div class="tx"><div class="a">${mode === 'mine' ? esc(SC_KINDS[r.kind]) : esc(r.name)}</div><div class="b">${fmtShort(fromYmd(r.day))}${mode === 'mine' ? '' : ' · ' + esc(SC_KINDS[r.kind])}${r.area ? ' · ' + esc(r.area) : ''}</div></div>${pill(r.status)}</div>
+      ${r.kind === 'other' ? '' : `<div class="sceff">${esc(scEffect(r))}</div>`}
+      ${r.reason ? `<div class="lr">“${esc(r.reason)}”</div>` : ''}
+      ${r.status !== 'pending' && r.decided_by ? `<div class="hint" style="margin-top:6px">${r.status === 'cancelled' ? 'Withdrawn' : LSTAT[r.status][0]} by ${esc(r.decided_by)} · ${fmtStamp(r.decided_at)}${r.decision_note ? ' · ' + esc(r.decision_note) : ''}${r.applied ? ' · schedule updated' : ''}</div>` : ''}
+      ${r.status === 'pending' ? `<div class="scw" data-day="${r.day}" data-comp="${r.comp_day || ''}" data-area="${esc(r.area || '')}" data-hi="${esc([r.name, r.with_name].filter(Boolean).join('|'))}"></div>` : ''}
+      ${r.status === 'pending' && mode === 'mine' ? `<button class="linkbtn" data-sccx="${r.id}">${ic('x', 18)} Withdraw request</button>` : ''}
+      ${r.status === 'pending' && mode === 'dec' ? `<div class="two" style="margin-top:10px"><button class="btn" data-scr="${r.id}">${ic('x')} Reject</button><button class="btn pri" data-sca="${r.id}">${ic('ok')} Approve</button></div>` : ''}</div>`;
+    body = `${scPend.length ? `<div class="label">${scPend.length} shift change${scPend.length > 1 ? 's' : ''} waiting for your decision</div>${scPend.map(r => scCard(r, 'dec')).join('')}` : ''}
+      <div class="label">My shift change requests</div>${scMine.length ? scMine.map(r => scCard(r, 'mine')).join('') : '<div class="empty"><b>No shift change requests</b>Tap the red “Shift change request” button.</div>'}
+      ${scAll.length ? `<div class="label" style="margin-top:14px">Recently decided (your areas)</div>${scAll.slice(0, 30).map(r => scCard(r, 'all')).join('')}` : ''}`;
   } else if (tab === 'mine') {
     const ap = mine.filter(r => r.status === 'approved'), days = ap.reduce((n, r) => n + +r.days, 0), pn = mine.filter(r => r.status === 'pending').length;
     body = `${mhead}<div class="lsum"><div><b>${days}</b><span>Approved days</span></div><div><b>${pn}</b><span>Pending</span></div><div><b>${mine.length}</b><span>Requests</span></div></div>
@@ -1867,8 +1957,16 @@ async function viewLeave() {
       ${rows.length ? `<button class="btn block" id="lxl" style="margin-bottom:12px">${ic('xls')} Excel of ${MONTHS[mo]}</button>` : ''}
       ${rows.length ? rows.map(r => card(r, true)).join('') : `<div class="empty"><b>No leave in ${MONTHS[mo]}</b></div>`}`;
   }
-  $('#lv').innerHTML = `<div class="pad">${admin ? `<div class="seg" id="lseg" style="margin:0 0 12px">${[['mine', 'My leave'], ['approve', `Approve${pend.length ? ` (${pend.length})` : ''}`], ['all', 'Report'], ...(ME.is_admin ? [['setup', 'Approvers']] : [])].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}${body}</div>`;
+  $('#lv').innerHTML = `<div class="pad"><div class="seg" id="lseg" style="margin:0 0 12px">${[['mine', 'My leave'], ['shift', 'Shift change'], ...(admin ? [['approve', `Approve${pend.length ? ` (${pend.length})` : ''}`], ['all', 'Report']] : []), ...(ME.is_admin ? [['setup', 'Approvers']] : [])].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>${body}</div>`;
+  if (tab === 'shift') { $$('#lv .scw').forEach(async el => { try {
+      const days = [el.dataset.day, ...(el.dataset.comp ? [el.dataset.comp] : [])], hi = el.dataset.hi.split('|');
+      const cr = await Promise.all(days.map(scCrew));
+      el.innerHTML = days.map((d, i) => `<div class="scd">${i ? 'Comp-off day' : 'Shift crew'} · ${fmtShort(fromYmd(d))}</div>${scCrewHtml(cr[i], el.dataset.area, hi)}`).join(''); } catch (e) {} }); }
   if (tab === 'setup') {
+    $('#lv').addEventListener('change', async e => { const s = e.target.closest('[data-scadd]'); if (!s || !s.value) return;
+      try { await rpc('hsm_sc_set_approver', { p_area: s.dataset.scadd, p_user: +s.value, p_on: true }); toast('Approver added'); viewLeave(); } catch (err) { netErr(err); } });
+    $('#lv').addEventListener('click', async e => { const x = e.target.closest('[data-scx]'); if (!x) return; const [a, u] = x.dataset.scx.split('|');
+      try { await rpc('hsm_sc_set_approver', { p_area: a, p_user: +u, p_on: false }); toast('Approver removed'); viewLeave(); } catch (err) { netErr(err); } });
     $$('#lv select[data-p]').forEach(sel => sel.onchange = async () => { try { await rpc('hsm_leave_set_approver', { p_ids: [+sel.dataset.p], p_approver: sel.value ? +sel.value : null }); toast('Approver saved'); } catch (e) { netErr(e); } });
     $('#lballgo').onclick = async () => { const v = $('#lball').value; if (!v) return toast('Choose the approver first');
       if (!(await ask('Set this approver for everyone?', `${names(+v)} will approve leave for all ${people.length} people.`, 'Apply'))) return;
@@ -1877,6 +1975,18 @@ async function viewLeave() {
   if ($('#lseg')) $('#lseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.leaveTab = b.dataset.t; viewLeave(); } };
   if ($('#lpm')) { $('#lpm').onclick = () => { S.leaveMonth = new Date(y, mo - 1, 1); viewLeave(); }; $('#lnm').onclick = () => { S.leaveMonth = new Date(y, mo + 1, 1); viewLeave(); }; }
   $('#lv').onclick = async e => {
+    const sx = e.target.closest('[data-sccx]'); if (sx) { if (!(await ask('Withdraw this request?', '', 'Withdraw'))) return;
+      try { await rpc('hsm_sc_cancel', { p_id: +sx.dataset.sccx }); toast('Request withdrawn'); viewLeave(); } catch (err) { netErr(err); } return; }
+    const sd = e.target.closest('[data-sca],[data-scr]'); if (sd) { const sid = +(sd.dataset.sca || sd.dataset.scr), sok = !!sd.dataset.sca, sr = scPend.find(x => x.id === sid); if (!sr) return;
+      const md = $('#modal');
+      md.innerHTML = `<div class="sheet"><h3>${sok ? 'Approve' : 'Reject'} shift change</h3><p><b>${esc(sr.name)}</b> · ${esc(SC_KINDS[sr.kind])} · ${fmtShort(fromYmd(sr.day))}</p>${sr.kind === 'other' ? '' : `<div class="sceff">${esc(scEffect(sr))}</div>`}
+        ${sok && sr.kind !== 'other' ? '<div class="hint" style="margin:6px 0">On approval the shift schedule is updated automatically.</div>' : ''}
+        <div class="fld"><label for="dn">Note ${sok ? '(optional)' : ''}</label><input id="dn" maxlength="200" placeholder="${sok ? 'Approved' : 'Reason for rejecting'}" autocomplete="off"></div>
+        <div class="two"><button class="btn ghost" id="dx">Cancel</button><button class="btn pri" id="dg">${sok ? 'Approve' : 'Reject'}</button></div></div>`;
+      md.classList.remove('hidden'); md.onclick = null; $('#dx').onclick = () => md.classList.add('hidden');
+      $('#dg').onclick = async () => { const note = $('#dn').value.trim(); if (!sok && !note) return toast('Please write a reason');
+        try { await rpc('hsm_sc_decide', { p_id: sid, p_approve: sok, p_note: note }); md.classList.add('hidden'); toast(sok ? 'Approved – schedule updated' : 'Rejected'); viewLeave(); } catch (err) { netErr(err); } };
+      return; }
     const c = e.target.closest('[data-cancel]'); if (c) { if (!(await ask('Withdraw this request?', '', 'Withdraw'))) return;
       try { await rpc('hsm_leave_cancel', { p_id: +c.dataset.cancel }); toast('Request withdrawn'); viewLeave(); } catch (err) { netErr(err); } return; }
     const a = e.target.closest('[data-app],[data-rej]'); if (!a) return;
@@ -1884,15 +1994,18 @@ async function viewLeave() {
     const md = $('#modal');
     md.innerHTML = `<div class="sheet"><h3>${ok ? 'Approve' : 'Reject'} leave</h3><p><b>${esc(r.name)}</b> · ${esc(leaveName(r.leave_type))}<br>${fmtRange(r)} · ${dayN(+r.days)}</p>
       <div class="fld"><label for="dn">Note ${ok ? '(optional)' : ''}</label><input id="dn" maxlength="200" placeholder="${ok ? 'Enjoy your leave' : 'Reason for rejecting'}" autocomplete="off"></div>
-      ${ok ? `<label class="admchk" style="margin:4px 0 12px"><input type="checkbox" id="dm" checked><span>Mark “L” in the shift schedule for these dates</span></label>` : ''}
+      ${ok ? `<div class="hint" style="margin:4px 0 12px">${ic('cal', 16)} “L” will be marked in the shift schedule automatically for these dates.</div>` : ''}
       <div class="two"><button class="btn ghost" id="dx">Cancel</button><button class="btn pri" id="dg">${ok ? 'Approve' : 'Reject'}</button></div></div>`;
     md.classList.remove('hidden'); md.onclick = null;
     $('#dx').onclick = () => md.classList.add('hidden');
     $('#dg').onclick = async () => { const note = $('#dn').value.trim(); if (!ok && !note) return toast('Please write a reason');
-      try { await rpc('hsm_leave_decide', { p_id: id, p_approve: ok, p_note: note, p_mark: ok && $('#dm').checked }); md.classList.add('hidden'); toast(ok ? 'Leave approved' : 'Leave rejected'); viewLeave(); } catch (err) { netErr(err); } };
+      try { await rpc('hsm_leave_decide', { p_id: id, p_approve: ok, p_note: note, p_mark: ok }); md.classList.add('hidden'); toast(ok ? 'Leave approved' : 'Leave rejected'); viewLeave(); } catch (err) { netErr(err); } };
   };
   if ($('#lxl')) $('#lxl').onclick = async () => { try { toast('Preparing Excel…', 6000); const buf = await xl().leaveWorkbook(rows, `${MONTHS[mo]} ${y}`, leaveName, fmtShort, fromYmd); deliver(buf, `HSM E&A Leave ${MONTHS[mo]} ${y}.xlsx`, false); } catch (err) { netErr(err); } };
-  if (tab === 'setup' || tab === 'approve') $('#lnew').style.display = 'none';
+  if (tab === 'setup' || tab === 'approve' || tab === 'all') { $('#lnew').style.display = 'none'; $('#scnew').style.display = 'none'; }
+  if (tab === 'shift') $('#lnew').style.display = 'none';
+  if (tab === 'shift') $('#scnew').style.bottom = '88px';
+  $('#scnew').onclick = () => scRequestSheet();
   $('#lnew').onclick = () => {
     const t0 = ymd(new Date()); let type = 'CL';
     const md = $('#modal');
