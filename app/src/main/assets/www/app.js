@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.5';
+const APP_VERSION = '3.6';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -2011,7 +2011,7 @@ async function drawApproverSetup(box) {
 }
 async function viewLeave() {
   const admin = isModAdmin('leave'); store.set('hsm_leave_seen', Date.now()); Object.keys(scCrewCache).forEach(k => delete scCrewCache[k]);
-  S.leaveTab = admin ? (S.leaveTab || 'mine') : (S.leaveTab === 'shift' ? 'shift' : 'mine');
+  S.leaveTab = admin ? (S.leaveTab || 'mine') : (['shift', 'month'].includes(S.leaveTab) ? S.leaveTab : 'mine');
   if (!S.leaveMonth) { const t = new Date(); S.leaveMonth = new Date(t.getFullYear(), t.getMonth(), 1); }
   const m = S.leaveMonth, y = m.getFullYear(), mo = m.getMonth(), first = ymd(m), last = ymd(new Date(y, mo + 1, 0));
   $('#app').innerHTML = `${bar('Leave Request', 'home')}<main class="scroll" id="lv" style="padding-bottom:96px"><div class="spin">Loading…</div></main>
@@ -2033,7 +2033,22 @@ async function viewLeave() {
   let body = '', people = [], scMine = [], scPend = [], scAll = [], scApprs = [];
   if (tab === 'shift') { try { [scMine, scPend, scAll] = await Promise.all([rpc('hsm_sc_list', { p_scope: 'mine' }), rpc('hsm_sc_list', { p_scope: 'approve' }), rpc('hsm_sc_list', { p_scope: 'all' })]);
     scMine = scMine || []; scPend = scPend || []; scAll = (scAll || []).filter(r => r.status !== 'pending' && r.auth_id !== (SESSION && uidOfToken())); } catch (e) { netErr(e); } }
-  if (tab === 'shift') {
+  let lm = [];
+  if (tab === 'month') { try { lm = (await rpc('hsm_leave_month', { p_from: first, p_to: last })) || []; } catch (e) { netErr(e); } }
+  if (tab === 'month') {
+    const af = S.lmArea || '', sf = S.lmShift || '';
+    const areas = [...new Set(lm.map(p => p.area).filter(Boolean))].sort(), shs = ['A', 'B', 'C', 'G'];
+    const list = lm.filter(p => (!af || p.area === af) && (!sf || (p.shifts || []).includes(sf)));
+    const onL = list.filter(p => p.leaves.length).length, ap = list.reduce((n, p) => n + p.leaves.filter(l => l.status === 'approved').length, 0), pn = list.reduce((n, p) => n + p.leaves.filter(l => l.status === 'pending').length, 0);
+    const rng = l => { const f = l.from < first ? first : l.from, t = l.to > last ? last : l.to, fd = fromYmd(f), td = fromYmd(t); const s = d => d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3); return f === t ? s(fd) : s(fd) + ' – ' + s(td); };
+    const row = p => `<div class="lmr"><div class="lmn"><b>${esc(p.name)}</b><span>${esc(p.shift || '')}${p.shift && p.area ? ' · ' : ''}${esc(p.area || '')}</span></div><div class="lmd">${p.leaves.length ? p.leaves.map(l => `<span class="lmc ${l.status}">${rng(l)}${l.half ? ' ½' : ''}</span>`).join('') : '<span class="lmnone">No leave</span>'}</div></div>`;
+    const grp = {}; list.forEach(p => { (grp[p.area || 'Other'] = grp[p.area || 'Other'] || []).push(p); });
+    body = `${mhead}
+      <div class="lachips" id="lmA"><button class="lachip ${af ? '' : 'on'}" data-a="">All areas</button>${areas.map(a => `<button class="lachip ${af === a ? 'on' : ''}" data-a="${esc(a)}">${esc(a)}</button>`).join('')}</div>
+      <div class="lachips" id="lmS"><button class="lachip ${sf ? '' : 'on'}" data-s="">All shifts</button>${shs.map(s => `<button class="lachip ${sf === s ? 'on' : ''}" data-s="${s}">${s} shift</button>`).join('')}</div>
+      <div class="lmleg"><span class="lmc approved">Approved ${ap}</span><span class="lmc pending">Pending ${pn}</span><span class="hint">${onL} of ${list.length} people on leave</span></div>
+      ${list.length ? Object.keys(grp).sort().map(a => `<div class="label">${esc(a)} · ${grp[a].length}</div><div class="card lmt">${grp[a].map(row).join('')}</div>`).join('') : '<div class="empty"><b>No people found</b>Change the area or shift filter.</div>'}`;
+  } else if (tab === 'shift') {
     const scCard = (r, mode) => `<div class="card lcard ${r.status}"><div class="lt"><span class="ltype">SC</span><div class="tx"><div class="a">${mode === 'mine' ? esc(SC_KINDS[r.kind]) : esc(r.name)}</div><div class="b">${fmtShort(fromYmd(r.day))}${mode === 'mine' ? '' : ' · ' + esc(SC_KINDS[r.kind])}${r.area ? ' · ' + esc(r.area) : ''}</div></div>${pill(r.status)}</div>
       ${r.kind === 'other' ? '' : `<div class="sceff">${esc(scEffect(r))}</div>`}
       ${r.reason ? `<div class="lr">“${esc(r.reason)}”</div>` : ''}
@@ -2058,7 +2073,7 @@ async function viewLeave() {
       ${rows.length ? `<button class="btn block" id="lxl" style="margin-bottom:12px">${ic('xls')} Excel of ${MONTHS[mo]}</button>` : ''}
       ${rows.length ? rows.map(r => card(r, true)).join('') : `<div class="empty"><b>No leave in ${MONTHS[mo]}</b></div>`}`;
   }
-  $('#lv').innerHTML = `<div class="pad"><div class="seg" id="lseg" style="margin:0 0 12px">${[['mine', 'My leave'], ['shift', 'Shift change'], ...(admin ? [['approve', `Approve${pend.length ? ` (${pend.length})` : ''}`], ['all', 'Report']] : [])].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>${body}</div>`;
+  $('#lv').innerHTML = `<div class="pad"><div class="seg" id="lseg" style="margin:0 0 12px">${[['mine', 'My leave'], ['shift', 'Shift change'], ['month', 'Month view'], ...(admin ? [['approve', `Approve${pend.length ? ` (${pend.length})` : ''}`], ['all', 'Report']] : [])].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>${body}</div>`;
   if (tab === 'shift') { $$('#lv .scw').forEach(async el => { try {
       const days = [el.dataset.day, ...(el.dataset.comp ? [el.dataset.comp] : [])], hi = el.dataset.hi.split('|');
       const cr = await Promise.all(days.map(scCrew));
@@ -2066,6 +2081,8 @@ async function viewLeave() {
   { const on = $('#lseg .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); }
   centerOn('#lseg .on');
   if ($('#lseg')) $('#lseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.leaveTab = b.dataset.t; viewLeave(); } };
+  if (tab === 'month') { $('#scnew').style.display = 'none'; $('#lnew').style.display = 'none'; }
+  if ($('#lmA')) { $('#lmA').onclick = e => { const b = e.target.closest('[data-a]'); if (b) { S.lmArea = b.dataset.a; viewLeave(); } }; $('#lmS').onclick = e => { const b = e.target.closest('[data-s]'); if (b) { S.lmShift = b.dataset.s; viewLeave(); } }; }
   if ($('#lpm')) { $('#lpm').onclick = () => { S.leaveMonth = new Date(y, mo - 1, 1); viewLeave(); }; $('#lnm').onclick = () => { S.leaveMonth = new Date(y, mo + 1, 1); viewLeave(); }; }
   $('#lv').onclick = async e => {
     const rv = e.target.closest('[data-lrev],[data-scrv]'); if (rv) { const isL = !!rv.dataset.lrev, rid = +(rv.dataset.lrev || rv.dataset.scrv), md = $('#modal');

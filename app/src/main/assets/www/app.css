@@ -621,3 +621,11 @@ body{background:#F4F1F2}
 .planrow .n{font-size:17px}
 .pnone{display:block;margin-top:4px;font-size:13.5px;color:var(--muted)}
 .planrow .pnote small{font-weight:500;color:#4a6a90}
+
+.lmt{padding:4px 12px}.lmr{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line,#eee)}.lmr:last-child{border-bottom:0}
+.lmn{flex:0 0 42%;min-width:0}.lmn b{display:block;font-size:14px}.lmn span{font-size:12px;color:var(--mut,#777)}
+.lmd{flex:1;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.lmc{display:inline-block;font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap}
+.lmc.approved{background:#e3f4e8;color:#1b7a3a}.lmc.pending{background:#fde3e6;color:#c8102e}
+.lmnone{font-size:12.5px;color:#9aa0a8}.lmleg{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 4px}
+#lmA,#lmS{padding:4px 0}#lmA .lachip,#lmS .lachip{height:34px;padding:0 14px;font-size:13px}
