@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.4';
+const APP_VERSION = '3.4.1';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -653,6 +653,8 @@ async function homeAlerts() {
   if (can('checklist')) { try { const d = await abnormalFor(ymd(new Date())); if (d.items.length) html += `<button class="alert" data-go="actions" style="margin-top:10px">${ic('warn')}<span style="flex:1">${d.items.length} abnormal reading${d.items.length > 1 ? 's' : ''} today – action required</span>${ic('chev')}</button>`; } catch (e) {} }
   box.innerHTML = html;
 }
+// keep the selected tab visible inside a sliding tab bar
+function centerOn(sel) { const f = () => { const on = $(sel); if (!on || !on.parentElement) return; const c = on.parentElement; c.scrollLeft = on.offsetLeft - (c.clientWidth - on.offsetWidth) / 2; }; requestAnimationFrame(f); setTimeout(f, 250); }
 const tile = (to, icon, t, s) => `<button class="card tile" data-go="${to}"><span class="ic">${ic(icon, 26)}</span><span><span class="tt">${t}</span></span><span class="ts">${s}</span></button>`;
 
 /* ================= PROFILE ================= */
@@ -735,6 +737,8 @@ async function viewApprovals() {
     <div class="seg" id="aseg">${[['pending','Pending'],['users','Users'],['approvers','Approvers'],['log','Sign-ins'],['other','Others']].map(([k, l]) => `<button data-t="${k}" class="${S.reqTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <main class="scroll" id="al"><div class="spin">Loading…</div></main>`;
   $('#arf').onclick = viewApprovals;
+  centerOn('#aseg .on');
+  { const on = $('#aseg .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); }
   $('#aseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.reqTab = b.dataset.t; viewApprovals(); } };
   try { REQ = await rpc('hsm_users'); } catch (e) { netErr(e); $('#al').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
   const isPend = r => r.status === 'pending' || (r.status === 'approved' && r.pending_device_name);
@@ -1237,7 +1241,7 @@ function viewSpares() {
   <main class="scroll" id="list" style="padding-bottom:90px"><div class="spin">Loading…</div></main>
   <button class="fab" data-go="spare/new" style="bottom:24px">${ic('plus', 24)} Add spare</button>`;
   if (!SPARE_AREAS.includes(S.spareArea)) S.spareArea = SPARE_AREAS[0];
-  const on = $('#tabs .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+  centerOn('#tabs .on');
   $('#tabs').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === '__low') S.spareLow = !S.spareLow; else { S.spareLow = false; S.spareArea = b.dataset.a; } viewSpares(); };
   $('#rbtn').onclick = loadSpares;
   $('#sxls').onclick = async () => { if (!(await ask('Download spares Excel?', 'All categories, one sheet each, in your HSM Spares format.', 'Download'))) return;
@@ -1251,12 +1255,14 @@ async function loadSpares() {
   let path = 'spares?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden&order=qty,material,id';
   if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*,cupboard.ilike.*${e}*,cupboard_key.ilike.*${e}*)`;
   if (S.spareLow) path += `&qty=lt.5&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
+  let notes = {};
   const item = (r, showArea) => `<button class="item" data-go="spare/${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
-      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span></span>
+      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span>${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
       <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < 5 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
   try {
     const rows = await api(path);
+    if (S.spareLow && rows.length) { try { const cm = await api(`spare_comments?select=spare_id,body&spare_id=in.(${rows.map(r => r.id).join(',')})&order=created_at.desc`); (cm || []).forEach(x => { if (!notes[x.spare_id] && !String(x.body).startsWith('[')) notes[x.spare_id] = x; }); } catch (e) {} }
     if (S.spareLow) {
       // out of stock (red, qty 0) and low stock (orange, qty below 5), area-wise; items removed by Planning/area admin are in the "Removed" view
       const tog = `<button class="linkbtn" id="shid" style="margin:0 16px 6px">${S.spareHid ? '← Back to out-of-stock list' : 'Show items removed by Planning'}</button>`;
@@ -1268,14 +1274,16 @@ async function loadSpares() {
       const shown = sel === 'all' ? rows : by[sel];
       const chip = (k, lbl, list) => `<button data-la="${esc(k)}" class="lachip ${sel === k ? 'on' : ''}">${esc(lbl)}<b class="${list.some(r => r.qty <= 0) ? '' : 'or'}">${list.length}</b></button>`;
       list.innerHTML = `<div class="lachips" id="lach">${chip('all', 'All areas', rows)}${order.map(a => chip(a, a, by[a])).join('')}</div>
-        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => r.qty <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => r.qty > 0).length} low (below 5) <span style="color:#E8710A">●</span>${sel === 'all' ? '' : ' · ' + esc(sel)}</div>${tog}`
+        <div class="areahead"><b>${sel === 'all' ? 'All areas' : esc(sel)}</b><span>${shown.length} item${shown.length > 1 ? 's' : ''}</span></div>
+        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => r.qty <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => r.qty > 0).length} low (below 5) <span style="color:#E8710A">●</span></div>${tog}`
         + (sel === 'all' ? order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => item(r, false)).join('')).join('') : shown.map(r => item(r, false)).join(''));
+      centerOn('#lach .on');
       $('#lach').onclick = e => { const b = e.target.closest('[data-la]'); if (b) { S.lowArea = b.dataset.la; loadSpares(); } };
       $('#shid').onclick = () => { S.spareHid = !S.spareHid; loadSpares(); };
       return;
     }
     if (!rows.length) { list.innerHTML = `<div class="empty"><b>${q ? 'No match found' : 'No spares in this category yet'}</b>${q ? 'Try another word.' : 'Tap “Add spare” to add one.'}</div>`; return; }
-    list.innerHTML = `<div class="hint" style="padding:10px 16px 6px;font-weight:600">${rows.length} item${rows.length > 1 ? 's' : ''}${q ? ' · all categories' : ''}</div>` + rows.map(r => item(r, !!q)).join('');
+    list.innerHTML = `<div class="areahead"><b>${q ? 'Search results' : esc(S.spareArea)}</b><span>${rows.length} item${rows.length > 1 ? 's' : ''}${q ? ' · all categories' : ''}</span></div>` + rows.map(r => item(r, !!q)).join('');
   } catch (err) { list.innerHTML = '<div class="empty"><b>Could not load spares</b>Check network and tap refresh.</div>'; netErr(err); }
 }
 let LOCS = null;
@@ -1312,17 +1320,26 @@ async function viewSpare(id) {
     <div class="fld"><label for="f-rem">Remark (used for)</label><textarea id="f-rem" rows="2" placeholder="e.g. Replaced faulty module in F1 panel"></textarea></div>
     <div class="two"><div class="fld"><label>Updated by</label><input readonly value="${esc(ME.name)}"></div><div class="fld"><label>Date · time</label><input readonly value="${fmtShort(now)} ${pad2(now.getHours())}:${pad2(now.getMinutes())}"></div></div>
     ${log.length ? `<div><div class="label" style="margin-top:6px">Recent updates</div><div class="list">${log.map(h => `<div class="lrow"><span class="tag ${h.change < 0 ? 'red' : h.change > 0 ? 'green' : ''}">${h.change > 0 ? '+' : ''}${h.change}</span><span class="tx"><span class="a" style="font-size:15.5px">${esc(h.remark || (h.change ? 'Stock updated' : 'Details edited'))}</span><span class="b">→ ${h.qty_after} Nos · ${esc(h.updated_by || '')} · ${fmtStamp(h.created_at)}</span></span></div>`).join('')}</div></div>` : ''}
-    ${isNew || !(s.qty < 5 || cmts.length || isPlan) ? '' : `<div class="card" style="padding:14px" id="pcm"><div class="label" style="margin:0 0 6px">Planning comments${s.low_hidden ? ' · <span style="color:var(--amber)">removed from out-of-stock list</span>' : ''}</div>
-      ${cmts.length ? cmts.map(c => `<div class="pcmt"><b>${esc(c.name || '')}</b> <span class="hint">${fmtStamp(c.created_at)}</span><div>${esc(c.body)}</div></div>`).join('') : '<div class="hint">No comments yet</div>'}
-      ${isPlan ? `<div class="fld" style="margin-top:10px"><label for="pc-t">Add comment</label><textarea id="pc-t" rows="2" maxlength="500" placeholder="e.g. PR generated · Quote requested from vendor"></textarea></div>
-        <label class="admchk" style="margin:4px 0 10px"><input type="checkbox" id="pc-h" ${s.low_hidden ? 'checked' : ''}><span>Keep this item out of the out-of-stock / low list (high-value spare, always kept below 5)</span></label>
-        <button class="btn block" type="button" id="pc-go">Post comment</button>` : '<div class="hint" style="margin-top:8px">Only the Planning team or area admin can comment.</div>'}</div>`}
+    ${isNew || !(s.qty < 5 || cmts.length || isPlan) ? '' : `<div class="card pln" id="pcm"><div class="plh">Planning status${s.low_hidden ? ' <span class="tag amber">Removed from out-of-stock list</span>' : ''}</div>
+      ${cmts.length ? cmts.map(c => `<div class="pcmt"><b>${esc(c.name || '')}</b> <span class="hint">${fmtStamp(c.created_at)}</span><div>${esc(c.body)}</div></div>`).join('') : '<div class="hint">No planning update yet.</div>'}
+      ${isPlan ? `<div class="label" style="margin:12px 0 6px">Tap to write quickly</div><div class="chips" id="pc-q">${['PR generated', 'Quotation requested from vendor', 'PO placed', 'Material in transit', 'High-value spare – kept below 5'].map(t => `<button type="button" class="chip" data-q="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+        <div class="fld" style="margin-top:10px"><label for="pc-t">Your comment</label><textarea id="pc-t" rows="2" maxlength="500" placeholder="Type here"></textarea></div>
+        <button class="btn pri block" type="button" id="pc-go">Post comment</button>
+        <button class="btn block" type="button" id="pc-h" style="margin-top:8px">${s.low_hidden ? 'Add back to out-of-stock list' : 'Remove from out-of-stock list'}</button>
+        <div class="hint" style="margin-top:6px">Remove is for high-value spares that are always kept below 5. A comment is saved with it.</div>` : ''}</div>`}
     <div style="height:40px"></div>
   </form></main>
   <div class="actions"><button class="btn ghost" type="button" id="cancel">Cancel</button><button class="btn pri" type="button" id="save">Save</button></div>`;
-  if ($('#pc-go')) $('#pc-go').onclick = async () => { const t = $('#pc-t').value.trim(), h = $('#pc-h').checked;
-    if (!t) return toast('Write a comment first'); const btn = $('#pc-go'); btn.disabled = true;
-    try { await rpc('hsm_spare_comment', { p_spare: s.id, p_body: t, p_hide: h === !!s.low_hidden ? null : h }); toast('Comment saved'); viewSpare(id); } catch (e) { btn.disabled = false; netErr(e); } };
+  if ($('#pc-go')) {
+    $('#pc-q').onclick = e => { const b = e.target.closest('[data-q]'); if (b) { $('#pc-t').value = b.dataset.q; $('#pc-t').focus(); } };
+    const send = async (hide, btn) => { let t = $('#pc-t').value.trim();
+      if (hide === null && !t) return toast('Write a comment first');
+      if (hide !== null && !t) t = hide ? 'High-value spare – kept below 5' : 'Added back to list';
+      btn.disabled = true;
+      try { await rpc('hsm_spare_comment', { p_spare: s.id, p_body: t, p_hide: hide }); toast(hide === true ? 'Removed from out-of-stock list' : hide === false ? 'Added back to list' : 'Comment saved'); viewSpare(id); } catch (e) { btn.disabled = false; netErr(e); } };
+    $('#pc-go').onclick = () => send(null, $('#pc-go'));
+    $('#pc-h').onclick = () => send(!s.low_hidden, $('#pc-h'));
+  }
   wireCombo('f-area', SPARE_AREAS.includes(s.area) ? SPARE_AREAS : [...SPARE_AREAS, s.area], false);
   wireCombo('f-loc', locs, true);
   wireCombo('f-type', ['Spare', 'Consumable', 'Tool'], false);
@@ -1986,6 +2003,8 @@ async function viewLeave() {
       const days = [el.dataset.day, ...(el.dataset.comp ? [el.dataset.comp] : [])], hi = el.dataset.hi.split('|');
       const cr = await Promise.all(days.map(scCrew));
       el.innerHTML = days.map((d, i) => `<div class="scd">${i ? 'Comp-off day' : 'Shift crew'} · ${fmtShort(fromYmd(d))}</div>${scCrewHtml(cr[i], el.dataset.area, hi)}`).join(''); } catch (e) {} }); }
+  { const on = $('#lseg .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); }
+  centerOn('#lseg .on');
   if ($('#lseg')) $('#lseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.leaveTab = b.dataset.t; viewLeave(); } };
   if ($('#lpm')) { $('#lpm').onclick = () => { S.leaveMonth = new Date(y, mo - 1, 1); viewLeave(); }; $('#lnm').onclick = () => { S.leaveMonth = new Date(y, mo + 1, 1); viewLeave(); }; }
   $('#lv').onclick = async e => {

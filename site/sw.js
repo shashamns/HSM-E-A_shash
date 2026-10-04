@@ -1,6 +1,6 @@
 /* HSM E&A web app – keeps the app files on the phone so it opens and works with no network.
  * Data (Supabase) is never cached here; the app keeps its own offline copy. */
-const CACHE = 'hsm-ea-21';
+const CACHE = 'hsm-ea-22';
 const FILES = ['./', 'index.html', 'boot.js', 'app.js', 'xlreport.js', 'app.css', 'lib/exceljs.min.js', 'manifest.webmanifest',
   'xl/templates.json', 'xl/ABB.xlsx', 'xl/DC.xlsx', 'xl/FMCB.xlsx', 'xl/INST.xlsx', 'xl/MOTABB.xlsx', 'xl/MOTMD.xlsx', 'xl/MOTSYN.xlsx', 'xl/PWRSG.xlsx',
   'xl/PWRLA.xlsx', 'xl/PWRTR.xlsx', 'xl/RHF.xlsx', 'xl/RMD.xlsx', 'img/coil.png', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
