@@ -767,6 +767,7 @@ async function viewApprovals() {
   $('#al').innerHTML = list.length ? `<div class="pad">${S.reqTab === 'users' ? '<div class="label">Tap a person to see their sign-ins and phone</div>' : ''}<div class="list">${body}</div></div>`
     : `<div class="empty"><b>${S.reqTab === 'pending' ? 'Nothing waiting' : 'Nobody here'}</b>${S.reqTab === 'pending' ? 'New users and phone changes appear here.' : ''}</div>`;
   list.filter(isPend).forEach(r => wireAccess('p' + r.id));
+  if (['users', 'other'].includes(S.reqTab)) { $('#al').insertAdjacentHTML('afterbegin', `<div style="padding:12px 16px 0"><button class="btn pri block" id="uadd">${ic('plus', 20)} Add user</button></div>`); $('#uadd').onclick = addUserSheet; }
   $('#al').onclick = async e => {
     const b = e.target.closest('[data-d]'); if (!b) return;
     const r = REQ.find(x => String(x.id) === b.dataset.d); const ok = b.dataset.a === '1'; const phone = r.status === 'approved';
@@ -779,6 +780,29 @@ async function viewApprovals() {
       const res = await rpc('hsm_decide', { p_id: r.id, p_approve: ok }); logAct('admin', ok ? 'User approved' : 'User rejected', r.full_name); toast({ approved: `${r.full_name} approved`, rejected: `${r.full_name} rejected`, device_changed: 'New phone approved', device_rejected: 'New phone blocked' }[res] || 'Done'); viewApprovals(); }
     catch (err) { netErr(err); b.disabled = false; }
   };
+}
+function addUserSheet() {
+  const m = $('#modal'), appr = REQ.filter(r => r.is_admin || (r.admin_modules || []).includes('leave'));
+  const areas = ['Crane', 'DC', 'Drive', 'FM', 'Instrument', 'L1', 'Motor', 'Planning', 'Power', 'RM', 'Shift'];
+  m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><h3>Add user</h3><p class="hint" style="margin:0 0 8px">The person signs in with the username, and the SAP ID is the first password. You approve them once on their first sign-in.</p>
+    <form class="f" id="auf" style="padding:0">
+    <div class="fld"><label for="au-n">Full name</label><input id="au-n" autocomplete="off"></div>
+    <div class="two"><div class="fld"><label for="au-u">Username</label><input id="au-u" autocapitalize="none" autocomplete="off" placeholder="e.g. rkanjariya"></div>
+      <div class="fld"><label for="au-s">SAP ID</label><input id="au-s" inputmode="numeric" autocomplete="off"></div></div>
+    <div class="two"><div class="fld"><label for="au-r">Role / company</label><input id="au-r" placeholder="AMNS Employee"></div>
+      <div class="fld"><label for="au-a">Team list area</label><input id="au-a" list="au-al" placeholder="Leave empty = not in Team list"><datalist id="au-al">${areas.map(a => `<option value="${a}">`).join('')}</datalist></div></div>
+    <div class="fld"><label for="au-l">Leave approver</label><select id="au-l"><option value="">Any approver / admin</option>${appr.map(r => `<option value="${r.id}">${esc(r.full_name)}</option>`).join('')}</select></div>
+    <div class="label" style="margin:6px 0 4px">What this person can open</div>
+    ${accessEditor({ modules: ['contacts', 'leave', 'schedule', 'sop', 'spares', 'tbt', 'team'], admin_modules: [], areas: {} }, 'nu')}
+    <div class="two" style="margin-top:12px"><button type="button" class="btn ghost" id="au-x">Cancel</button><button type="submit" class="btn pri">Add user</button></div></form></div>`;
+  m.classList.remove('hidden'); m.onclick = e => { if (e.target === m) m.classList.add('hidden'); };
+  wireAccess('nu');
+  $('#au-x').onclick = () => m.classList.add('hidden');
+  $('#auf').onsubmit = async e => { e.preventDefault();
+    const acc = readAccess('nu'), n = $('#au-n').value.trim(), u = $('#au-u').value.trim(), s = $('#au-s').value.trim();
+    if (!n || !u || !s) return toast('Enter name, username and SAP ID');
+    try { await rpc('hsm_add_user', { p_name: n, p_username: u, p_sap: s, p_role: $('#au-r').value, p_modules: acc.modules, p_areas: acc.areas, p_admin_modules: acc.admin_modules, p_leave_approver: $('#au-l').value ? +$('#au-l').value : null, p_team_area: $('#au-a').value });
+      m.classList.add('hidden'); toast(`${n} added`); S.reqTab = 'other'; viewApprovals(); } catch (err) { netErr(err); } };
 }
 async function drawLog(el, userId) {
   el.innerHTML = '<div class="spin">Loading…</div>';
