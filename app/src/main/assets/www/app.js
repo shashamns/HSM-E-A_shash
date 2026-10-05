@@ -883,9 +883,12 @@ async function viewSchedule() {
     const cls = [dt.getDay() === 0 ? 'sun' : '', +dt === +today ? 'today' : '', +dt === +S.calSel && +dt !== +today ? 'sel' : '', marked.has(k) ? 'has' : '', hCls(hmap[k])].join(' ');
     cells += `<button class="${cls}" data-day="${k}" aria-label="${d} ${MONTHS[mo]}${hmap[k] ? ', ' + hmap[k].map(h => h.name).join(', ') : ''}">${d}</button>`;
   }
-  const editable = isModAdmin('schedule') && +S.calSel >= +today, edit = editable && S.schedEdit;
+  const incN = a => { a = String(a || '').trim().toLowerCase(); return a === 'automation (l1)' ? 'l1' : (a === 'abb mv drive' || a === 'abb lv drive') ? 'drive' : a; };
+  const incAreas = !isModAdmin('schedule') && ME.areas && Array.isArray(ME.areas.incharge) ? ME.areas.incharge.map(incN) : [];
+  const canEdP = r => isModAdmin('schedule') || incAreas.includes(incN(r.area));
+  const editable = (isModAdmin('schedule') || incAreas.length) && +S.calSel >= +today, edit = editable && S.schedEdit;
   const by = s => rows.filter(r => r.shift === s);
-  const nm = r => `<div class="nm ${sameName(r.name, ME.name) ? 'me' : ''}${edit ? ' ed' : ''}" ${edit ? `data-p="${esc(r.name)}" role="button" tabindex="0"` : ''}>${esc(r.name)}${r.area ? ` <span class="hint">· ${esc(r.area)}</span>` : ''}${r.edited_by ? ` <span class="edmark" title="Changed in the app by ${esc(r.edited_by)}">${ic('edit', 13)} ${esc(firstName(r.edited_by))}</span>` : ''}${edit ? `<span class="chev">${ic('chev', 18)}</span>` : ''}</div>`;
+  const nm = r => `<div class="nm ${sameName(r.name, ME.name) ? 'me' : ''}${edit && canEdP(r) ? ' ed' : ''}" ${edit && canEdP(r) ? `data-p="${esc(r.name)}" role="button" tabindex="0"` : ''}>${esc(r.name)}${r.area ? ` <span class="hint">· ${esc(r.area)}</span>` : ''}${r.edited_by ? ` <span class="edmark" title="Changed in the app by ${esc(r.edited_by)}">${ic('edit', 13)} ${esc(firstName(r.edited_by))}</span>` : ''}${edit ? `<span class="chev">${ic('chev', 18)}</span>` : ''}</div>`;
   // General shift people are shown area-wise below, so the shift list shows A, B, C, Leave and Weekly Off
   const grp = (b, cls, t, list) => list.length ? `<div class="grp g-${cls}"><span class="badge ${cls}">${b}</span><div style="flex:1;min-width:0"><div class="gt">${t}</div>${list.map(nm).join('')}</div></div>` : '';
   const general = by('G'), areaMap = {};
@@ -903,13 +906,13 @@ async function viewSchedule() {
         <div style="display:flex;gap:8px;margin-left:auto">${isModAdmin('schedule') ? `<button class="btn sm" id="shol" aria-label="Add holiday">${ic('star', 18)} Holiday</button>` : ''}
         ${editable ? `<button class="btn sm ${edit ? 'pri' : ''}" id="sedit">${ic(edit ? 'ok' : 'edit', 18)} ${edit ? 'Done' : 'Edit'}</button>` : ''}</div></div>
       ${hmap[ymd(S.calSel)] ? `<div class="holbar">${hmap[ymd(S.calSel)].map(h => `<span class="holchip ${h.kind === 'r' ? 'soft' : ''}">${ic('star', 15)} ${esc(h.name)}${h.custom && isModAdmin('schedule') ? `<button class="x" data-hdel="${esc(h.name)}" aria-label="Remove">${ic('x', 14)}</button>` : ''}</span>`).join('')}</div>` : ''}
-      ${edit ? `<div class="edbar">${ic('edit', 18)}<span>Tap a name to change the shift, or add a person.</span><button class="btn sm" id="sadd">${ic('plus', 18)} Add</button></div>` : ''}
+      ${edit ? `<div class="edbar">${ic('edit', 18)}<span>${isModAdmin('schedule') ? 'Tap a name to change the shift, or add a person.' : 'Tap a name from your area to change the shift.'}</span>${isModAdmin('schedule') ? `<button class="btn sm" id="sadd">${ic('plus', 18)} Add</button>` : ''}</div>` : ''}
       ${rows.length ? grp('A','a','A Shift · 7 AM – 3 PM',by('A')) + grp('B','b','B Shift · 3 PM – 11 PM',by('B')) + grp('C','c','C Shift · 11 PM – 7 AM',by('C')) + grp('L','l','Leave',by('L')) + grp('WO','wo','Weekly Off',by('WO'))
           + (!by('A').length && !by('B').length && !by('C').length && !by('L').length && !by('WO').length ? '<div class="empty" style="padding:18px 20px">Only general shift on this date – see Area-wise below.</div>' : '')
         : '<div class="empty" style="padding:26px 20px">No schedule uploaded for this date.</div>'}
     </section>
     ${general.length ? `<section class="card" style="overflow:hidden"><div class="boxh g-area"><h2>Area-wise · General Shift</h2></div>
-      ${Object.keys(areaMap).sort().map(a => `<div class="arow"><span class="an">${esc(a)}</span><div>${areaMap[a].map(p => `<div class="pp${edit ? ' ed' : ''}${sameName(p.name, ME.name) ? ' me' : ''}" ${edit ? `data-p="${esc(p.name)}" role="button" tabindex="0"` : ''}><span>${esc(p.name)}</span>${p.edited_by ? `<span class="edmark">${ic('edit', 13)}</span>` : ''}</div>`).join('')}</div></div>`).join('')}
+      ${Object.keys(areaMap).sort().map(a => `<div class="arow"><span class="an">${esc(a)}</span><div>${areaMap[a].map(p => `<div class="pp${edit && canEdP(p) ? ' ed' : ''}${sameName(p.name, ME.name) ? ' me' : ''}" ${edit && canEdP(p) ? `data-p="${esc(p.name)}" role="button" tabindex="0"` : ''}><span>${esc(p.name)}</span>${p.edited_by ? `<span class="edmark">${ic('edit', 13)}</span>` : ''}</div>`).join('')}</div></div>`).join('')}
     </section>` : ''}</div>`;
   $('#pm').onclick = () => { S.calMonth = new Date(y, mo - 1, 1); viewSchedule(); };
   $('#nm').onclick = () => { S.calMonth = new Date(y, mo + 1, 1); viewSchedule(); };
@@ -934,7 +937,8 @@ async function viewSchedule() {
   if (!edit) return;
   const day = ymd(S.calSel);
   const setShift = async (p, sh) => {
-    try { await rpc('hsm_set_shift', { p_day: day, p_name: p.name, p_sap_id: p.sap_id || null, p_shift: sh, p_area: p.area || null });
+    try { if (isModAdmin('schedule')) await rpc('hsm_set_shift', { p_day: day, p_name: p.name, p_sap_id: p.sap_id || null, p_shift: sh, p_area: p.area || null });
+      else await rpc('hsm_set_shift_inc', { p_day: day, p_name: p.name, p_sap_id: p.sap_id || null, p_shift: sh });
       if (!sh) logAct('schedule', 'Removed from schedule', `${p.name} · ${fmtShort(S.calSel)}`);
       toast(sh ? `${p.name}: ${SHIFT_NAME[sh]}` : `${p.name} removed from ${fmtShort(S.calSel)}`); viewSchedule(); }
     catch (e) { netErr(e); }
@@ -943,14 +947,14 @@ async function viewSchedule() {
     const md = $('#modal');
     md.innerHTML = `<div class="sheet"><h3>${esc(p.name)}</h3><p>${fmtDay(S.calSel)}${p.shift ? ` · now <b>${esc(SHIFT_NAME[p.shift])}</b>` : ''}</p>
       <div class="shpick">${['A','B','C','G','L','WO'].map(k => `<button class="sp-${k.toLowerCase()} ${p.shift === k ? 'on' : ''}" data-sh="${k}"><b>${k}</b><span>${SHIFT_NAME[k]}</span></button>`).join('')}</div>
-      ${isNew ? '' : `<button class="btn ghost block" data-sh="__x" style="color:var(--red)">${ic('x')} Remove from this date</button>`}
+      ${isNew || !isModAdmin('schedule') ? '' : `<button class="btn ghost block" data-sh="__x" style="color:var(--red)">${ic('x')} Remove from this date</button>`}
       <button class="btn ghost block" data-sh="__c">Cancel</button></div>`;
     md.classList.remove('hidden');
     md.onclick = e => { const b = e.target.closest('[data-sh]'); if (!b && e.target !== md) return; md.classList.add('hidden'); md.onclick = null;
       if (!b || b.dataset.sh === '__c') return; setShift(p, b.dataset.sh === '__x' ? null : b.dataset.sh); };
   };
   $('#sc').addEventListener('click', e => { const t = e.target.closest('[data-p]'); if (!t) return; const p = rows.find(r => r.name === t.dataset.p); if (p) pick(p); });
-  $('#sadd').onclick = async () => {
+  if ($('#sadd')) $('#sadd').onclick = async () => {
     let people = []; try { people = await team(); } catch (e) {}
     const md = $('#modal');
     md.innerHTML = `<div class="sheet" style="max-height:80vh;display:flex;flex-direction:column"><h3>Add a person to ${fmtShort(S.calSel)}</h3>
