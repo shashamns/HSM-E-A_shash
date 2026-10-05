@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.6';
+const APP_VERSION = '3.6.1';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -1251,7 +1251,7 @@ function viewSpares() {
   let tm; $('#sq').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { S.spareQuery = e.target.value.trim(); loadSpares(); }, 300); };
   loadSpares();
 }
-async function loadSpares() {
+async function loadSpares(fromCache) {
   const list = $('#list'); if (!list) return;
   const q = S.spareQuery.replace(/[,()*"]/g, ' ').trim(); const e = encodeURIComponent(q);
   let path = 'spares?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden&order=qty,material,id';
@@ -1268,8 +1268,14 @@ async function loadSpares() {
       ${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
       <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < 5 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
   try {
-    const rows = await api(path);
-    if (S.spareLow && rows.length) { try { const cm = await api(`spare_comments?select=spare_id,body,name,created_at&spare_id=in.(${rows.map(r => r.id).join(',')})&order=created_at.desc`); (cm || []).forEach(x => { if (!notes[x.spare_id]) notes[x.spare_id] = x; }); } catch (e) {} }
+    const lc = S.lowCache, cached = fromCache === true && S.spareLow && !q && lc && lc.hid === !!S.spareHid;
+    let rows;
+    if (cached) { rows = lc.rows; notes = lc.notes; }
+    else {
+      rows = await api(path);
+      if (S.spareLow && rows.length) { try { const cm = await api(`spare_comments?select=spare_id,body,name,created_at&spare_id=in.(${rows.map(r => r.id).join(',')})&order=created_at.desc`); (cm || []).forEach(x => { if (!notes[x.spare_id]) notes[x.spare_id] = x; }); } catch (e) {} }
+      if (S.spareLow && !q) S.lowCache = { rows, notes, hid: !!S.spareHid };
+    }
     if (S.spareLow) {
       // out of stock (red, qty 0) and low stock (orange, qty below 5), area-wise; items removed by Planning/area admin are in the "Removed" view
       const tog = `<button class="linkbtn" id="shid" style="margin:0 16px 6px">${S.spareHid ? '← Back to out-of-stock list' : 'Show items removed by Planning'}</button>`;
@@ -1285,10 +1291,10 @@ async function loadSpares() {
         <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => r.qty <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => r.qty > 0).length} low (below 5) <span style="color:#E8710A">●</span></div>${tog}`
         + (sel === 'all' ? order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => planItem(r)).join('')).join('') : shown.map(r => planItem(r)).join(''));
       rows.forEach(r => { lowRows[r.id] = r; });
-      try { S.planAreas = await rpc('hsm_plan_areas'); } catch (e) { S.planAreas = S.planAreas || { all: false, areas: [] }; }
+      if (!cached || !S.planAreas) rpc('hsm_plan_areas').then(v => { S.planAreas = v; }).catch(() => { S.planAreas = S.planAreas || { all: false, areas: [] }; });
       list.onclick = e => { const b = e.target.closest('[data-plan]'); if (b) { e.preventDefault(); e.stopPropagation(); planSheet(lowRows[b.dataset.plan], notes, loadSpares); } };
       centerOn('#lach .on');
-      $('#lach').onclick = e => { const b = e.target.closest('[data-la]'); if (b) { S.lowArea = b.dataset.la; loadSpares(); } };
+      $('#lach').onclick = e => { const b = e.target.closest('[data-la]'); if (b) { S.lowArea = b.dataset.la; loadSpares(true); } };
       $('#shid').onclick = () => { S.spareHid = !S.spareHid; loadSpares(); };
       return;
     }
