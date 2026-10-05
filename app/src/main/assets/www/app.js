@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.6.1';
+const APP_VERSION = '3.7';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -718,7 +718,8 @@ const accessEditor = (r, key, withAdmin = true) => `<div class="acc" data-ak="${
   const areas = k === 'planning' ? SPARE_AREAS.map(a => [a, a]) : AREA_MODS[k], sel = r.areas && Array.isArray(r.areas[k]) ? r.areas[k] : null;
   return `<div class="accm ${on ? 'on' : ''}" data-m="${k}"><div class="accr"><label class="modchk"><input type="checkbox" class="am" value="${k}" ${on ? 'checked' : ''}><span class="mi">${ic(i, 18)}</span><span>${t}</span></label>
     ${withAdmin ? `<label class="admchk"><input type="checkbox" class="ad" ${adm ? 'checked' : ''}><span>${k === 'planning' ? 'All areas' : 'Admin'}</span></label>` : ''}</div>${k === 'planning' ? '<div class="hint" style="padding:0 4px 6px">Can write Planning status in Spares → Out / low stock. Tick “All areas” or pick areas below.</div>' : ''}
-    ${areas ? `<div class="areas"><span class="hint">Areas</span>${areas.map(([a, l]) => `<label class="chipchk"><input type="checkbox" class="aa" value="${a}" ${!sel || sel.includes(a) ? 'checked' : ''}><span>${esc(l)}</span></label>`).join('')}</div>` : ''}</div>`; }).join('')}</div>`;
+    ${areas ? `<div class="areas"><span class="hint">Areas</span>${areas.map(([a, l]) => `<label class="chipchk"><input type="checkbox" class="aa" value="${a}" ${!sel || sel.includes(a) ? 'checked' : ''}><span>${esc(l)}</span></label>`).join('')}</div>` : ''}</div>`; }).join('')}
+  ${withAdmin ? `<div class="accinc"><div class="accr"><span class="mi">${ic('users', 18)}</span><b style="flex:1">Area incharge of</b></div><div class="hint" style="padding:0 4px 6px">Gets the Planning updates of these areas as notifications and can write Planning status for them.</div><div class="areas">${SPARE_AREAS.map(a => `<label class="chipchk"><input type="checkbox" class="inch" value="${esc(a)}" ${r.areas && Array.isArray(r.areas.incharge) && r.areas.incharge.includes(a) ? 'checked' : ''}><span>${esc(a)}</span></label>`).join('')}</div></div>` : ''}</div>`;
 function wireAccess(key) {
   const box = $(`[data-ak="${key}"]`); if (!box) return;
   box.addEventListener('change', e => { const m = e.target.closest('.accm'); if (!m) return;
@@ -731,6 +732,7 @@ function readAccess(key) {
   $$('.accm', box).forEach(m => { const k = m.dataset.m, on = $('.am', m).checked, ad = $('.ad', m);
     if (on) out.modules.push(k); if (ad && ad.checked) out.admin_modules.push(k);
     const aa = $$('.aa', m); if (on && aa.length && !(k === 'planning' && ad && ad.checked)) { const sel = aa.filter(x => x.checked).map(x => x.value); if (sel.length < aa.length) out.areas[k] = sel; } });
+  { const ic2 = $$('.inch', box).filter(c => c.checked).map(c => c.value); if (ic2.length) out.areas.incharge = ic2; }
   return out;
 }
 async function viewApprovals() {
