@@ -122,6 +122,15 @@ public class MainActivity extends Activity {
 
     /** Called from the web app: window.HSMNative.* */
     class NativeBridge {
+        /** Drive reader: blocks screenshots and screen recording while a protected PDF is open. */
+        @JavascriptInterface
+        public void secure(final boolean on) {
+            runOnUiThread(() -> {
+                if (on) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+                else getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+            });
+        }
+
         /** Saves a file to Downloads/HSM EA and optionally opens the share sheet (Gmail, Outlook, WhatsApp…). */
         @JavascriptInterface
         public String saveFile(String base64, String fileName, String mime, boolean share) {

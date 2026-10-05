@@ -9,18 +9,19 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.7';
+const APP_VERSION = '3.8';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
   ['sop','SOP & HIRAC','shield','Numbers, hazards, docs'],['mill',"SOP's of Mill Process",'doc','Operational procedures'],['team','Team','users','E&amp;A directory'],
-  ['contacts','Contacts','phone','AMNS phone numbers'],['tbt','TBT – HSM Electrical','talk','Tool box talks'],['leave','Leave Request','plane','Apply & approve']];
+  ['contacts','Contacts','phone','AMNS phone numbers'],['tbt','TBT – HSM Electrical','talk','Tool box talks'],['leave','Leave Request','plane','Apply & approve'],
+  ['drive','Drive','drive','Drive manuals & fault codes (PDF)']];
 const ALL_MODS = MODULES.map(m => m[0]);
 const ROUTE_MOD = { schedule: 'schedule', checklist: 'checklist', actions: 'checklist', cl: 'checklist', clh: 'checklist', cle: 'checklist', spares: 'spares', spare: 'spares', sop: 'sop', hirac: 'sop', mill: 'mill', team: 'team',
-  contacts: 'contacts', tbt: 'tbt', leave: 'leave' };
+  contacts: 'contacts', tbt: 'tbt', leave: 'leave', drive: 'drive' };
 const MILL_AREAS = [['CB','CB'],['DC','DC'],['FM','FM'],['LEVEL-1','Level 1'],['RHF','RHF'],['RM','RM'],['CRANE','Crane'],['MOTOR','Motor'],['POWER','Power'],['INSTRUMENT','Instrument']];
 const CL_AREAS = [['ABB','ABB Drive'],['DC','DC'],['FMCB','FM & CB'],['INST','Instrument'],['MOTOR','Motor'],['POWER','Power'],['RHF','RHF'],['RM','RM']];
-const AREA_MODS = { checklist: CL_AREAS, mill: MILL_AREAS };
+const AREA_MODS = { checklist: CL_AREAS, mill: MILL_AREAS, drive: [['ACPAR','ABB AC Drive Parameters'],['DCPAR','ABB DC Drive Parameters'],['GEFLT','GE Drive Fault Codes'],['ACFLT','ABB AC Drive Fault Codes'],['DCFLT','ABB DC Drive Fault Codes']] };
 const SHIFT_NAME = { A: 'A Shift', B: 'B Shift', C: 'C Shift', G: 'General', L: 'Leave', WO: 'Weekly Off' };
 const SOP_GROUPS = ['All','Common','Instrument','RM','CB','FM','Coiler','MD Motor','Crane','Power'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -50,6 +51,7 @@ const I = {
   cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   check:'<path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/>',
   box:'<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  drive:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9.5 12.5h6M9.5 16.5h6"/>',
   shield:'<path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
@@ -329,7 +331,7 @@ function openLink(url) { if (window.HSMNative && HSMNative.openUrl) HSMNative.op
 /* ================= DOCUMENT VIEWER (in-app, no download) ================= */
 const loadScript = src => new Promise((ok, no) => { if (document.querySelector(`script[data-lib="${src}"]`)) return ok();
   const t = document.createElement('script'); t.src = src; t.dataset.lib = src; t.onload = ok; t.onerror = () => { t.remove(); no(new Error('Viewer could not load')); }; document.head.appendChild(t); });
-function closeDoc() { const v = $('#docv'); if (v) { v.remove(); document.body.style.overflow = ''; } }
+function closeDoc() { const v = $('#docv'); if (v) { v.remove(); document.body.style.overflow = ''; if (window.HSMNative && HSMNative.secure) { try { HSMNative.secure(false); } catch (e) {} } } }
 window.addEventListener('popstate', () => { if ($('#docv')) closeDoc(); });
 async function openDoc(path, bucket) {
   const name = path.split('/').pop(), ext = (name.split('.').pop() || '').toLowerCase();
@@ -450,7 +452,7 @@ function render() {
   const [page, ...rest] = h.split('/'); const arg = decodeURIComponent(rest.join('/'));
   const routes = { home: viewHome, schedule: viewSchedule, checklist: viewChecklist, cl: () => viewChecklistFill(arg), clh: () => viewChecklistHistory(arg),
     cle: () => viewChecklistEntry(arg), actions: viewActions, activity: viewActivity, clearlogs: viewClearLogs, spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
-    approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, admin: viewAdmin,
+    approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, drive: () => viewDrive(arg), admin: viewAdmin,
     contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
   (routes[page] || viewHome)();
@@ -1532,6 +1534,158 @@ async function sopDocs() {
       const r = e.target.closest('[data-p]'); if (!r) return;
       try { await openDoc(r.dataset.p, SOP_BUCKET); } catch (err) { netErr(err); } };
   } catch (e) { $('#dl').innerHTML = '<div class="empty"><b>Could not load documents</b></div>'; netErr(e); }
+}
+
+/* ================= DRIVE (PDF manuals, view only) ================= */
+const DRIVE_BUCKET = 'drive-docs';
+const DRIVE_TABS = [['ACPAR', 'ABB AC Drive Parameters'], ['DCPAR', 'ABB DC Drive Parameters'], ['GEFLT', 'GE Drive Fault Codes'], ['ACFLT', 'ABB AC Drive Fault Codes'], ['DCFLT', 'ABB DC Drive Fault Codes']];
+const driveLabel = k => (DRIVE_TABS.find(t => t[0] === k) || [k, k])[1];
+const fmtSize = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const driveFiles = async tab => (await storageList(`${tab}/`, DRIVE_BUCKET)).filter(o => o.id && o.name && /\.pdf$/i.test(o.name));
+
+async function viewDrive(tab) {
+  const admin = isModAdmin('drive'), tabs = DRIVE_TABS.filter(([k]) => canArea('drive', k));
+  if (tab && !tabs.some(t => t[0] === tab)) tab = '';
+  $('#app').innerHTML = `${bar(tab ? driveLabel(tab) : 'Drive', tab ? 'drive' : 'home')}<main class="scroll" id="dr" style="${admin ? 'padding-bottom:150px' : ''}"><div class="spin">Loading…</div></main>
+    ${admin ? `<label class="fab" style="cursor:pointer;bottom:88px">${ic('upload', 22)} Add document<input type="file" id="dup" hidden multiple accept=".pdf,application/pdf"></label>` : ''}${nav('drive')}`;
+  if (admin) $('#dup').onchange = async e => {
+    const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+    if (files.some(f => !/\.pdf$/i.test(f.name))) return toast('Only PDF files can be added');
+    if (files.some(f => f.size > 100 * 1024 * 1024)) return toast('A file is larger than 100 MB');
+    const target = await new Promise(res => { const md = $('#modal');
+      md.innerHTML = `<div class="sheet"><h3>Add to which tab?</h3><p style="word-break:break-all;max-height:84px;overflow:auto">${files.map(f => esc(f.name)).join('<br>')}</p>
+        <div class="list">${DRIVE_TABS.map(([k, l]) => `<button class="lrow" data-k="${k}" style="${k === tab ? 'outline:2px solid var(--brand,#0B5FFF)' : ''}"><span class="tx"><span class="a" style="font-size:16px">${esc(l)}</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('')}</div>
+        <button class="btn ghost block" data-k="" style="margin-top:8px">Cancel</button></div>`;
+      md.classList.remove('hidden'); md.onclick = ev => { const k = ev.target.closest('[data-k]'); if (!k && ev.target !== md) return; md.classList.add('hidden'); md.onclick = null; res(k ? k.dataset.k : ''); }; });
+    if (!target) return;
+    let ok = 0;
+    for (const f of files) {
+      const path = `${target}/${f.name.replace(/[\\/#?%]/g, '_')}`;
+      toast(`Uploading ${ok + 1} of ${files.length}…`, 120000);
+      try { await storageUpload(path, f, DRIVE_BUCKET); ok++; logAct('drive', 'Document added', `${driveLabel(target)} · ${f.name}`); }
+      catch (err) {
+        if (err.exists && await ask('Replace the existing file?', `${f.name} is already in ${driveLabel(target)}.`, 'Replace')) {
+          try { await storageUpload(path, f, DRIVE_BUCKET, true); ok++; logAct('drive', 'Document replaced', `${driveLabel(target)} · ${f.name}`); } catch (e2) { netErr(e2); }
+        } else if (!err.exists) { netErr(err); break; }
+      }
+    }
+    if (ok) toast(`${ok} document${ok > 1 ? 's' : ''} added to ${driveLabel(target)}`);
+    viewDrive(tab);
+  };
+  if (!tabs.length) { $('#dr').innerHTML = `<div class="empty"><b>No Drive folders for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access.</div>`; return; }
+  if (!tab) {
+    $('#dr').innerHTML = `<div class="pad"><div class="list">${tabs.map(([k, l]) => `<button class="lrow" data-t="${k}"><span class="ic">${ic('drive', 24)}</span><span class="tx"><span class="a" style="font-size:17px">${esc(l)}</span><span class="b" id="cnt-${k}">&nbsp;</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('')}</div>
+      <p class="hint" style="text-align:center;margin-top:14px">View only. Documents cannot be downloaded.</p></div>`;
+    $('#dr').onclick = e => { const b = e.target.closest('[data-t]'); if (b) location.hash = '#drive/' + b.dataset.t; };
+    tabs.forEach(async ([k]) => { try { const n = (await driveFiles(k)).length; const el = $('#cnt-' + k); if (el) el.textContent = n ? `${n} document${n > 1 ? 's' : ''}` : 'No documents yet'; } catch (e) {} });
+    return;
+  }
+  let items = [];
+  try { items = await driveFiles(tab); } catch (e) { $('#dr').innerHTML = `<div class="empty"><b>Could not load documents</b>Check the network and try again.</div>`; netErr(e); return; }
+  items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const row = o => `<button class="lrow" data-f="${esc(tab + '/' + o.name)}" style="${admin ? 'flex:1;min-width:0' : ''}"><span class="ic" style="font-size:12px;font-weight:800">PDF</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${o.metadata ? fmtSize(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
+  $('#dr').innerHTML = `<div class="pad"><div class="label">${items.length} document${items.length === 1 ? '' : 's'}</div>
+    <div class="list">${items.length ? items.map(o => admin ? `<div style="display:flex;align-items:center">${row(o)}<button class="ib" data-del="${esc(tab + '/' + o.name)}" aria-label="Remove ${esc(o.name)}" style="color:var(--red);margin-right:6px">${ic('trash', 22)}</button></div>` : row(o)).join('')
+      : `<div class="empty"><b>No documents in ${esc(driveLabel(tab))} yet</b>${admin ? 'Tap “Add document” to upload PDF files.' : ''}</div>`}</div></div>`;
+  $('#dr').onclick = async e => {
+    const d = e.target.closest('[data-del]');
+    if (d) { const name = d.dataset.del.split('/').pop();
+      if (!(await ask('Remove this document?', `${name}\nIt is removed for everyone.`, 'Remove', 'Cancel', true))) return;
+      try { await storageDelete(d.dataset.del, DRIVE_BUCKET); logAct('drive', 'Document removed', `${driveLabel(tab)} · ${name}`); toast('Document removed'); viewDrive(tab); } catch (err) { netErr(err); } return; }
+    const r = e.target.closest('[data-f]'); if (r) openDriveDoc(r.dataset.f);
+  };
+}
+
+// In-app PDF reader: pages are drawn to canvas (no file, no download or print button), with text search + zoom.
+async function openDriveDoc(path) {
+  const name = path.split('/').pop();
+  closeDoc();
+  const v = document.createElement('div'); v.id = 'docv'; v.className = 'drv';
+  v.innerHTML = `<header class="bar"><h1 style="font-size:17px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(name.replace(/\.[^.]+$/, ''))}</h1>
+    <button class="ib" id="dv-s" aria-label="Search in document">${ic('search', 26)}</button><button class="ib" id="docx-close" aria-label="Close">${ic('x', 28)}</button></header>
+    <div class="dvs hidden" id="dvs"><input id="dvq" type="search" placeholder="Search text in this document" autocomplete="off"><span id="dvc" class="dvc"></span>
+      <button class="ib dvu" id="dvp" aria-label="Previous match">${ic('chev', 22)}</button><button class="ib dvd" id="dvn" aria-label="Next match">${ic('chev', 22)}</button></div>
+    <div id="docb" class="dvb"><div class="spin">Opening…</div></div>
+    <div class="dvz"><button class="ib" id="dvzo" aria-label="Zoom out">${ic('minus', 22)}</button><button class="ib" id="dvzi" aria-label="Zoom in">${ic('plus', 22)}</button></div>`;
+  ['contextmenu', 'dragstart', 'copy', 'cut'].forEach(t => v.addEventListener(t, e => e.preventDefault()));
+  document.body.appendChild(v); document.body.style.overflow = 'hidden';
+  if (window.HSMNative && HSMNative.secure) { try { HSMNative.secure(true); } catch (e) {} }
+  history.pushState({ docv: 1 }, '');
+  $('#docx-close').onclick = () => history.back();
+  const body = $('#docb'), live = () => document.body.contains(body);
+  try {
+    const url = await storageSignedUrl(path, DRIVE_BUCKET);
+    const res = await fetch(url); if (!res.ok) throw new Error('Could not open document');
+    const total = +res.headers.get('content-length') || 0; let buf;
+    if (res.body && total) { const rd = res.body.getReader(), parts = []; let got = 0;
+      for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; if (!live()) return; body.firstChild.textContent = `Opening… ${Math.round(got * 100 / total)}%`; }
+      buf = new Uint8Array(got); let o = 0; parts.forEach(p => { buf.set(p, o); o += p.length; });
+    } else buf = new Uint8Array(await res.arrayBuffer());
+    if (!live()) return;
+    await loadScript('lib/pdf.min.js'); pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise; if (!live()) return;
+    body.innerHTML = '';
+    const dpr = Math.min(window.devicePixelRatio || 1, 2), n = pdf.numPages;
+    let zoom = 1, baseW = body.clientWidth - 16;
+    const ratio = new Array(n).fill(0), wraps = [], tx = new Array(n).fill(null);
+    const p1 = await pdf.getPage(1), v1 = p1.getViewport({ scale: 1 }); ratio.fill(v1.height / v1.width);
+    for (let i = 0; i < n; i++) { const w = document.createElement('div'); w.className = 'dvp'; w.dataset.i = i; w.innerHTML = '<span class="dvn">' + (i + 1) + '</span>'; body.appendChild(w); wraps.push(w); }
+    const size = () => wraps.forEach((w, i) => { w.style.width = baseW * zoom + 'px'; w.style.height = baseW * zoom * ratio[i] + 'px'; });
+    const marks = { list: [], cur: -1 };
+    const drawMarks = i => { const w = wraps[i]; let h = w.querySelector('.hl'); if (!h) { h = document.createElement('div'); h.className = 'hl'; w.appendChild(h); }
+      h.innerHTML = marks.list.map((m, k) => m.page === i ? m.rects.map(r => `<i class="${k === marks.cur ? 'cur' : ''}" style="left:${r[0]}%;top:${r[1]}%;width:${r[2]}%;height:${r[3]}%"></i>`).join('') : '').join(''); };
+    const renderPg = async i => {
+      const w = wraps[i], key = zoom + ':' + baseW; if (w.dataset.r === key) return; w.dataset.r = key; const my = w._t = (w._t || 0) + 1;
+      try {
+        const pg = await pdf.getPage(i + 1), vp0 = pg.getViewport({ scale: 1 }); ratio[i] = vp0.height / vp0.width;
+        const cssW = baseW * zoom, vp = pg.getViewport({ scale: cssW / vp0.width * dpr });
+        const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; c.className = 'pdfpg';
+        await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+        if (w._t !== my || !live()) return;
+        const old = w.querySelector('canvas'); if (old) old.remove(); w.insertBefore(c, w.firstChild); w.style.height = cssW * ratio[i] + 'px'; drawMarks(i);
+      } catch (e) { w.dataset.r = ''; }
+    };
+    const freePg = i => { const w = wraps[i]; w._t = (w._t || 0) + 1; w.dataset.r = ''; const c = w.querySelector('canvas'); if (c) { c.width = 0; c.remove(); } };
+    const io = new IntersectionObserver(es => es.forEach(en => { const i = +en.target.dataset.i; if (en.isIntersecting) renderPg(i); else freePg(i); }), { root: body, rootMargin: '900px 0px' });
+    size(); wraps.forEach(w => io.observe(w));
+    const relayout = () => { const y = body.scrollTop / Math.max(1, body.scrollHeight); wraps.forEach((w, i) => { w.dataset.r = ''; w._t = (w._t || 0) + 1; }); size(); body.scrollTop = y * body.scrollHeight; io.disconnect(); wraps.forEach(w => io.observe(w)); };
+    $('#dvzi').onclick = () => { if (zoom < 3) { zoom = Math.min(3, +(zoom + 0.5).toFixed(1)); relayout(); } };
+    $('#dvzo').onclick = () => { if (zoom > 1) { zoom = Math.max(1, +(zoom - 0.5).toFixed(1)); relayout(); } };
+    // ---- text search ----
+    let ready = null, last = '';
+    const extract = () => ready || (ready = (async () => {
+      for (let i = 0; i < n; i++) {
+        if (!live()) return;
+        const pg = await pdf.getPage(i + 1), vp = pg.getViewport({ scale: 1 }), c = await pg.getTextContent(); let full = ''; const it = [];
+        for (const t of c.items) { if (typeof t.str !== 'string') continue; const m = pdfjsLib.Util.transform(vp.transform, t.transform), fh = Math.hypot(m[2], m[3]) || t.height || 10;
+          it.push({ s: full.length, l: t.str.length, x: m[4] / vp.width * 100, y: (m[5] - fh) / vp.height * 100, w: t.width / vp.width * 100, h: fh * 1.15 / vp.height * 100 }); full += t.str + ' '; }
+        tx[i] = { full: full.toLowerCase(), it };
+        if (i % 10 === 0) $('#dvc').textContent = `Reading ${i + 1}/${n}`;
+      }
+    })());
+    const go = k => { if (!marks.list.length) return; const old = marks.cur; marks.cur = (k + marks.list.length) % marks.list.length;
+      const m = marks.list[marks.cur]; [old >= 0 ? marks.list[old].page : -1, m.page].forEach(p => { if (p >= 0) drawMarks(p); });
+      const w = wraps[m.page], r = m.rects[0]; body.scrollTo({ top: w.offsetTop + r[1] / 100 * w.offsetHeight - body.clientHeight / 3, behavior: 'smooth' });
+      $('#dvc').textContent = `${marks.cur + 1} / ${marks.list.length}`; };
+    const search = async () => {
+      const q = $('#dvq').value.trim().toLowerCase().replace(/\s+/g, ' '); if (q === last) return; last = q;
+      const prev = marks.list.map(m => m.page); marks.list = []; marks.cur = -1; [...new Set(prev)].forEach(drawMarks);
+      if (q.length < 2) { $('#dvc').textContent = ''; return; }
+      await extract(); if (!live() || last !== q) return;
+      let any = 0;
+      tx.forEach((t, i) => { if (!t) return; any += t.full.length; let p = 0;
+        while ((p = t.full.indexOf(q, p)) >= 0) { const e = p + q.length, rects = [];
+          t.it.forEach(x => { const a = Math.max(p, x.s), b = Math.min(e, x.s + x.l); if (a < b && x.l) rects.push([x.x + x.w * (a - x.s) / x.l, x.y, x.w * (b - a) / x.l, x.h]); });
+          if (rects.length) marks.list.push({ page: i, rects }); p = e; } });
+      new Set(marks.list.map(m => m.page)).forEach(drawMarks);
+      if (!marks.list.length) { $('#dvc').textContent = any < n ? 'No text in this file (scanned)' : 'No match'; return; }
+      go(0);
+    };
+    $('#dv-s').onclick = () => { const s = $('#dvs'); s.classList.toggle('hidden'); if (!s.classList.contains('hidden')) { $('#dvq').focus(); extract(); } };
+    let tm; $('#dvq').oninput = () => { clearTimeout(tm); tm = setTimeout(search, 450); };
+    $('#dvq').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); if ($('#dvq').value.trim().toLowerCase().replace(/\s+/g, ' ') === last && marks.list.length) go(marks.cur + 1); else search(); $('#dvq').blur(); } };
+    $('#dvn').onclick = () => go(marks.cur + 1); $('#dvp').onclick = () => go(marks.cur - 1);
+  } catch (e) { if (live()) body.innerHTML = `<div class="empty"><b>Could not open this document</b>${esc(isNet(e) ? 'Check the network and try again.' : e.message)}</div>`; }
 }
 
 /* ================= SOP's OF MILL PROCESS ================= */
