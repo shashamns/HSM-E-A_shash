@@ -1138,7 +1138,7 @@ async function viewChecklist() {
       $('#clt').innerHTML = areas.map(([a, l]) => { const n = subsOf(a), d = n.filter(x => x.h >= x.n).length, hits = q ? n.filter(x => secHit(x.t, x.si, q)).length : 0;
         return `<button role="tab" data-a="${a}" class="${a === S.clArea ? 'on' : ''}" aria-selected="${a === S.clArea}">${esc(l)}<span class="cnt ${d === n.length ? 'all' : ''}">${d}/${n.length}</span>${hits && a !== S.clArea ? `<i class="mk">${hits}</i>` : ''}</button>`; }).join('');
       $('#clst').innerHTML = list.map((x, i) => { const full = x.h >= x.n, hit = q && secHit(x.t, x.si, q);
-        return `<button type="button" role="listitem" data-i="${i}" class="${full ? 'ok' : x.h || x.draft ? 'part' : ''}${hit ? ' hit' : ''}"><span class="nm2">${esc(lab(S.clArea, x))}${x.draft && !full ? '<i class="dr" title="Draft saved"></i>' : ''}</span><span class="cnt ${full ? 'all' : ''}">${x.h}/${x.n}</span></button>`; }).join('');
+        return `<button type="button" role="listitem" data-i="${i}" class="${full ? 'ok' : x.h || x.draft ? 'part' : ''}${hit ? ' hit' : q ? ' dim' : ''}"><span class="nm2">${esc(lab(S.clArea, x))}${x.draft && !full ? '<i class="dr" title="Draft saved"></i>' : ''}${hit ? `<em class="mt">${ic('search', 14)} ${hit} found</em>` : ''}</span><span class="cnt ${full ? 'all' : ''}">${x.h}/${x.n}</span></button>`; }).join('');
       const pend = list.filter(x => x.h < x.n);
       let msg = '';
       if (q) { const here = list.filter(x => secHit(x.t, x.si, q)), other = areas.filter(([a]) => a !== S.clArea).map(([a, l]) => [l, subsOf(a).filter(x => secHit(x.t, x.si, q)).length]).filter(([, n]) => n);

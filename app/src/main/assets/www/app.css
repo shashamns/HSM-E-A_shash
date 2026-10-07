@@ -704,3 +704,11 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .clstv button.ok{background:#1B8F4C!important;border-color:#1B8F4C!important;color:#fff!important}
 .clstv button.ok .cnt{background:rgba(255,255,255,.25)!important;color:#fff!important}
 .clsc button:has(.cnt.all):not(.on){background:#E8F6EE;border-color:#1B8F4C;color:#1B8F4C}
+/* search match = blue (never confused with the amber "partly filled" state) */
+.clstv button.hit{background:#E3EEFF!important;border:2.5px solid #1E6FEB!important;color:#0B3A8C!important;box-shadow:0 0 0 3px rgba(30,111,235,.25)!important}
+.clstv button.hit .cnt{background:#1E6FEB!important;color:#fff!important}
+.clstv button.dim{opacity:.4}
+.clstv .mt{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:2px 8px;border-radius:9px;background:#1E6FEB;color:#fff;font-size:12.5px;font-style:normal;font-weight:800;vertical-align:middle}
+.cltabs .mk{background:#1E6FEB!important}
+.clitem.hit{background:#E3EEFF!important;outline:2px solid #1E6FEB!important}
+@keyframes clflash{50%{background:#9EC3FF}}
