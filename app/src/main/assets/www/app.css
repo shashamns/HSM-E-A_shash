@@ -701,3 +701,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .clstv button.hit{background:#FFE98A;border-color:#FF9F1A;box-shadow:0 0 0 3px rgba(255,159,26,.4);animation:hitpulse 1.2s ease 3}
 .clstv .dr{display:inline-block;width:9px;height:9px;margin-left:8px;border-radius:50%;background:var(--amber,#E69100)}
 .clmsg[hidden]{display:none}
+.clstv button.ok{background:#1B8F4C!important;border-color:#1B8F4C!important;color:#fff!important}
+.clstv button.ok .cnt{background:rgba(255,255,255,.25)!important;color:#fff!important}
+.clsc button:has(.cnt.all):not(.on){background:#E8F6EE;border-color:#1B8F4C;color:#1B8F4C}
