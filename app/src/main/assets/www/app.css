@@ -691,3 +691,13 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .cslim .two{align-items:end}
 .cslim .fld label{min-height:20px;display:block;white-space:nowrap}
 .cslim .fld input{width:100%}
+.clstv{display:flex;flex-direction:column;gap:8px;padding:10px 14px 12px}
+.clstv button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:54px;padding:10px 14px;border-radius:14px;border:1.5px solid var(--line-2,#ddd);background:#fff;text-align:left;font-size:16px;font-weight:600;color:var(--ink)}
+.clstv button .nm2{flex:1;min-width:0;position:relative;line-height:1.25}
+.clstv button .cnt{flex-shrink:0;padding:3px 10px;border-radius:10px;background:var(--bg,#eee);font-size:15px;font-weight:800;color:var(--ink-2)}
+.clstv button.part{border-color:var(--amber,#E69100);background:#FFF8EA}
+.clstv button.ok{border-color:var(--green,#1B8F4C);background:var(--green-50,#E8F6EE)}
+.clstv button.ok .cnt,.clstv button .cnt.all{background:var(--green,#1B8F4C);color:#fff}
+.clstv button.hit{background:#FFE98A;border-color:#FF9F1A;box-shadow:0 0 0 3px rgba(255,159,26,.4);animation:hitpulse 1.2s ease 3}
+.clstv .dr{display:inline-block;width:9px;height:9px;margin-left:8px;border-radius:50%;background:var(--amber,#E69100)}
+.clmsg[hidden]{display:none}

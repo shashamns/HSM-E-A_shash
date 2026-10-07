@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.10';
+const APP_VERSION = '3.11';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -1126,7 +1126,7 @@ async function viewChecklist() {
     const multi = a => tpl.filter(t => t.area === a).length > 1, lab = (a, x) => multi(a) ? `${x.t.name} › ${x.title}` : x.title;
     $('#cl').innerHTML = `<div class="tabs cltabs" id="clt" role="tablist"></div>
       <div class="clq" style="border-top:1px solid var(--line)"><div class="search">${ic('search', 22)}<input id="clq" type="search" placeholder="Search reading – motor, pump, panel…" aria-label="Search all check lists" value="${esc(S.clQ)}"></div></div>
-      <div class="clstw"><div class="clstl">Sub-trees of ${esc(clAreaName(S.clArea))} · ${fmtDay(new Date())}</div><div class="tabs cltabs clst" id="clst" role="tablist"></div><div class="clmsg" id="clmsg"></div></div>
+      <div class="clstw"><div class="clstl">Sub-trees of ${esc(clAreaName(S.clArea))} · ${fmtDay(new Date())}</div><div class="clstv" id="clst" role="list"></div><div class="clmsg" id="clmsg"></div></div>
       <div class="pad">
       ${waiting.length ? `<div class="card obx"><span class="ic">${ic('clock', 24)}</span><div style="flex:1"><div class="t">${waiting.length} check list${waiting.length > 1 ? 's' : ''} saved on this phone</div>
         <div class="s">${waiting.some(x => x.err) ? 'Upload problem: ' + esc(waiting.find(x => x.err).err) : 'Will upload by itself when the network is back'}</div></div><button class="btn" id="obxgo">Upload now</button></div>` : ''}
@@ -1138,12 +1138,12 @@ async function viewChecklist() {
       $('#clt').innerHTML = areas.map(([a, l]) => { const n = subsOf(a), d = n.filter(x => x.h >= x.n).length, hits = q ? n.filter(x => secHit(x.t, x.si, q)).length : 0;
         return `<button role="tab" data-a="${a}" class="${a === S.clArea ? 'on' : ''}" aria-selected="${a === S.clArea}">${esc(l)}<span class="cnt ${d === n.length ? 'all' : ''}">${d}/${n.length}</span>${hits && a !== S.clArea ? `<i class="mk">${hits}</i>` : ''}</button>`; }).join('');
       $('#clst').innerHTML = list.map((x, i) => { const full = x.h >= x.n, hit = q && secHit(x.t, x.si, q);
-        return `<button type="button" role="tab" data-i="${i}" class="${full ? 'ok' : x.h || x.draft ? 'part' : ''}${hit ? ' hit' : ''}">${esc(lab(S.clArea, x))}<span class="cnt ${full ? 'all' : ''}">${x.h}/${x.n}</span>${x.draft && !full ? '<i class="dr" title="Draft saved"></i>' : ''}</button>`; }).join('');
+        return `<button type="button" role="listitem" data-i="${i}" class="${full ? 'ok' : x.h || x.draft ? 'part' : ''}${hit ? ' hit' : ''}"><span class="nm2">${esc(lab(S.clArea, x))}${x.draft && !full ? '<i class="dr" title="Draft saved"></i>' : ''}</span><span class="cnt ${full ? 'all' : ''}">${x.h}/${x.n}</span></button>`; }).join('');
       const pend = list.filter(x => x.h < x.n);
-      let msg = pend.length ? `<b>Pending:</b> ${pend.map(x => `${esc(lab(S.clArea, x))} (${x.n - x.h} left)`).join(', ')}` : `<span style="color:var(--green)"><b>All sub-trees filled today.</b></span>`;
+      let msg = '';
       if (q) { const here = list.filter(x => secHit(x.t, x.si, q)), other = areas.filter(([a]) => a !== S.clArea).map(([a, l]) => [l, subsOf(a).filter(x => secHit(x.t, x.si, q)).length]).filter(([, n]) => n);
         msg = (!here.length && !other.length) ? `<span style="color:var(--red)"><b>No reading matches “${esc(q)}”.</b></span>` : `<b>${here.length ? `${here.length} sub-tree${here.length > 1 ? 's' : ''} here ${here.length > 1 ? 'have' : 'has'} it – tap the highlighted one.` : 'No match in this area.'}</b>${other.length ? ` Also in: ${other.map(([l, n]) => `${esc(l)} (${n})`).join(', ')}` : ''}`; }
-      $('#clmsg').innerHTML = msg;
+      $('#clmsg').innerHTML = msg; $('#clmsg').hidden = !msg;
       const on = $('#clt .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); };
     draw();
     abnormalFor(today).then(d => { const el = $('#actn'); if (!el) return; const n = d.items.length;
