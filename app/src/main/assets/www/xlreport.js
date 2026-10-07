@@ -25,7 +25,7 @@
   const asValue = v => (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) ? Number(v) : v;
   const RED = { argb: 'FFC8102E' };
   // temperature fields: a reading above 100 is shown red (app, record and Excel)
-  const isHot = (type, v) => type === 't' && v != null && v !== '' && !isNaN(parseFloat(v)) && parseFloat(v) > 100;
+  const isHot = (type, v, code, si) => { if (type !== 't' || v == null || v === '' || isNaN(parseFloat(v))) return false; const x = parseFloat(v), l = (typeof window.clLim === 'function' ? window.clLim(code, si) : null) || { hi: 100, lo: null }; return x > l.hi || (l.lo != null && x < l.lo); };
   const fieldType = (sec, item, fi) => item.t || ((sec.fields && sec.fields[fi]) || {}).t || 's';
 
   function write(ws, spec, value, opts) {
@@ -52,7 +52,7 @@
     (tpl.sections || []).forEach((s, si) => (s.items || []).forEach((it, ii) => (it.cells || []).forEach((spec, fi) => {
       const v = V[`${si}.${ii}.${fi}`]; if (!spec || v == null || v === '') return;
       const plain = !/^[LAP]:/.test(spec);
-      write(ws, spec, v, { center: plain, red: v === 'NOT OK' || isHot(fieldType(s, it, fi), v) });
+      write(ws, spec, v, { center: plain, red: v === 'NOT OK' || isHot(fieldType(s, it, fi), v, tpl.code, si) });
     })));
     const date = `${fmtDate(entry.check_date)} (${entry.shift || '-'})`;
     const by = `${entry.inspected_name || ''}${entry.inspected_by ? ' (' + entry.inspected_by + ')' : ''}`;
@@ -127,7 +127,7 @@
       sum.columns = [{ width: 34 }, { width: 8 }, { width: 26 }, { width: 11 }, { width: 10 }, { width: 12 }, { width: 40 }];
       sum.addRow([`HSM E&A – Daily Inspection Report   ${fmtDate(isoDate)}`]).font = { bold: true, size: 14 };
       sum.addRow([]);
-      const h = sum.addRow(['Check list', 'Shift', 'Inspected by', 'Readings', 'NOT OK', 'Temp > 100', 'Remarks']);
+      const h = sum.addRow(['Check list', 'Shift', 'Inspected by', 'Readings', 'NOT OK', 'Temp above limit', 'Remarks']);
       h.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       h.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC8102E' } }; });
       list.forEach(e => {
@@ -175,7 +175,7 @@
       ws.addRow([`HSM E&A – Daily action required   ${fmtDate(isoDate)}`]).font = { bold: true, size: 14 }; ws.addRow([]);
       const h = ws.addRow(['Area', 'Check list', 'Shift', 'Equipment', 'Parameter', 'Reading', 'Problem', 'Time', 'Checked by']);
       h.font = { bold: true, color: { argb: 'FFFFFFFF' } }; h.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: RED }; });
-      items.forEach(i => { const r = ws.addRow([areaName ? areaName(i.area) : i.area, i.tname, i.shift, i.equip, i.param, asValue(i.value), i.kind === 'hot' ? 'Temperature above 100' : 'NOT OK', hhmm(i.at), i.by]);
+      items.forEach(i => { const r = ws.addRow([areaName ? areaName(i.area) : i.area, i.tname, i.shift, i.equip, i.param, asValue(i.value), i.kind === 'hot' ? 'Temperature above limit' : 'NOT OK', hhmm(i.at), i.by]);
         r.getCell(6).font = { bold: true, color: RED }; r.alignment = { vertical: 'top', wrapText: true }; });
       if (!items.length) ws.addRow(['No abnormal reading']);
       if (notes && notes.length) { ws.addRow([]); ws.addRow(['Remarks']).font = { bold: true }; notes.forEach(n => ws.addRow([areaName ? areaName(n.area) : n.area, n.tname, n.shift, n.text, '', '', '', '', n.by])); }
@@ -202,7 +202,7 @@
 
   function hotCount(tpl, V) {
     let n = 0;
-    (tpl.sections || []).forEach((s, si) => (s.items || []).forEach((it, ii) => (it.cells || []).forEach((c, fi) => { if (isHot(fieldType(s, it, fi), V[`${si}.${ii}.${fi}`])) n++; })));
+    (tpl.sections || []).forEach((s, si) => (s.items || []).forEach((it, ii) => (it.cells || []).forEach((c, fi) => { if (isHot(fieldType(s, it, fi), V[`${si}.${ii}.${fi}`], tpl.code, si)) n++; })));
     return n;
   }
 

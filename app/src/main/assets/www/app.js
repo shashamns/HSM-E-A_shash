@@ -9,8 +9,8 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.8';
-const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG'];
+const APP_VERSION = '3.9';
+const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
   ['sop','SOP & HIRAC','shield','Numbers, hazards, docs'],['mill',"SOP's of Mill Process",'doc','Operational procedures'],['team','Team','users','E&amp;A directory'],
@@ -18,10 +18,10 @@ const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklis
   ['drive','Drive','drive','Drive manuals & fault codes (PDF)']];
 const ALL_MODS = MODULES.map(m => m[0]);
 const ROUTE_MOD = { schedule: 'schedule', checklist: 'checklist', actions: 'checklist', cl: 'checklist', clh: 'checklist', cle: 'checklist', spares: 'spares', spare: 'spares', sop: 'sop', hirac: 'sop', mill: 'mill', team: 'team',
-  contacts: 'contacts', tbt: 'tbt', leave: 'leave', drive: 'drive' };
+  contacts: 'contacts', tbt: 'tbt', leave: 'leave', drive: 'drive', clset: 'clset' };
 const MILL_AREAS = [['CB','CB'],['DC','DC'],['FM','FM'],['LEVEL-1','Level 1'],['RHF','RHF'],['RM','RM'],['CRANE','Crane'],['MOTOR','Motor'],['POWER','Power'],['INSTRUMENT','Instrument']];
 const CL_AREAS = [['ABB','ABB Drive'],['DC','DC'],['FMCB','FM & CB'],['INST','Instrument'],['MOTOR','Motor'],['POWER','Power'],['RHF','RHF'],['RM','RM']];
-const AREA_MODS = { checklist: CL_AREAS, mill: MILL_AREAS, drive: [['ACPAR','ABB AC Drive Parameters'],['DCPAR','ABB DC Drive Parameters'],['GEFLT','GE Drive Fault Codes'],['ACFLT','ABB AC Drive Fault Codes'],['DCFLT','ABB DC Drive Fault Codes']] };
+const AREA_MODS = { checklist: CL_AREAS, clset: CL_AREAS, mill: MILL_AREAS, get drive() { return DRIVE_TABS; } };
 const SHIFT_NAME = { A: 'A Shift', B: 'B Shift', C: 'C Shift', G: 'General', L: 'Leave', WO: 'Weekly Off' };
 const SOP_GROUPS = ['All','Common','Instrument','RM','CB','FM','Coiler','MD Motor','Crane','Power'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -40,9 +40,29 @@ const HOLIDAYS = [
 ['2027-01-14','Makar Sankranti / Uttarayan','r'],['2027-01-26','Republic Day','n'],['2027-03-10','Id-ul-Fitr (Eid)','f'],['2027-03-23','Holi','f'],['2027-03-26','Good Friday','f'],['2027-04-14','Ambedkar Jayanti','n'],
 ['2027-04-15','Ram Navami','f'],['2027-04-19','Mahavir Jayanti','f'],['2027-05-17','Id-ul-Zuha (Bakrid)','f'],['2027-05-20','Buddha Purnima','f'],['2027-06-16','Muharram','f'],['2027-08-15','Independence Day','n'],
 ['2027-08-25','Janmashtami','f'],['2027-09-17','Vishwakarma Puja','r'],['2027-10-02','Gandhi Jayanti','n'],['2027-10-09','Dussehra','f'],['2027-10-29','Diwali','f'],['2027-11-14','Guru Nanak Jayanti','f'],['2027-12-25','Christmas','f']];
-const QUOTES = ['One action, multiple solutions.','Safety first, production next – never the other way round.','A small check today prevents a big breakdown tomorrow.','Teamwork makes the toughest shutdown feel easy.','Do it right the first time, every time.','Discipline in the small things builds reliability in the big ones.','Every reading you record is a breakdown you may prevent.','Alone we repair, together we improve.','Stay curious. Every fault is a lesson.','Go home safe – that is the real target.','No job is so urgent that we cannot take time to do it safely.','Lock out, tag out, try out – then touch.','If you are not sure, stop and ask. Asking is strength.','A shortcut today can become a lifelong regret.','Your family is waiting for you – work safely for them.','Wear your PPE like you wear your pride.','Isolate. Verify. Then work. Every single time.','Near-miss reported today is an accident prevented tomorrow.','Be the reason your colleague goes home safe.','Hot strip, cool head.','Housekeeping is the first step of safety.','Look up, look down, look around – before you step in.','Safe work is smart work.','Never assume a panel is dead – test it.','Stand clear of the line when the mill is running.','Safety is not a department, it is everyone\'s duty.','Speak up for safety – it takes one second.','Good habits in safety are built on ordinary days.','The best repair is the one that never needs repeating.','Predict, prevent, perform.','Preventive maintenance is cheaper than breakdown maintenance.','A tidy panel is a reliable panel.','Measure twice, trip never.','Small leaks sink big ships – fix the small fault now.','Quality is remembering what to do when nobody is watching.','Trust the process, check the data.','Learn something new on every shift.','Consistency beats intensity.','Today\'s effort is tomorrow\'s uptime.','Ownership turns a job into a responsibility.','Respect the machine and it will respect your time.','Every shutdown completed safely is a team victory.','Great teams share knowledge, not just tasks.','Handover well – the next shift inherits your work.','Write down what you learn, so the next person starts higher.','Challenges are what make the shift interesting.','Keep calm in a breakdown – clear mind fixes faster.','Fix the root cause, not just the symptom.','Be proud of the steel you help make.','Steel is forged in heat – so is character.','Progress, not perfection.','Start where you are, use what you have, do what you can.','The only way to do great work is to love what you do.','Hard work beats talent when talent does not work hard.','Success is the sum of small efforts repeated daily.','Take pride in the quality of your work.','A positive mind keeps the whole shift running.','Never stop improving – even 1% a day adds up.','Let us make today safer than yesterday.','Courage is calling a stop when something looks wrong.','Respect every colleague – the plant runs on all of us.','Help a new joiner today – you were one once.','Think before you act, check before you start.','Compliance today, confidence tomorrow.','Zero harm is possible when everyone cares.','Work to a plan, and plan for safety.','Fatigue is a hazard – take your rest, stay alert.','Mobile in pocket, eyes on the job.','Use the right tool for the right job.','Keep walkways clear – the next step may be yours.','Gas, heat, height, voltage – respect them all.','Confined space, clear permit, trained person – no compromise.','Working at height? Harness on, hook on.','Hydraulic energy stored is energy waiting – release it safely.','Never bypass an interlock – it was put there for a reason.','A calm shift is a well-prepared shift.','Your signature on a permit is your promise of safety.','When in doubt, find out.','Every day is a new chance to get it right.','Gratitude for the team makes the work lighter.','Be the calm in the breakdown storm.','Technology changes, discipline stays.','Reliability is built one inspection at a time.','Sharing a lesson saves someone else a mistake.','Honest reporting builds a safe plant.','Think safe, act safe, be safe.','Live to work another day – follow the rules.','Courtesy on the shop floor costs nothing and saves a lot.','Great things in business are never done by one person.','What gets measured gets improved.','Be early, be prepared, be professional.','A strong team has no weak shift.','Learning never exhausts the mind.','Keep your tools clean and your mind clear.','The mill never sleeps – and neither does the need for safety.','Do not walk past a hazard – fix it or report it.','Work smart, stay safe, finish strong.','Your attention today protects someone tomorrow.','Every safe shift is a gift to your family.','Make safety a habit, not a reaction.','Energy isolation is life insurance.','It is okay to say "I need help".','Better to be late than to be hurt.','Check your own safety first, then help others.','The strength of the team is each individual member.','Respect time, respect process, respect people.','Simple actions, repeated daily, make great results.','Improve one thing today.','Finish what you start – and start it safely.'];
+const QUOTES = ["One action, multiple solutions.","Safety first, production next – never the other way round.","A small check today prevents a big breakdown tomorrow.","Teamwork makes the toughest shutdown feel easy.","Do it right the first time, every time.","Discipline in the small things builds reliability in the big ones.","Every reading you record is a breakdown you may prevent.","Alone we repair, together we improve.","Stay curious. Every fault is a lesson.","Go home safe – that is the real target.","No job is so urgent that we cannot take time to do it safely.","Lock out, tag out, try out – then touch.","If you are not sure, stop and ask. Asking is strength.","A shortcut today can become a lifelong regret.","Your family is waiting for you – work safely for them.","Wear your PPE like you wear your pride.","Isolate. Verify. Then work. Every single time.","Near-miss reported today is an accident prevented tomorrow.","Be the reason your colleague goes home safe.","Hot strip, cool head.","Housekeeping is the first step of safety.","Look up, look down, look around – before you step in.","Safe work is smart work.","Never assume a panel is dead – test it.","Stand clear of the line when the mill is running.","Safety is not a department, it is everyone's duty.","Speak up for safety – it takes one second.","Good habits in safety are built on ordinary days.","The best repair is the one that never needs repeating.","Predict, prevent, perform.","Preventive maintenance is cheaper than breakdown maintenance.","A tidy panel is a reliable panel.","Measure twice, trip never.","Small leaks sink big ships – fix the small fault now.","Quality is remembering what to do when nobody is watching.","Trust the process, check the data.","Learn something new on every shift.","Consistency beats intensity.","Today's effort is tomorrow's uptime.","Ownership turns a job into a responsibility.","Respect the machine and it will respect your time.","Every shutdown completed safely is a team victory.","Great teams share knowledge, not just tasks.","Handover well – the next shift inherits your work.","Write down what you learn, so the next person starts higher.","Challenges are what make the shift interesting.","Keep calm in a breakdown – clear mind fixes faster.","Fix the root cause, not just the symptom.","Be proud of the steel you help make.","Steel is forged in heat – so is character.","Progress, not perfection.","Start where you are, use what you have, do what you can.","The only way to do great work is to love what you do.","Hard work beats talent when talent does not work hard.","Success is the sum of small efforts repeated daily.","Take pride in the quality of your work.","A positive mind keeps the whole shift running.","Never stop improving – even 1% a day adds up.","Let us make today safer than yesterday.","Courage is calling a stop when something looks wrong.","Respect every colleague – the plant runs on all of us.","Help a new joiner today – you were one once.","Think before you act, check before you start.","Compliance today, confidence tomorrow.","Zero harm is possible when everyone cares.","Work to a plan, and plan for safety.","Fatigue is a hazard – take your rest, stay alert.","Mobile in pocket, eyes on the job.","Use the right tool for the right job.","Keep walkways clear – the next step may be yours.","Gas, heat, height, voltage – respect them all.","Confined space, clear permit, trained person – no compromise.","Working at height? Harness on, hook on.","Hydraulic energy stored is energy waiting – release it safely.","Never bypass an interlock – it was put there for a reason.","A calm shift is a well-prepared shift.","Your signature on a permit is your promise of safety.","When in doubt, find out.","Every day is a new chance to get it right.","Gratitude for the team makes the work lighter.","Be the calm in the breakdown storm.","Technology changes, discipline stays.","Reliability is built one inspection at a time.","Sharing a lesson saves someone else a mistake.","Honest reporting builds a safe plant.","Think safe, act safe, be safe.","Live to work another day – follow the rules.","Courtesy on the shop floor costs nothing and saves a lot.","Great things in business are never done by one person.","What gets measured gets improved.","Be early, be prepared, be professional.","A strong team has no weak shift.","Learning never exhausts the mind.","Keep your tools clean and your mind clear.","The mill never sleeps – and neither does the need for safety.","Do not walk past a hazard – fix it or report it.","Work smart, stay safe, finish strong.","Your attention today protects someone tomorrow.","Every safe shift is a gift to your family.","Make safety a habit, not a reaction.","Energy isolation is life insurance.","It is okay to say \"I need help\".","Better to be late than to be hurt.","Check your own safety first, then help others.","The strength of the team is each individual member.","Respect time, respect process, respect people.","Simple actions, repeated daily, make great results.","Improve one thing today.","Finish what you start – and start it safely.","A good electrician reads the drawing before touching the wire.","Every alarm is a message – listen before you silence it.","Behind every trip there is a reason – find it.","Cables tell stories to those who inspect them.","A loose lug today is a fire tomorrow.","Tighten the connection, loosen the stress.","Check the earth, trust the protection.","An interlock saved is a life saved.","Dust is the silent enemy of every panel.","Heat in a joint is a warning – act before it speaks louder.","Thermography shows what eyes cannot.","Listen to the motor – it speaks before it fails.","Vibration is the heartbeat of a machine; know its normal rhythm.","A clean contact is a happy contact.","Label everything – your future self will thank you.","Document the change, or the change will confuse the next shift.","Backup the program before you change it.","Never trust a drawing you have not verified on site.","Test the spare before you need the spare.","A well-kept spare store is a calm breakdown.","Know your plant – every cable, every card, every cabinet.","Fault finding is detective work – be patient and logical.","Divide the problem in half, and half again – the fault must be somewhere.","The simplest cause is often the real cause – check it first.","When everything looks fine, look again.","A rushed repair is a repeated repair.","Take ten minutes to plan, save ten hours of rework.","Trust your instruments, but verify your instruments.","Calibration is confidence in numbers.","Numbers do not lie, but they need honest readers.","Record the reading as you see it, not as you wish it.","A true entry in the checklist is worth more than a perfect one.","Small deviations are loud warnings when noticed early.","Trends matter more than single readings.","Predictive today, productive tomorrow.","Reliability is a team sport.","Mean time between failures starts with mean attention to detail.","The best breakdown is the one that never happens.","Good maintenance is invisible – everything simply keeps running.","Pride in the plant begins with pride in the panel.","The coil does not stop; neither should our learning.","Rolling steel needs rolling improvements.","Every coil rolled safely is a promise kept.","Quality steel starts with quality attention.","The strip runs straight when the team pulls together.","Heat the steel, not the argument.","Mill stands strong because people stand together.","Production is a result; safety is the foundation.","Do not trade a minute of time for a lifetime of regret.","A moment of carelessness can undo years of careful work.","Safety rules are written from lessons learned the hard way.","Be the example others follow on the shop floor.","Leadership is doing the right thing when no one is watching.","Say thank you – it costs nothing and builds everything.","A kind word on a tough shift goes a long way.","Listen first, then speak, then act.","Disagree with ideas, not with people.","Admit a mistake early – it is the cheapest time to fix it.","Mistakes are proof that you are trying.","Ask the question you are afraid to ask – someone else needs the answer too.","Teach what you know, learn what you do not.","Seniors guide, juniors question, the plant improves.","Experience is a teacher that sends the bill after the lesson – learn from others' bills.","Be a student of your machine for life.","Curiosity is the engine of improvement.","Fresh eyes see new faults – welcome fresh eyes.","Every expert was once a beginner who did not quit.","Slow is smooth, smooth is safe, safe is fast.","Patience in a breakdown saves time.","Stay humble – the plant can always teach you something new.","Today is a good day to learn one new thing about your area.","Small steps taken daily beat big plans never started.","A habit built today pays dividends for years.","Discipline is choosing what you want most over what you want now.","Be so reliable that people stop double-checking.","Commit to the shift, not just the shift timing.","Punctuality is respect in action.","Handover is not a formality; it is a lifeline.","A clear handover is a gift to the next shift.","Write the note you would want to read at the start of your shift.","Communication is the cheapest safety device.","Over-communicate during shutdowns.","Share the plan, share the risk, share the success.","Know who is working where before you energise.","Permit to work is permission to think.","Tool box talk is five minutes that can save a life.","A good TBT starts a safe shift.","Listen to the TBT as if it were about you – it is.","Every hazard identified is a hazard half controlled.","HIRAC is not paperwork – it is a map of what can hurt us.","Risk assessed is risk reduced.","The best control is the one that removes the hazard.","PPE is the last line of defence – do not make it the only one.","Safety shoes protect only when worn.","A helmet on the head, not on the hook.","Gloves for the job, not for the pocket.","Safety glasses cost little; eyes cost everything.","Ear protection today, clear hearing tomorrow.","Hydrate in the heat – a thirsty mind slips.","Heat stress is real – take a break in the shade.","Eat well, sleep well, work well.","Rest is part of the job, not a break from it.","A clear mind is the best safety equipment.","Stretch before the shift, think before the task.","Lift with your legs, not your back.","Your back has to last forty years – treat it well.","Walk, do not run, on the mill floor.","Hold the handrail – gravity never takes a day off.","Slips, trips and falls are the commonest and the most avoidable.","Spill cleaned today is a fall prevented tomorrow.","A tidy area is a visible sign of a disciplined team.","5S: sort, set, shine, standardise, sustain.","Everything in its place makes everything faster.","Standard work is the best starting point for improvement.","First make it safe, then make it right, then make it quick.","Quality is everyone's job, not just the inspector's.","Right first time beats best second time.","Rework is the most expensive way to learn.","Waste hides in waiting, walking and searching.","Make the problem visible and half the work is done.","Ask why five times to reach the real cause.","Blame the process, fix the process, thank the people.","A problem shared is a problem half solved.","A good question beats a quick guess.","Data without action is just decoration.","Keep your logbook honest – it is the memory of the plant.","What is written gets done; what is spoken gets forgotten.","Follow the SOP – it holds the experience of those before us.","When the SOP is wrong, correct the SOP; never ignore it.","Procedures are written in the language of past mistakes.","Training is an investment, not an interruption.","Competence earns trust, trust earns freedom.","Know your limits and ask for help beyond them.","No one has ever been blamed for stopping an unsafe job.","Stop work authority is a duty, not a right.","You are the last safety check before the accident.","See something, say something, fix something.","Near misses are free lessons – collect them.","An accident is never an accident – it has causes we can remove.","Zero harm is a daily decision.","Live every shift as if your family were watching.","Home is the destination, work is the journey.","Make your family proud twice – with your work and your safe return.","Your children copy what you do, not what you say – set the example.","Spend time with the ones who wait for you.","Balance work and life – the plant will manage an hour without you.","Switch off the plant at the gate and switch on the family.","Health is wealth – check yours, too.","A walk after the shift clears the head.","A smile is a free tool for every toolbox.","Cheerful teams find faster solutions.","Gratitude turns routine into richness.","Be thankful for a day without incidents.","Celebrate small wins – they add up to big results.","Recognise good work aloud.","Praise in public, correct in private.","Treat the contractor as you would treat your own team.","One plant, one team, one goal.","Together Everyone Achieves More.","No department wins alone.","Cooperation between shifts is the secret of uptime.","When one shift hands over well, two shifts win.","The best team members make others better.","Collaboration turns problems into projects.","Diversity of experience solves more faults.","Respect the night shift – they keep the plant alive while others sleep.","Salute the people behind the scenes; the plant runs on them.","Thank the team that fixed it at 3 AM.","Courage is staying calm when the alarm is loudest.","In a crisis, slow down your breathing and speed up your thinking.","Panic is the enemy of the sharp mind.","Think in steps: isolate, identify, correct, confirm.","After every breakdown, ask: what did we learn?","Good judgement comes from experience; experience comes from bad judgement – share both.","Do not fear failure; fear not learning from it.","Resilience is bouncing back with better knowledge.","A setback is a setup for a comeback.","Fall seven times, stand up eight.","Persistence beats resistance.","The way to get started is to quit talking and begin doing.","It always seems impossible until it is done.","Well done is better than well said.","Quality is not an act, it is a habit.","Excellence is doing ordinary things extraordinarily well.","You do not have to be great to start, but you have to start to be great.","Stay hungry for knowledge.","An investment in knowledge pays the best interest.","The more you learn, the more you earn – and the safer you work.","Read the manual – it is the cheapest training available.","Technology serves those who understand it.","Automation is only as smart as the engineer behind it.","Sensors do not lie; wiring sometimes does.","Always know the normal, so you can spot the abnormal.","A logical mind and a patient heart – the tools of a good engineer.","Troubleshooting is the art of asking the right question.","Check the power supply first – it is the root of many faults.","Many a mystery was just a loose connector.","Reboot is not a solution; understanding is.","Trust, but verify – then document.","Version your programs and sleep better.","A change without a record is a future fault.","Test in a safe mode before running in the live mode.","Simulate the risk, not the accident.","Know the sequence before you force the output.","Never force an output without knowing what it moves.","Mechanical and electrical – two faces of the same machine.","Respect the process – it is the reason the plant exists.","Understand the process and the fault becomes clearer.","Every motor has a story – learn to read it.","Cooling is life for drives; clean the filters.","Ventilation is the breath of a panel.","Dust and moisture – the two thieves of reliability.","Oil is the blood of the mill – keep it clean.","Hydraulic pressure respects no mistakes.","A leak is a symptom; find the disease.","Keep the area clean and the faults will be easier to see.","Good lighting finds faults before they find you.","Inspect with all your senses – look, listen, smell, feel (safely).","Walk the line every day; the plant will tell you its secrets.","The routine round is the first line of defence.","Do the round as if it were the first, and the last, of the week.","Be present on your round – distraction misses the fault.","The checklist is not a burden; it is a safety net.","Every box ticked is a promise kept.","Never tick a box you did not check.","Honesty in the checklist is the foundation of reliability.","Out-of-range readings are an invitation to investigate.","Small changes in a trend say big things about the future.","Respect the red reading – it is trying to help you.","Act on abnormal today; do not carry it to tomorrow.","Escalate early, explain clearly, follow up closely.","Keep your supervisor informed, never surprised.","Truth travels faster than rumour when it is shared early.","Tomorrow's plan begins with today's handover.","Plan the job, brief the team, work the plan, review the result.","After the job, leave the area better than you found it.","Return every tool to its place and every guard to its position.","Replace the guard before you restart – always.","Check twice before you energise.","Lock your own lock; trust your own key.","Your lock, your key, your life.","Verify zero energy with your own meter.","A multimeter is the cheapest life insurance.","Test the tester before you test the circuit.","Ground it, test it, then touch it.","Respect high voltage – it gives no second chance.","Arc flash is instant; protection must be earlier.","Stay within the safe approach distance, always.","Never work alone on live equipment.","Two pairs of eyes are better than one on every critical job.","A buddy check takes a minute and saves a lifetime.","Be your brother's keeper on the shop floor.","Care for your colleagues like family.","We are one family in the same helmet.","Be kind – everyone on the shift is fighting some battle.","A peaceful mind makes fewer errors.","Take a deep breath before a critical switching.","Switching operations need full attention, not half.","Follow the switching sequence – every step, every time.","Confirm, repeat back, then act.","Three-way communication prevents wrong operations.","Use the radio clearly: who, where, what.","Silence on the radio can be as dangerous as noise.","Wait for the all-clear before you restart.","Never restart a tripped machine without knowing why it tripped.","Understand the trip, then reset.","The reset button is not a repair tool.","A warning ignored is a failure invited.","Observation today is prevention tomorrow.","Small improvements, big impact.","Kaizen: change for the better, one step at a time.","Ideas are free – share yours.","Suggest it, test it, own it.","Innovation begins with a simple question: can we do this better?","Make the job easier for the next person.","Simplify, then standardise.","Leave a trail of knowledge wherever you work.","Mentoring is the best legacy in an industry.","The best leaders create more leaders.","Pass the torch of knowledge to every new joiner.","Today's trainee is tomorrow's team leader.","Start the shift with intention, end it with reflection.","Each day builds the plant you will work in tomorrow.","A good shift is quiet – and quiet is the sound of success.","Aim for no news – the best news in maintenance.","Ten thousand safe shifts begin with one.","Be proud of the uptime you protect.","You are an important link in the chain that moves steel.","Behind every coil there is a team.","Thank you for keeping the Hot Strip Mill alive."];
 // activity log: every change in any module is written to the cloud (fire and forget)
 const logAct = (module, action, detail) => { try { if (typeof rpc === 'function' && SESSION) rpc('hsm_log', { p_module: module, p_action: action, p_detail: detail || null }).catch(() => {}); } catch (e) {} };
+
+/* ================= SETTINGS (admin-changeable, shared by everyone) =================
+ * low_stock {n}: spares below n are "low"; drive_folders [{k,l}]: extra Drive tabs; cl_limits {"CODE|sectionIndex": {hi, lo}}: red-alert range per check list section */
+let SET = {}, LOWN = 5, CL_LIM = {};
+function applySettings(m) {
+  SET = m || {};
+  const n = SET.low_stock && +SET.low_stock.n; LOWN = n >= 1 ? n : 5;
+  CL_LIM = SET.cl_limits && typeof SET.cl_limits === 'object' ? SET.cl_limits : {};
+  const f = SET.drive_folders; DRIVE_TABS = [...DRIVE_BASE, ...(Array.isArray(f) ? f.filter(x => x && x.k && x.l).map(x => [x.k, x.l]) : [])];
+}
+async function loadSettings() {
+  try { const rows = await api('app_settings?select=key,value', { fresh: true }), m = {}; (rows || []).forEach(r => { m[r.key] = r.value; });
+    if (JSON.stringify(m) !== JSON.stringify(SET)) { store.set('hsm_set', m); applySettings(m); return true; } } catch (e) {}
+  return false;
+}
+let setInit = false;
+function initSettings() { if (setInit) return; setInit = true; loadSettings().then(ch => { if (ch) softRerender(); }); }
+window.clLim = (code, si) => limOf(code, si);
+async function saveSetting(key, value) { await rpc('hsm_set_setting', { p_key: key, p_value: value }); const m = { ...SET, [key]: value }; store.set('hsm_set', m); applySettings(m); }
+const limOf = (code, si) => { const l = CL_LIM[`${code}|${si}`] || {}; return { hi: l.hi != null && l.hi !== '' ? +l.hi : 100, lo: l.lo != null && l.lo !== '' ? +l.lo : null }; };
 
 /* ================= ICONS ================= */
 const I = {
@@ -52,6 +72,8 @@ const I = {
   check:'<path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/>',
   box:'<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   drive:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  folderplus:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v6M9 14h6"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9.5 12.5h6M9.5 16.5h6"/>',
   shield:'<path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
@@ -146,10 +168,12 @@ function tfetch(url, opts = {}, ms = 12000) {
     .finally(() => clearTimeout(t));
 }
 /* Offline copies of what was last seen, so the app still works without network */
-const CACHE_OK = /^(checklist_templates|team|shift_roster|sop_hirac|sops|spares|spare_log|hirac|checklist_entries)\b/;
+const CACHE_OK = /^(checklist_templates|team|shift_roster|sop_hirac|sops|spares|spare_log|hirac|checklist_entries|app_settings|contacts|tbt)\b/;
+/* Cache-first (instant) reads: show the last copy at once, refresh from the cloud in the background and redraw only if it changed */
+const SWR_OK = /^(checklist_templates|team|shift_roster|sop_hirac|sops|spares|hirac|app_settings|contacts|tbt)\b/;
 const CKEY = 'hsm_c:';
 function cachePut(path, data) {
-  try { const s = JSON.stringify(data); if (s.length > 600000) return;
+  try { const s = JSON.stringify(data); if (s.length > 1200000) return;
     const idx = store.get('hsm_cidx', []).filter(p => p !== path); idx.push(path);
     while (idx.length > 80) store.del(CKEY + idx.shift());
     localStorage.setItem(CKEY + path, s); store.set('hsm_cidx', idx);
@@ -196,11 +220,36 @@ async function apiNet(path, opts = {}, retry = true) {
   if (!res.ok) throw new Error((data && (data.message || data.hint)) || `Error ${res.status}`);
   return data;
 }
+const reval = {};
+function revalidate(path, old) {
+  if (reval[path]) return; reval[path] = 1;
+  apiNet(path).then(d => { setOffline(false); if (JSON.stringify(d) !== JSON.stringify(old)) { cachePut(path, d); softRerender(); } })
+    .catch(e => { if (isNet(e)) setOffline(true); }).finally(() => { delete reval[path]; });
+}
+function bustCache() { try { store.get('hsm_cidx', []).forEach(p => store.del(CKEY + p)); store.set('hsm_cidx', []); } catch (e) {} }
+const WRITE_RPC = /^rpc\/(adjust|hsm_(set|add|edit|decide|spare|leave|sc_(apply|cancel|decide|revoke|set)|upload|publish|admin))/;
+const SAFE_REFRESH = new Set(['home', 'schedule', 'spares', 'sop', 'hirac', 'team', 'contacts', 'tbt', 'checklist']);
+let rerT;
+function softRerender() {
+  clearTimeout(rerT); rerT = setTimeout(() => {
+    const h = (location.hash.replace(/^#\/?/, '') || 'home').split('/');
+    if (!SESSION || !ME || !SAFE_REFRESH.has(h[0]) || (h[0] === 'hirac' && h[1])) return;
+    const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    const md = $('#modal'); if ((md && !md.classList.contains('hidden')) || $('#docv')) return;
+    const m0 = document.querySelector('main.scroll'), sy = m0 ? m0.scrollTop : 0, tab = document.querySelector('.tabs .on');
+    render();
+    if (sy) [150, 450].forEach(t => setTimeout(() => { const m = document.querySelector('main.scroll'); if (m) m.scrollTop = sy; }, t));
+  }, 200);
+}
 async function api(path, opts = {}) {
   const get = !opts.method || opts.method === 'GET';
+  if (get && !opts.prefer && !opts.fresh && SWR_OK.test(path) && !/select=\*/.test(path)) {
+    const c = cacheGet(path); if (c != null) { revalidate(path, c); return c; }
+  }
   try {
     const d = await apiNet(path, opts);
     setOffline(false); if (get && CACHE_OK.test(path) && !opts.prefer) cachePut(path, d);
+    if (!get && (!/^rpc\//.test(path) || WRITE_RPC.test(path))) bustCache();
     if (outbox().length) setTimeout(flushOutbox, 300);
     return d;
   } catch (e) {
@@ -333,13 +382,37 @@ const loadScript = src => new Promise((ok, no) => { if (document.querySelector(`
   const t = document.createElement('script'); t.src = src; t.dataset.lib = src; t.onload = ok; t.onerror = () => { t.remove(); no(new Error('Viewer could not load')); }; document.head.appendChild(t); });
 function closeDoc() { const v = $('#docv'); if (v) { v.remove(); document.body.style.overflow = ''; if (window.HSMNative && HSMNative.secure) { try { HSMNative.secure(false); } catch (e) {} } } }
 window.addEventListener('popstate', () => { if ($('#docv')) closeDoc(); });
+// Search inside an HTML document (Word / Excel preview): marks every match, next / previous
+function docSearchInit(body) {
+  const q = $('#dvq'), cnt = $('#dvc'); let marks = [], cur = -1, last = '';
+  const clear = () => { marks.forEach(m => { const p = m.parentNode; if (p) { p.replaceChild(document.createTextNode(m.textContent), m); p.normalize(); } }); marks = []; cur = -1; };
+  const show = i => { if (!marks.length) return; if (cur >= 0 && marks[cur]) marks[cur].classList.remove('cur'); cur = (i + marks.length) % marks.length;
+    const m = marks[cur]; m.classList.add('cur'); m.scrollIntoView({ block: 'center', behavior: 'smooth' }); cnt.textContent = `${cur + 1} / ${marks.length}`; };
+  const run = () => { const v = q.value.trim().toLowerCase(); if (v === last) return; last = v; clear(); if (v.length < 2) { cnt.textContent = ''; return; }
+    const w = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, { acceptNode: n => n.nodeValue.toLowerCase().includes(v) && !/^(SCRIPT|STYLE)$/.test(n.parentNode.tagName) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+    const nodes = []; while (w.nextNode()) nodes.push(w.currentNode);
+    nodes.forEach(n => { const txt = n.nodeValue, low = txt.toLowerCase(), fr = document.createDocumentFragment(); let p = 0, i;
+      while ((i = low.indexOf(v, p)) >= 0) { if (i > p) fr.appendChild(document.createTextNode(txt.slice(p, i))); const m = document.createElement('mark'); m.className = 'hlm'; m.textContent = txt.slice(i, i + v.length); fr.appendChild(m); marks.push(m); p = i + v.length; }
+      if (p < txt.length) fr.appendChild(document.createTextNode(txt.slice(p))); n.parentNode.replaceChild(fr, n); });
+    if (!marks.length) { cnt.textContent = 'No match'; return; } show(0); };
+  $('#dv-s').onclick = () => { const s = $('#dvs'); s.classList.toggle('hidden'); if (!s.classList.contains('hidden')) q.focus(); };
+  let tm; q.oninput = () => { clearTimeout(tm); tm = setTimeout(run, 350); };
+  q.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); if (q.value.trim().toLowerCase() === last && marks.length) show(cur + 1); else run(); q.blur(); } };
+  $('#dvn').onclick = () => show(cur + 1); $('#dvp').onclick = () => show(cur - 1);
+  return { reset: () => { last = ''; marks = []; cur = -1; cnt.textContent = ''; if (q.value.trim()) run(); } };
+}
 async function openDoc(path, bucket) {
   const name = path.split('/').pop(), ext = (name.split('.').pop() || '').toLowerCase();
-  if (!['docx', 'pdf', 'jpg', 'jpeg', 'png'].includes(ext)) { toast('Opening…'); return openLink(await storageSignedUrl(path, bucket)); }
+  if (ext === 'pdf') return openDriveDoc(path, bucket);
+  if (!['docx', 'xlsx', 'jpg', 'jpeg', 'png'].includes(ext)) { toast('This file type cannot be opened inside the app. Ask the admin to upload it as PDF.', 5000); return; }
   closeDoc();
+  const textual = ext === 'docx' || ext === 'xlsx';
   const v = document.createElement('div'); v.id = 'docv';
-  v.innerHTML = `<header class="bar"><h1 style="font-size:17px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(name.replace(/\.[^.]+$/, ''))}</h1><button class="ib" id="docx-close" aria-label="Close">${ic('x', 28)}</button></header><div id="docb"><div class="spin">Opening…</div></div>`;
-  v.addEventListener('contextmenu', e => e.preventDefault());
+  v.innerHTML = `<header class="bar"><h1 style="font-size:17px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(name.replace(/\.[^.]+$/, ''))}</h1>${textual ? `<button class="ib" id="dv-s" aria-label="Search in document">${ic('search', 26)}</button>` : ''}<button class="ib" id="docx-close" aria-label="Close">${ic('x', 28)}</button></header>
+    ${textual ? `<div class="dvs hidden" id="dvs"><input id="dvq" type="search" placeholder="Search text in this document" autocomplete="off"><span id="dvc" class="dvc"></span>
+      <button class="ib dvu" id="dvp" aria-label="Previous match">${ic('chev', 22)}</button><button class="ib dvd" id="dvn" aria-label="Next match">${ic('chev', 22)}</button></div>` : ''}
+    <div id="docb"><div class="spin">Opening…</div></div>`;
+  ['contextmenu', 'dragstart', 'copy', 'cut'].forEach(t => v.addEventListener(t, e => e.preventDefault()));
   document.body.appendChild(v); document.body.style.overflow = 'hidden';
   history.pushState({ docv: 1 }, '');
   $('#docx-close').onclick = () => history.back();
@@ -357,15 +430,21 @@ async function openDoc(path, bucket) {
         if (d && d.tagName === 'DIV') Object.assign(d.style, { position: 'static', display: 'block', width: 'auto', height: 'auto', top: 'auto', left: 'auto', margin: '8px 0' }); });
       body.querySelectorAll('section.docx p').forEach(p => { const empty = x => x && x.tagName === 'P' && !x.textContent.trim() && !x.querySelector('img,svg,table');
         if (empty(p) && empty(p.previousElementSibling)) p.remove(); });
-    } else if (ext === 'pdf') {
-      await loadScript('lib/pdf.min.js'); pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise; body.innerHTML = '';
-      const w = body.clientWidth - 16, dpr = Math.min(window.devicePixelRatio || 1, 2);
-      for (let i = 1; i <= pdf.numPages && live(); i++) {
-        const pg = await pdf.getPage(i), vp0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: (w / vp0.width) * dpr });
-        const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; c.className = 'pdfpg'; body.appendChild(c);
-        await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-      }
+      docSearchInit(body);
+    } else if (ext === 'xlsx') {
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buf); if (!live()) return;
+      const sheets = wb.worksheets.filter(w => w.state !== 'hidden' && w.rowCount);
+      if (!sheets.length) { body.innerHTML = '<div class="empty"><b>This workbook is empty</b></div>'; return; }
+      let cur = 0; const srch = docSearchInit(body);
+      const cellTxt = c => { const x = xv(c.value); if (x == null) return ''; if (x instanceof Date) return fmtShort(x); return typeof x === 'number' ? String(Math.round(x * 1e6) / 1e6) : String(x).replace(/\s+$/, ''); };
+      const drawSheet = () => { const ws = sheets[cur], rows = Math.min(ws.rowCount, 1500), cols = Math.min(ws.columnCount, 40); let h = '';
+        for (let r = 1; r <= rows; r++) { const row = ws.getRow(r); let tds = '', any = false;
+          for (let c = 1; c <= cols; c++) { const cell = row.getCell(c); if (cell.isMerged && cell.master && cell.master.address !== cell.address) continue; const t = cellTxt(cell); if (t) any = true;
+            tds += `<td>${esc(t)}</td>`; }
+          if (any) h += `<tr>${tds}</tr>`; }
+        body.innerHTML = `${sheets.length > 1 ? `<div class="xtabs">${sheets.map((w, i) => `<button data-i="${i}" class="${i === cur ? 'on' : ''}">${esc(w.name)}</button>`).join('')}</div>` : ''}<div class="xsheet"><table>${h || '<tr><td>(empty sheet)</td></tr>'}</table></div>`;
+        $$('.xtabs button', body).forEach(b => b.onclick = () => { cur = +b.dataset.i; drawSheet(); srch.reset(); }); };
+      drawSheet();
     } else {
       const img = new Image(); img.src = URL.createObjectURL(new Blob([buf])); img.style.cssText = 'width:100%;display:block'; body.innerHTML = ''; body.appendChild(img);
     }
@@ -406,7 +485,7 @@ async function hiracData() {
 async function team() { if (!TEAM) TEAM = await api('team?select=id,name,area,role,plant,company,mobile,email,sap_id&order=name'); return TEAM; }
 const itemCount = t => t.sections.reduce((n, s) => n + s.items.reduce((m, it) => m + it.cells.filter(Boolean).length, 0), 0);
 const ftype = (s, it, fi) => window.HSMXL ? HSMXL.fieldType(s, it, fi) : (it.t || (s.fields[fi] || {}).t || 's');
-const isHot = (t, v) => t === 't' && v != null && v !== '' && !isNaN(parseFloat(v)) && parseFloat(v) > 100;
+const isHot = (t, v, lim) => { if (t !== 't' || v == null || v === '' || isNaN(parseFloat(v))) return false; const x = parseFloat(v), l = lim || { hi: 100, lo: null }; return x > l.hi || (l.lo != null && x < l.lo); };
 const clAreaName = a => (CL_AREAS.find(x => x[0] === a) || [a, a])[1];
 
 /* ================= ROUTER ================= */
@@ -415,7 +494,8 @@ const S = { spareArea: SPARE_AREAS[0], spareQuery: '', spareLow: false, sopTab: 
 const go = h => { location.hash = h; };
 window.addEventListener('hashchange', render);
 document.addEventListener('click', e => {
-  const g = e.target.closest('[data-go]'); if (g) { go(g.dataset.go); return; }
+  const lg = e.target.closest('[data-log]'); if (lg) { S.actOnly = lg.dataset.log; S.actMod = lg.dataset.log; S.actBack = (location.hash.replace(/^#\/?/, '') || 'home'); go('activity'); return; }
+  const g = e.target.closest('[data-go]'); if (g) { if (g.dataset.go === 'activity') { S.actOnly = null; S.actMod = 'all'; } go(g.dataset.go); return; }
   const b = e.target.closest('[data-back]'); if (b) { if (history.length > 1) history.back(); else go(b.dataset.back); }
 });
 window.hsmBack = () => {
@@ -446,17 +526,18 @@ function render() {
   window.scrollTo(0, 0);
   const md = $('#modal'); if (md && !md.classList.contains('hidden')) { md.classList.add('hidden'); md.onclick = null; }
   if (!SESSION || !ME) return viewLogin();
-  refreshMe(); initNotify();
+  refreshMe(); initNotify(); initSettings();
   if (ME.need_pin) return viewSetPin(false);
   const h = location.hash.replace(/^#\/?/, '') || 'home';
   const [page, ...rest] = h.split('/'); const arg = decodeURIComponent(rest.join('/'));
   const routes = { home: viewHome, schedule: viewSchedule, checklist: viewChecklist, cl: () => viewChecklistFill(arg), clh: () => viewChecklistHistory(arg),
     cle: () => viewChecklistEntry(arg), actions: viewActions, activity: viewActivity, clearlogs: viewClearLogs, spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
-    approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, drive: () => viewDrive(arg), admin: viewAdmin,
+    clset: viewClSettings, approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, drive: () => viewDrive(arg), admin: viewAdmin,
     contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
   (routes[page] || viewHome)();
 }
+const logBtn = m => (ME && (ME.is_admin || isModAdmin(m))) ? `<button class="ib" data-log="${m}" aria-label="Activity log of this module">${ic('list', 24)}</button>` : '';
 const bar = (title, backTo, extra = '') => `<header class="bar">${backTo ? `<button class="ib back" aria-label="Back" data-back="${backTo}">${ic('back', 26)}</button>` : ''}<h1>${esc(title)}</h1>${extra}</header>`;
 const nav = on => `<nav class="nav" aria-label="Main">${[['home','home','Home'],['schedule','cal','Schedule'],['checklist','check','Check List'],['suggest','bulb','Suggestions']].filter(([k]) => k === 'home' || k === 'suggest' || can(k))
   .map(([k, i, l]) => `<button class="${on === k ? 'on' : ''}" data-go="${k}" ${on === k ? 'aria-current="page"' : ''}><span class="pill">${ic(i, 24)}</span>${l}</button>`).join('')}</nav>`;
@@ -600,7 +681,7 @@ async function viewHome() {
       cS ? soft(api(`shift_roster?select=name,shift,area,ranking&day=eq.${today}&order=ranking,name`)) : null,
       cC ? templates() : [],
       cC ? soft(api(`checklist_entries?select=template_code&check_date=eq.${today}`)) : null,
-      cP ? soft(api('spares?select=id,qty&qty=lt.5&low_hidden=eq.false')) : null]);
+      cP ? soft(api(`spares?select=id,qty&qty=lt.${LOWN}&low_hidden=eq.false`)) : null]);
     if (cS && $('#hcrew')) {
       roster = roster || [];
       const crew = roster.filter(r => r.shift === sh);
@@ -613,7 +694,7 @@ async function viewHome() {
       const n = new Set(done.map(d => d.template_code)).size;
       $('#hcl').innerHTML = `${n}<small>/${tpl.length}</small>`; $('#hclb').style.width = (tpl.length ? 100 * n / tpl.length : 0) + '%';
     }
-    if (cP && $('#hsp')) { $('#hsp').textContent = low ? low.length : '–'; const z = low ? low.filter(x => x.qty <= 0).length : 0; if ($('#hspz')) $('#hspz').textContent = low ? `${z} nil · ${low.length - z} below 5` : 'Tap to view'; }
+    if (cP && $('#hsp')) { $('#hsp').textContent = low ? low.length : '–'; const z = low ? low.filter(x => x.qty <= 0).length : 0; if ($('#hspz')) $('#hspz').textContent = low ? `${z} nil · ${low.length - z} below ${LOWN}` : 'Tap to view'; }
   } catch (e) { netErr(e); }
   if (canAp) {
     try { const c = await approvalCounts(); const b = $('#apb');
@@ -714,7 +795,7 @@ let REQ = [];
 const RESULT = { ok: ['Signed in', 'green'], first_login: ['First sign-in', 'green'], new_device: ['New phone tried', 'amber'], wrong_password: ['Wrong SAP ID / PIN', 'red'],
   locked: ['Locked (too many tries)', 'red'], not_approved: ['Not approved yet', 'amber'], unknown_user: ['Unknown username', 'red'] };
 // Access editor: module ticks, area ticks inside Check List / Mill SOPs, and "Admin" per module
-const ACC_MODS = [...MODULES, ['planning', 'Planning – Out of stock status', 'box']];
+const ACC_MODS = [...MODULES, ['planning', 'Planning – Out of stock status', 'box'], ['clset', 'Checklist settings (alert limits)', 'gear']];
 const accessEditor = (r, key, withAdmin = true) => `<div class="acc" data-ak="${key}">${ACC_MODS.map(([k, t, i]) => {
   const on = (r.modules || ALL_MODS).includes(k), adm = (r.admin_modules || []).includes(k);
   const areas = k === 'planning' ? SPARE_AREAS.map(a => [a, a]) : AREA_MODS[k], sel = r.areas && Array.isArray(r.areas[k]) ? r.areas[k] : null;
@@ -881,12 +962,20 @@ function editUser(r, done) {
 }
 
 /* ================= SHIFT SCHEDULE ================= */
+async function contactSheet(name) {
+  let people = []; try { people = await team(); } catch (e) {}
+  const p = people.find(x => sameName(x.name, name)), mob = p && p.mobile ? String(p.mobile).replace(/[^0-9+]/g, '') : '', em = p && p.email ? String(p.email).trim() : '', md = $('#modal');
+  md.innerHTML = `<div class="sheet"><h3>${esc(name)}</h3><p>${p ? esc([p.area, p.role || p.company].filter(Boolean).join(' · ')) : ''}</p>
+    ${mob || em ? `<div class="two">${mob ? `<a class="btn pri" href="tel:${mob}">${ic('phone', 20)} Call</a>` : '<span></span>'}${em ? `<a class="btn" href="mailto:${esc(em)}">${ic('mail', 20)} Mail</a>` : '<span></span>'}</div>
+      <p class="hint" style="text-align:center;margin:8px 0 0">${esc([mob ? p.mobile : '', em].filter(Boolean).join(' · '))}</p>` : '<p class="hint" style="margin:6px 0 10px">No phone or email saved for this person in Team.</p>'}
+    <button class="btn ghost block" id="cx" style="margin-top:12px">Close</button></div>`;
+  md.classList.remove('hidden'); md.onclick = e => { if (e.target === md) md.classList.add('hidden'); }; $('#cx').onclick = () => md.classList.add('hidden');
+}
 async function viewSchedule() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (!S.calMonth) S.calMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   if (!S.calSel) S.calSel = new Date(today);
-  $('#app').innerHTML = `${bar('Shift Schedule', 'home', (ME.is_admin || isModAdmin('schedule')) ? `<button class="ib" id="schlog" aria-label="Change log">${ic('list', 24)}</button>` : '')}<main class="scroll" id="sc"><div class="spin">Loading…</div></main>${nav('schedule')}`;
-  if ($('#schlog')) $('#schlog').onclick = () => { S.actMod = 'schedule'; go('activity'); };
+  $('#app').innerHTML = `${bar('Shift Schedule', 'home', logBtn('schedule'))}<main class="scroll" id="sc"><div class="spin">Loading…</div></main>${nav('schedule')}`;
   const m = S.calMonth, y = m.getFullYear(), mo = m.getMonth();
   let marked = new Set(), rows = [], extraH = [];
   try {
@@ -914,7 +1003,7 @@ async function viewSchedule() {
   const canEdP = r => isModAdmin('schedule') || incAreas.includes(incN(r.area));
   const editable = (isModAdmin('schedule') || incAreas.length) && +S.calSel >= +today, edit = editable && S.schedEdit;
   const by = s => rows.filter(r => r.shift === s);
-  const nm = r => `<div class="nm ${sameName(r.name, ME.name) ? 'me' : ''}${edit && canEdP(r) ? ' ed' : ''}" ${edit && canEdP(r) ? `data-p="${esc(r.name)}" role="button" tabindex="0"` : ''}>${esc(r.name)}${r.area ? ` <span class="hint">· ${esc(r.area)}</span>` : ''}${r.edited_by ? ` <span class="edmark" title="Changed in the app by ${esc(r.edited_by)}">${ic('edit', 13)} ${esc(firstName(r.edited_by))}</span>` : ''}${edit ? `<span class="chev">${ic('chev', 18)}</span>` : ''}</div>`;
+  const nm = r => `<div class="nm ${sameName(r.name, ME.name) ? 'me' : ''}${edit && canEdP(r) ? ' ed' : ''}" data-nm="${esc(r.name)}" ${edit && canEdP(r) ? `data-p="${esc(r.name)}" role="button" tabindex="0"` : ''}>${esc(r.name)}${r.area ? ` <span class="hint">· ${esc(r.area)}</span>` : ''}${r.edited_by ? ` <span class="edmark" title="Changed in the app by ${esc(r.edited_by)}">${ic('edit', 13)} ${esc(firstName(r.edited_by))}</span>` : ''}${edit ? `<span class="chev">${ic('chev', 18)}</span>` : ''}</div>`;
   // General shift people are shown area-wise below, so the shift list shows A, B, C, Leave and Weekly Off
   const grp = (b, cls, t, list) => list.length ? `<div class="grp g-${cls}"><span class="badge ${cls}">${b}</span><div style="flex:1;min-width:0"><div class="gt">${t}</div>${list.map(nm).join('')}</div></div>` : '';
   const general = by('G'), areaMap = {};
@@ -938,7 +1027,7 @@ async function viewSchedule() {
         : '<div class="empty" style="padding:26px 20px">No schedule uploaded for this date.</div>'}
     </section>
     ${general.length ? `<section class="card" style="overflow:hidden"><div class="boxh g-area"><h2>Area-wise · General Shift</h2></div>
-      ${Object.keys(areaMap).sort().map(a => `<div class="arow"><span class="an">${esc(a)}</span><div>${areaMap[a].map(p => `<div class="pp${edit && canEdP(p) ? ' ed' : ''}${sameName(p.name, ME.name) ? ' me' : ''}" ${edit && canEdP(p) ? `data-p="${esc(p.name)}" role="button" tabindex="0"` : ''}><span>${esc(p.name)}</span>${p.edited_by ? `<span class="edmark">${ic('edit', 13)}</span>` : ''}</div>`).join('')}</div></div>`).join('')}
+      ${Object.keys(areaMap).sort().map(a => `<div class="arow"><span class="an">${esc(a)}</span><div>${areaMap[a].map(p => `<div class="pp${edit && canEdP(p) ? ' ed' : ''}${sameName(p.name, ME.name) ? ' me' : ''}" data-nm="${esc(p.name)}" ${edit && canEdP(p) ? `data-p="${esc(p.name)}" role="button" tabindex="0"` : ''}><span>${esc(p.name)}</span>${p.edited_by ? `<span class="edmark">${ic('edit', 13)}</span>` : ''}</div>`).join('')}</div></div>`).join('')}
     </section>` : ''}</div>`;
   $('#pm').onclick = () => { S.calMonth = new Date(y, mo - 1, 1); viewSchedule(); };
   $('#nm').onclick = () => { S.calMonth = new Date(y, mo + 1, 1); viewSchedule(); };
@@ -960,6 +1049,15 @@ async function viewSchedule() {
     if (!(await ask('Remove this holiday?', n, 'Remove'))) return;
     try { await api(`holidays?day=eq.${ymd(S.calSel)}&name=eq.${encodeURIComponent(n)}`, { method: 'DELETE', prefer: 'return=minimal' });
       logAct('schedule', 'Holiday removed', `${fmtShort(S.calSel)} · ${n}`); viewSchedule(); } catch (e) { netErr(e); } });
+  // long press on a name: small Call / Mail popup (contact details come from Team)
+  { let lp = null, fired = false; const sc = $('#sc');
+    const st = e => { const t = e.target.closest('[data-nm]'); if (!t) return; fired = false; clearTimeout(lp);
+      lp = setTimeout(() => { fired = true; try { if (navigator.vibrate) navigator.vibrate(15); } catch (x) {} contactSheet(t.dataset.nm); }, 550); };
+    const en = () => clearTimeout(lp);
+    sc.addEventListener('touchstart', st, { passive: true }); sc.addEventListener('mousedown', st);
+    ['touchend', 'touchmove', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => sc.addEventListener(ev, en, { passive: true }));
+    sc.addEventListener('contextmenu', e => { if (e.target.closest('[data-nm]')) e.preventDefault(); });
+    sc.addEventListener('click', e => { if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true); }
   if (!edit) return;
   const day = ymd(S.calSel);
   const setShift = async (p, sh) => {
@@ -1001,7 +1099,8 @@ async function viewSchedule() {
 /* ================= CHECK LISTS ================= */
 const draftKey = code => `hsm_cl2_${code}`;
 async function viewChecklist() {
-  $('#app').innerHTML = `${bar('Check List', 'home')}<main class="scroll" id="cl"><div class="spin">Loading…</div></main>${nav('checklist')}`;
+  $('#app').innerHTML = `${bar('Check List', 'home', logBtn('checklist') + (can('clset') ? `<button class="ib" id="clgear" aria-label="Check list settings">${ic('gear', 26)}</button>` : ''))}<main class="scroll" id="cl"><div class="spin">Loading…</div></main>${nav('checklist')}`;
+  if ($('#clgear')) $('#clgear').onclick = () => go('clset');
   const today = ymd(new Date()); S.reportDate = S.reportDate || today;
   try {
     const tpl = await templates();
@@ -1081,7 +1180,7 @@ async function dayEntries(code, day) {
 }
 const countFlags = (t, V) => { let nok = 0, hot = 0;
   t.sections.forEach((s, si) => s.items.forEach((it, ii) => it.cells.forEach((c, fi) => { const v = V[`${si}.${ii}.${fi}`]; if (!c || !v) return;
-    if (v === 'NOT OK') nok++; if (isHot(ftype(s, it, fi), v)) hot++; }))); return { nok, hot }; };
+    if (v === 'NOT OK') nok++; if (isHot(ftype(s, it, fi), v, limOf(t.code, si))) hot++; }))); return { nok, hot }; };
 
 async function viewChecklistFill(code) {
   $('#app').innerHTML = `${bar('Check List', 'checklist')}<main class="scroll"><div class="spin">Loading…</div></main>`;
@@ -1089,36 +1188,61 @@ async function viewChecklistFill(code) {
   if (!t) { $('#app').innerHTML = `${bar('Check List', 'checklist')}<div class="empty"><b>Check list not found</b>You may not have access to this area.</div>`; return; }
   const total = itemCount(t), day = ymd(new Date());
   const dr = store.get(draftKey(code)) || { v: {}, shift: curShift(), remarks: '' }; const V = dr.v;
-  // readings already submitted today for this shift (e.g. half filled earlier): shown here, only the rest is entered now
+  // Readings already submitted TODAY for this check list (by anybody, any shift): shown in green, only the rest is entered now. Resets by itself next day.
   let priorRows = []; try { priorRows = await dayEntries(code, day); } catch (e) { netErr(e); }
-  const prior = (mergeEntries(priorRows.filter(r => (r.shift || '') === dr.shift))[0]) || null, P = prior ? prior.vals : {};
+  const prior = priorRows.length ? mergeEntries(priorRows.map(r => ({ ...r, shift: '' })))[0] : null, P = prior ? prior.vals : {};
   const val = k => V[k] != null && V[k] !== '' ? V[k] : (P[k] || '');
   const saved = k => !(V[k] != null && V[k] !== '') && !!P[k];
+  const lim = k => limOf(code, +k.split('.')[0]);
   const btns = (k, opts) => `<span class="okg ${saved(k) ? 'sv' : ''}" data-k="${k}">${opts.map(o => `<button type="button" data-ok="${o}" class="${o === 'NOT OK' || o === 'OUT' ? 'nok ' : ''}${val(k) === o ? 'on' : ''}">${o}</button>`).join('')}</span>`;
   const input = (ty, k, label) => ty === 'ok' ? btns(k, ['OK', 'NOT OK']) : ty === 'io' ? btns(k, ['IN', 'OUT'])
-    : `<input data-k="${k}" data-t="${ty}" class="${isHot(ty, val(k)) ? 'hot' : ''}${saved(k) ? ' sv' : ''}" ${ty === 't' || ty === 'n' ? 'inputmode="decimal"' : ''} value="${esc(val(k))}" aria-label="${esc(label || 'Value')}" placeholder="${ty === 't' ? '°C' : ''}">`;
+    : `<input data-k="${k}" data-t="${ty}" class="${isHot(ty, val(k), lim(k)) ? 'hot' : ''}${saved(k) ? ' sv' : ''}" ${ty === 't' || ty === 'n' ? 'inputmode="decimal"' : ''} value="${esc(val(k))}" aria-label="${esc(label || 'Value')}" placeholder="${ty === 't' ? '°C' : ''}">`;
   const nPrior = prior ? Object.keys(P).length : 0;
+  const secTot = t.sections.map(s => s.items.reduce((n, it) => n + it.cells.filter(Boolean).length, 0));
+  let selSec = S.clSec && S.clSec.code === code ? S.clSec.v : 'all', onlyEmpty = false, qtxt = '';
+  if (selSec !== 'all' && !t.sections[+selSec]) selSec = 'all';
   $('#app').innerHTML = `${bar(t.name, 'checklist', `<button class="ib" aria-label="Past records" data-go="clh/${esc(code)}">${ic('clock', 26)}</button>`)}
   <div class="clhead"><span>${fmtDay(new Date())}</span><span class="shiftsel" id="shs">${['A','B','C','G'].map(x => `<button type="button" data-s="${x}" class="${dr.shift === x ? 'on' : ''}" aria-pressed="${dr.shift === x}">${x}</button>`).join('')}</span></div>
   <div class="prog"><div id="pbar"></div></div>
+  <div class="clq"><div class="search">${ic('search', 22)}<input id="clq" type="search" placeholder="Search reading – motor, pump, panel…" aria-label="Search readings"></div><button type="button" class="chip" id="clemp" aria-pressed="false">Only empty</button></div>
+  ${t.sections.length > 1 ? `<div class="tabs cltabs clsc" id="clsc" role="tablist"></div>` : ''}
   <main class="scroll" id="clf"><div style="padding:6px 12px 24px">
-    ${prior ? `<div class="resume">${ic('ok', 20)}<div><b>Continuing today's Shift ${esc(dr.shift)} check list</b><span>${nPrior} readings already saved (${esc(prior.names.map(firstName).join(', '))}, last ${new Date(prior.filled_at).toTimeString().slice(0, 5)}). Fill the rest and submit – everything is combined in one Excel.</span></div></div>` : ''}
-    ${t.sections.map((s, si) => `<h2 class="clsec">${esc(s.title)}</h2>
+    ${prior ? `<div class="resume">${ic('ok', 20)}<div><b>Today's check list is already started</b><span>${nPrior} of ${total} readings saved earlier today (${esc(prior.names.map(firstName).join(', '))}, last ${new Date(prior.filled_at).toTimeString().slice(0, 5)}). They are shown in <b style="display:inline">green</b> – fill only the rest. Tap “Only empty” to hide the filled ones.</span></div></div>` : ''}
+    ${t.sections.map((s, si) => `<section class="clsecw" data-si="${si}" data-t="${esc(s.title.toLowerCase())}"><h2 class="clsec">${esc(s.title)}</h2>
       ${s.items.map((it, ii) => { const fs = it.cells.map((c, fi) => c ? fi : -1).filter(fi => fi >= 0);
-        return `<div class="clitem"><div class="cln">${esc(it.name)}</div><div class="clf ${fs.length === 1 ? 'one' : ''}">${fs.map(fi => { const ty = ftype(s, it, fi), l = (s.fields[fi] || {}).l || '';
-          return `<label>${l ? `<span>${esc(l)}</span>` : ''}${input(ty, `${si}.${ii}.${fi}`, l || it.name)}</label>`; }).join('')}</div></div>`; }).join('')}`).join('')}
+        return `<div class="clitem" data-ks="${fs.map(fi => `${si}.${ii}.${fi}`).join(',')}" data-n="${esc((it.name + ' ' + fs.map(fi => (s.fields[fi] || {}).l || '').join(' ')).toLowerCase())}"><div class="cln">${esc(it.name)}</div><div class="clf ${fs.length === 1 ? 'one' : ''}">${fs.map(fi => { const ty = ftype(s, it, fi), l = (s.fields[fi] || {}).l || '';
+          return `<label>${l ? `<span>${esc(l)}</span>` : ''}${input(ty, `${si}.${ii}.${fi}`, l || it.name)}</label>`; }).join('')}</div></div>`; }).join('')}</section>`).join('')}
+    <div class="empty" id="clnone" hidden><b>Nothing to show</b>Change the search or the section.</div>
     <div class="fld" style="margin-top:18px"><label for="clrem">Remarks</label><textarea id="clrem" rows="3" placeholder="Abnormality found, action taken…">${esc(dr.remarks || '')}</textarea></div>
-    <p class="hint" style="margin-top:12px">Inspected by ${esc(ME.name)}. Temperatures above 100 are shown in red. Readings stay on this phone until you submit.</p>
+    <p class="hint" style="margin-top:12px">Inspected by ${esc(ME.name)}. Readings outside the set limit are shown in red. Readings stay on this phone until you submit.</p>
   </div></main>
   <div class="actions"><button class="btn ghost" type="button" id="clclear">Clear</button><button class="btn pri" type="button" id="clsub">Submit</button></div>`;
-  const filled = () => { let n = 0; for (let i = 0; i < t.sections.length; i++) t.sections[i].items.forEach((it, ii) => it.cells.forEach((c, fi) => { if (c && val(`${i}.${ii}.${fi}`)) n++; })); return n; };
+  const secFilled = () => t.sections.map((s, si) => { let n = 0; s.items.forEach((it, ii) => it.cells.forEach((c, fi) => { if (c && val(`${si}.${ii}.${fi}`)) n++; })); return n; });
+  const filled = () => secFilled().reduce((a, b) => a + b, 0);
   const fresh = () => Object.keys(V).filter(k => V[k] && V[k] !== P[k]);
-  const upd = () => { const n = filled(); $('#pbar').style.width = Math.min(100, 100 * n / total) + '%'; $('#clsub').innerHTML = `Submit <span style="font-size:15px;font-weight:600;opacity:.85">${n}/${total}</span>`; };
-  const persist = () => { dr.remarks = $('#clrem').value; store.set(draftKey(code), dr); upd(); };
-  upd();
   const f = $('#clf');
+  const drawChips = () => { const box = $('#clsc'); if (!box) return; const fl = secFilled();
+    box.innerHTML = [['all', 'All', filled(), total], ...t.sections.map((s, si) => [String(si), s.title, fl[si], secTot[si]])].map(([k, l, a, b]) =>
+      `<button role="tab" data-sc="${k}" class="${String(selSec) === k ? 'on' : ''}" aria-selected="${String(selSec) === k}">${esc(l)}<span class="cnt ${a === b ? 'all' : ''}">${a}/${b}</span></button>`).join('');
+    const on = $('#clsc .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); };
+  const updChips = () => { const box = $('#clsc'); if (!box) return; const fl = secFilled(), all = filled();
+    $$('[data-sc]', box).forEach(b => { const k = b.dataset.sc, a = k === 'all' ? all : fl[+k], n = k === 'all' ? total : secTot[+k], c = $('.cnt', b); c.textContent = `${a}/${n}`; c.classList.toggle('all', a === n); }); };
+  const applyFilter = () => { const q = qtxt.toLowerCase().trim();
+    $$('.clsecw', f).forEach(w => { const si = w.dataset.si; let vis = 0;
+      $$('.clitem', w).forEach(it => { let show = (selSec === 'all' || String(selSec) === si) && (!q || it.dataset.n.includes(q) || w.dataset.t.includes(q));
+        if (show && onlyEmpty) show = it.dataset.ks.split(',').some(k => !val(k));
+        it.hidden = !show; if (show) vis++; });
+      w.hidden = !vis; });
+    $('#clnone').hidden = $$('.clsecw:not([hidden])', f).length > 0; };
+  const upd = () => { const n = filled(); $('#pbar').style.width = Math.min(100, 100 * n / total) + '%'; $('#clsub').innerHTML = `Submit <span style="font-size:15px;font-weight:600;opacity:.85">${n}/${total}</span>`; updChips(); };
+  const persist = () => { dr.remarks = $('#clrem').value; store.set(draftKey(code), dr); upd(); };
+  drawChips(); applyFilter(); upd();
+  if ($('#clsc')) $('#clsc').onclick = e => { const b = e.target.closest('[data-sc]'); if (!b) return; selSec = b.dataset.sc; S.clSec = { code, v: selSec };
+    $$('#clsc button').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); }); applyFilter(); f.scrollTop = 0; };
+  $('#clq').oninput = e => { qtxt = e.target.value; applyFilter(); };
+  $('#clemp').onclick = e => { onlyEmpty = !onlyEmpty; e.currentTarget.classList.toggle('on', onlyEmpty); e.currentTarget.setAttribute('aria-pressed', onlyEmpty); applyFilter(); };
   f.addEventListener('input', e => { const k = e.target.dataset.k; if (!k) return; V[k] = e.target.value.trim(); e.target.classList.remove('sv');
-    e.target.classList.toggle('hot', isHot(e.target.dataset.t, val(k))); persist(); });
+    e.target.classList.toggle('hot', isHot(e.target.dataset.t, val(k), lim(k))); persist(); });
   f.addEventListener('click', e => { const b = e.target.closest('[data-ok]'); if (!b) return; const g = b.parentElement, k = g.dataset.k;
     V[k] = val(k) === b.dataset.ok && !P[k] ? '' : b.dataset.ok;   // an answer saved earlier cannot be un-ticked, only changed
     g.classList.remove('sv'); $$('button', g).forEach(x => x.classList.toggle('on', val(k) === x.dataset.ok)); persist(); });
@@ -1128,7 +1252,8 @@ async function viewChecklistFill(code) {
     const add = {}; fresh().forEach(k => { const v = String(V[k]).trim(); if (v) add[k] = v; });
     const n = Object.keys(add).length, have = filled();
     if (!n) return toast(nPrior ? 'Nothing new to submit – fill the remaining readings' : 'Fill at least one reading');
-    if (have < total && !(await ask('Submit check list?', `${total - have} of ${total} readings are still empty. You can come back later and fill the rest – it will be combined.`, 'Submit'))) return;
+    const sel = selSec !== 'all' ? t.sections[+selSec] : null, selTotal = sel ? secTot[+selSec] : total, selHave = sel ? secFilled()[+selSec] : have;
+    if (selHave < selTotal && !(await ask('Submit what you have filled?', `${selTotal - selHave} of ${selTotal} readings${sel ? ' in “' + sel.title + '”' : ''} are still empty. You or a colleague can fill the rest later – everything is combined.`, 'Submit'))) return;
     const btn = $('#clsub'); btn.disabled = true; btn.textContent = 'Submitting…';
     try {
       const now = new Date();
@@ -1138,23 +1263,50 @@ async function viewChecklistFill(code) {
       store.del(draftKey(code));
       await flushOutbox();
       const pending = outbox().some(x => x.body.client_id === body.client_id);
-      const merged = mergeEntries(await dayEntries(code, day)).find(r => (r.shift || '') === dr.shift) || { ...body, vals: Object.assign({}, P, add), created_at: body.filled_at };
       const all = Object.assign({}, P, add), { nok, hot } = countFlags(t, all);
+      const left = t.sections.map((s, si) => ({ s, e: secTot[si] - s.items.reduce((c, it, ii) => c + it.cells.filter((x, fi) => x && all[`${si}.${ii}.${fi}`]).length, 0) })).filter(x => x.e > 0);
       const m = $('#modal');
       m.innerHTML = `<div class="sheet"><div class="status" style="padding:0"><div class="ring" style="background:${pending ? 'var(--amber-50,#FFF4E5);color:var(--amber)' : 'var(--green-50);color:var(--green)'}">${ic(pending ? 'clock' : 'ok', 40)}</div>
-        <h2>${pending ? 'Saved on this phone' : 'Check list submitted'}</h2><p>${esc(t.name)} · Shift ${esc(dr.shift)} · ${Object.keys(all).length} of ${total} readings${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--red)">${hot} above 100 °C</b>` : ''}</p>
-        ${Object.keys(all).length < total ? `<p style="margin-top:8px">${total - Object.keys(all).length} readings still empty – open this check list again later to fill them; they join the same sheet.</p>` : ''}
+        <h2>${pending ? 'Saved on this phone' : 'Submitted'}</h2><p>${esc(t.name)}${sel ? ' · ' + esc(sel.title) : ''} · ${n} new reading${n > 1 ? 's' : ''} · ${Object.keys(all).length} of ${total} done today${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--red)">${hot} out of limit</b>` : ''}</p>
+        ${left.length ? `<p style="margin-top:8px;text-align:left"><b>Still empty:</b> ${left.map(x => `${esc(x.s.title)} (${x.e})`).join(', ')}</p>` : `<p style="margin-top:8px"><b>All readings of this check list are filled.</b> Use “Daily report (Excel)” on the Check List page to get the full Excel.</p>`}
         ${pending ? '<p style="margin-top:8px">No network here. It will upload by itself when the network is back – no need to fill it again.</p>' : ''}</div>
-        <button class="btn pri block" id="mshare">${ic('share')} Share Excel by mail</button>
-        <div class="two"><button class="btn" id="msave">${ic('download')} Save Excel</button><button class="btn ghost" id="mdone">Done</button></div></div>`;
+        <button class="btn pri block" id="mdone" style="margin-top:14px">Done</button></div>`;
       m.classList.remove('hidden');
       const close = () => { m.classList.add('hidden'); go('checklist'); };
-      $('#mshare').onclick = () => recordReport(t, merged, true);
-      $('#msave').onclick = () => recordReport(t, merged, false);
       $('#mdone').onclick = close; m.onclick = e => { if (e.target === m) close(); };
-      logAct('checklist', 'Check list submitted', `${t.name} · Shift ${dr.shift} · ${n} new readings${nok ? ` · ${nok} NOT OK` : ''}${hot ? ` · ${hot} >100°C` : ''}`);
+      logAct('checklist', 'Check list submitted', `${t.name}${sel ? ' · ' + sel.title : ''} · Shift ${dr.shift} · ${n} new readings${nok ? ` · ${nok} NOT OK` : ''}${hot ? ` · ${hot} out of limit` : ''}`);
     } catch (e) { netErr(e); btn.disabled = false; upd(); }
   };
+}
+
+/* ================= CHECK LIST SETTINGS (red-alert limits per area / sub-area) ================= */
+async function viewClSettings() {
+  $('#app').innerHTML = `${bar('Check list settings', 'checklist')}<main class="scroll" id="cs"><div class="spin">Loading…</div></main>`;
+  let tpl; try { tpl = await templates(); } catch (e) { netErr(e); $('#cs').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
+  const areas = CL_AREAS.filter(([a]) => tpl.some(t => t.area === a) && canArea('clset', a));
+  if (!areas.length) { $('#cs').innerHTML = `<div class="empty"><b>No areas for you yet</b>Ask ${esc(ADMIN_NAME)} for access to Checklist settings.</div>`; return; }
+  if (!areas.some(a => a[0] === S.csArea)) S.csArea = areas[0][0];
+  const hasTemp = (t, si) => t.sections[si].items.some((it, ii) => it.cells.some((c, fi) => c && ftype(t.sections[si], it, fi) === 't'));
+  const draw = () => {
+    const list = tpl.filter(t => t.area === S.csArea);
+    $('#cs').innerHTML = `<div class="tabs cltabs" id="cst">${areas.map(([a, l]) => `<button data-a="${a}" class="${a === S.csArea ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>
+      <div class="pad"><p class="hint" style="margin:0 0 10px">A temperature reading turns <b style="color:var(--red)">red</b> when it is above “Red above” (or below “Red below”, if filled). Default: above 100. Changes apply to everyone from now on.</p>
+      ${list.map(t => `<div class="label" style="margin-top:14px">${esc(t.name)}</div>` + t.sections.map((s, si) => { if (!hasTemp(t, si)) return ''; const l = limOf(t.code, si);
+        return `<div class="card cslim" data-k="${esc(t.code)}|${si}" style="padding:12px;margin-bottom:8px"><div style="font-weight:700;margin-bottom:8px">${esc(s.title)}</div>
+          <div class="two"><div class="fld"><label>Red above (°C)</label><input type="number" inputmode="decimal" class="hi" value="${l.hi}"></div>
+          <div class="fld"><label>Red below (°C) – optional</label><input type="number" inputmode="decimal" class="lo" value="${l.lo != null ? l.lo : ''}" placeholder="none"></div></div></div>`; }).join('')).join('') || '<div class="empty"><b>No check lists in this area</b></div>'}
+      <button class="btn pri block" id="css" style="margin:14px 0 24px">Save ${esc(clAreaName(S.csArea))} limits</button></div>`;
+    $('#cst').onclick = e => { const b = e.target.closest('[data-a]'); if (b) { S.csArea = b.dataset.a; draw(); } };
+    $('#css').onclick = async () => {
+      const next = { ...CL_LIM }; let bad = '';
+      $$('.cslim').forEach(c => { const k = c.dataset.k, hiS = $('.hi', c).value.trim(), loS = $('.lo', c).value.trim(), hi = hiS === '' ? 100 : +hiS, lo = loS === '' ? null : +loS;
+        if (isNaN(hi) || (lo != null && isNaN(lo)) || (lo != null && lo >= hi)) { bad = bad || 'Check the numbers – “below” must be lower than “above”'; return; }
+        if (hi === 100 && lo == null) delete next[k]; else next[k] = { hi, lo }; });
+      if (bad) return toast(bad);
+      $('#css').disabled = true;
+      try { await saveSetting('cl_limits', next); logAct('checklist', 'Alert limits changed', clAreaName(S.csArea)); toast('Limits saved'); draw(); } catch (e) { $('#css').disabled = false; netErr(e); } };
+  };
+  draw();
 }
 
 /* ================= DAILY ACTION REQUIRED (abnormal readings of all check lists) ================= */
@@ -1169,7 +1321,7 @@ async function abnormalFor(day) {
     const t = tpl.find(x => x.code === r.template_code); if (!t || !canArea('checklist', t.area)) return;
     t.sections.forEach((s, si) => s.items.forEach((it, ii) => it.cells.forEach((c, fi) => {
       const v = c && (r.vals || {})[`${si}.${ii}.${fi}`]; if (!v) return;
-      const hot = isHot(ftype(s, it, fi), v);
+      const hot = isHot(ftype(s, it, fi), v, limOf(t.code, si));
       if (v === 'NOT OK' || hot) items.push({ area: t.area, code: t.code, tname: t.name, shift: r.shift || '', equip: it.name, param: (s.fields[fi] || {}).l || s.title, value: v, kind: hot ? 'hot' : 'nok', by: r.inspected_name || '', at: r.filled_at || r.created_at });
     })));
     if (r.remarks) notes.push({ area: t.area, tname: t.name, shift: r.shift || '', text: r.remarks, by: r.inspected_name || '' });
@@ -1179,7 +1331,7 @@ async function abnormalFor(day) {
 const actionText = (day, d) => {
   const L = [`HSM E&A – Daily action required – ${fmtShort(fromYmd(day))}`, ''];
   const by = {}; d.items.forEach(i => { (by[i.area] = by[i.area] || []).push(i); });
-  CL_AREAS.filter(([a]) => by[a]).forEach(([a, n]) => { L.push(`*${n}*`); by[a].forEach(i => L.push(`• ${i.tname} (${i.shift}) – ${i.equip}: ${i.param} = ${i.value}${i.kind === 'hot' ? ' °C (above 100)' : ''}`)); L.push(''); });
+  CL_AREAS.filter(([a]) => by[a]).forEach(([a, n]) => { L.push(`*${n}*`); by[a].forEach(i => L.push(`• ${i.tname} (${i.shift}) – ${i.equip}: ${i.param} = ${i.value}${i.kind === 'hot' ? ' °C (out of limit)' : ''}`)); L.push(''); });
   if (!d.items.length) L.push('No abnormal reading found.');
   return L.join('\n');
 };
@@ -1192,7 +1344,7 @@ async function viewActions() {
   const doneN = new Set(); // check lists of the day that were filled
   $('#ac').innerHTML = `<div class="pad">
     <div class="card actsum ${d.items.length ? 'bad' : 'good'}"><span class="ic">${ic(d.items.length ? 'warn' : 'ok', 28)}</span><div style="flex:1"><div class="t">${d.items.length ? `${d.items.length} abnormal reading${d.items.length > 1 ? 's' : ''} need action` : 'All readings normal'}</div>
-      <div class="s">${d.items.length ? `${nhot} above 100 °C · ${nnok} NOT OK` : 'No temperature above 100 °C and no NOT OK so far'}${ME.is_admin || isModAdmin('checklist') ? ' · all areas' : ' · your areas'}</div></div></div>
+      <div class="s">${d.items.length ? `${nhot} out of limit · ${nnok} NOT OK` : 'No reading out of limit and no NOT OK so far'}${ME.is_admin || isModAdmin('checklist') ? ' · all areas' : ' · your areas'}</div></div></div>
     <div class="row" style="margin:12px 0"><input type="date" id="adate" value="${S.actDay}" max="${today}" aria-label="Date"></div>
     ${d.items.length ? `<div class="two" style="margin-bottom:6px"><button class="btn" id="axl">${ic('xls')} Excel</button><button class="btn pri" id="ashare">${ic('share')} Share</button></div>` : ''}
     ${CL_AREAS.filter(([a]) => by[a]).map(([a, n]) => `<div class="label" style="margin-top:16px">${esc(n)} · ${by[a].length}</div><div class="card actl">${by[a].map(i => `<button class="actr ${i.kind}" data-go="cl/${esc(i.code)}">
@@ -1228,15 +1380,15 @@ async function viewChecklistEntry(id) {
     if (r && t) { const sib = (await dayEntries(r.template_code, r.check_date)).filter(x => (x.shift || '') === (r.shift || '')); r = mergeEntries(sib.length ? sib : [r])[0]; }
     if (!r || !t) { $('#ce').innerHTML = '<div class="empty"><b>Record not found</b></div>'; return; }
     const V = r.vals || {};
-    const cell = (v, ty) => !v ? '<span style="color:var(--muted)">—</span>' : v === 'NOT OK' || v === 'OUT' ? `<b style="color:var(--red)">${esc(v)}</b>` : v === 'OK' || v === 'IN' ? `<span style="color:var(--green);font-weight:700">${esc(v)}</span>`
-      : isHot(ty, v) ? `<b style="color:var(--red)">${esc(v)}</b>` : esc(v);
+    const cell = (v, ty, si) => !v ? '<span style="color:var(--muted)">—</span>' : v === 'NOT OK' || v === 'OUT' ? `<b style="color:var(--red)">${esc(v)}</b>` : v === 'OK' || v === 'IN' ? `<span style="color:var(--green);font-weight:700">${esc(v)}</span>`
+      : isHot(ty, v, limOf(t.code, si)) ? `<b style="color:var(--red)">${esc(v)}</b>` : esc(v);
     $('#ce').innerHTML = `<div class="dayhead"><div class="k">${esc(t.name)}</div><div class="v">${fmtDay(fromYmd(r.check_date))} · Shift ${esc(r.shift || '-')}</div><div style="font-size:15px;margin-top:2px">${esc(r.inspected_name || '')} · ${fmtStamp(r.filled_at || r.created_at)}${r.local ? ' · waiting to upload' : ''}</div>
         ${r.nparts > 1 ? `<div style="font-size:13.5px;margin-top:6px;opacity:.85">${r.nparts} submissions combined: ${r.parts.map(x => `${esc(firstName(x.name))} ${new Date(x.at).toTimeString().slice(0, 5)} (${x.n})`).join(' · ')}</div>` : ''}</div>
       <div style="padding:12px 16px 0" class="two"><button class="btn" id="esave">${ic('download')} Save Excel</button><button class="btn pri" id="eshare">${ic('share')} Share</button></div>
       <div style="padding:4px 12px 24px">${t.sections.map((s, si) => {
         const one = s.fields.length === 1;
         const rowsH = s.items.map((it, ii) => { const any = it.cells.some((c, fi) => c && V[`${si}.${ii}.${fi}`]);
-          return `<tr${any ? '' : ' class="dim"'}><td>${esc(it.name)}</td>${s.fields.map((f, fi) => `<td class="v">${it.cells[fi] ? cell(V[`${si}.${ii}.${fi}`], ftype(s, it, fi)) : '<span style="color:var(--muted)">·</span>'}</td>`).join('')}</tr>`; }).join('');
+          return `<tr${any ? '' : ' class="dim"'}><td>${esc(it.name)}</td>${s.fields.map((f, fi) => `<td class="v">${it.cells[fi] ? cell(V[`${si}.${ii}.${fi}`], ftype(s, it, fi), si) : '<span style="color:var(--muted)">·</span>'}</td>`).join('')}</tr>`; }).join('');
         return `<h2 class="clsec">${esc(s.title)}</h2><div class="card" style="overflow-x:auto"><table class="rt"><thead><tr><th>Equipment</th>${s.fields.map(f => `<th>${esc(f.l || (one ? 'Value' : ''))}</th>`).join('')}</tr></thead><tbody>${rowsH}</tbody></table></div>`; }).join('')}
       ${r.remarks ? `<h2 class="clsec">Remarks</h2><div class="card" style="padding:14px;font-size:17px;line-height:1.4">${esc(r.remarks)}</div>` : ''}</div>`;
     $('#esave').onclick = () => recordReport(t, r, false);
@@ -1268,8 +1420,10 @@ function wireCombo(id, options, free) {
   list.addEventListener('click', e => { const o = e.target.closest('[data-v]'); if (!o) return; inp.value = o.dataset.v; inp.dispatchEvent(new Event('change', { bubbles: true })); hide(); inp.blur(); });
   inp.addEventListener('blur', () => setTimeout(hide, 150));
 }
+// areas whose spares Excel this person may download: app/spares admin = all; area incharge = own areas only; others none
+const spareXlsAreas = () => (ME.is_admin || isModAdmin('spares')) ? SPARE_AREAS : (ME.areas && Array.isArray(ME.areas.incharge) ? SPARE_AREAS.filter(a => ME.areas.incharge.includes(a)) : []);
 function viewSpares() {
-  $('#app').innerHTML = `${bar('Spares', 'home', `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button><button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
+  $('#app').innerHTML = `${bar('Spares', 'home', `${logBtn('spares')}${ME.is_admin ? `<button class="ib" id="sset" aria-label="Spares settings">${ic('gear', 26)}</button>` : ''}${spareXlsAreas().length ? `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button>` : ''}<button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="sq" type="search" placeholder="Search item, model, make, location, cupboard" value="${esc(S.spareQuery)}" aria-label="Search spares"></div></div>
   <div class="tabs" role="tablist" id="tabs"><button data-a="__low" class="${S.spareLow ? 'on' : ''}" style="${S.spareLow ? 'background:var(--red);border-color:var(--red)' : ''}">Out / low stock</button>${SPARE_AREAS.map(a => `<button role="tab" data-a="${esc(a)}" class="${!S.spareLow && a === S.spareArea ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>
   <main class="scroll" id="list" style="padding-bottom:90px"><div class="spin">Loading…</div></main>
@@ -1278,8 +1432,18 @@ function viewSpares() {
   centerOn('#tabs .on');
   $('#tabs').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === '__low') S.spareLow = !S.spareLow; else { S.spareLow = false; S.spareArea = b.dataset.a; } viewSpares(); };
   $('#rbtn').onclick = loadSpares;
-  $('#sxls').onclick = async () => { if (!(await ask('Download spares Excel?', 'All categories, one sheet each, in your HSM Spares format.', 'Download'))) return;
-    try { toast('Preparing Excel…', 8000); const rows = await api('spares?select=*&order=area,id'); deliver(await xl().sparesWorkbook(rows, SPARE_AREAS), `HSM Spares ${fmtShort(new Date())}.xlsx`, true); } catch (e) { netErr(e); } };
+  if ($('#sxls')) $('#sxls').onclick = async () => { const ar = spareXlsAreas(); if (!ar.length) return;
+    if (!(await ask('Download spares Excel?', ar.length === SPARE_AREAS.length ? 'All categories, one sheet each, in your HSM Spares format.' : `Your area${ar.length > 1 ? 's' : ''}: ${ar.join(', ')}`, 'Download'))) return;
+    try { toast('Preparing Excel…', 8000); const rows = await api(`spares?select=*&order=area,id&area=in.(${ar.map(a => '"' + a.replace(/"/g, '') + '"').join(',')})`, { fresh: true });
+      deliver(await xl().sparesWorkbook(rows, ar), `HSM Spares ${fmtShort(new Date())}.xlsx`, true); logAct('spares', 'Spares Excel downloaded', ar.length === SPARE_AREAS.length ? 'All areas' : ar.join(', ')); } catch (e) { netErr(e); } };
+  if ($('#sset')) $('#sset').onclick = () => { const md = $('#modal');
+    md.innerHTML = `<div class="sheet"><h3>Spares settings</h3><div class="fld"><label for="lown">Low stock: quantity below</label><input id="lown" type="number" inputmode="numeric" min="1" max="1000" value="${LOWN}"></div>
+      <p class="hint" style="margin:6px 0 12px">Items with quantity 0 are “Out of stock”. Items below this number are “Low stock” (orange). Changes apply to everyone.</p>
+      <div class="two"><button class="btn ghost" id="lx">Cancel</button><button class="btn pri" id="ls">Save</button></div></div>`;
+    md.classList.remove('hidden'); md.onclick = e => { if (e.target === md) md.classList.add('hidden'); };
+    $('#lx').onclick = () => md.classList.add('hidden');
+    $('#ls').onclick = async () => { const n = Math.round(+$('#lown').value); if (!(n >= 1 && n <= 1000)) return toast('Enter a number from 1 to 1000');
+      $('#ls').disabled = true; try { await saveSetting('low_stock', { n }); logAct('spares', 'Low stock limit changed', `below ${n}`); md.classList.add('hidden'); S.lowCache = null; toast(`Low stock is now below ${n}`); viewSpares(); } catch (e) { $('#ls').disabled = false; netErr(e); } }; };
   let tm; $('#sq').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { S.spareQuery = e.target.value.trim(); loadSpares(); }, 300); };
   loadSpares();
 }
@@ -1288,17 +1452,17 @@ async function loadSpares(fromCache) {
   const q = S.spareQuery.replace(/[,()*"]/g, ' ').trim(); const e = encodeURIComponent(q);
   let path = 'spares?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden&order=qty,material,id';
   if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*,cupboard.ilike.*${e}*,cupboard_key.ilike.*${e}*)`;
-  if (S.spareLow) path += `&qty=lt.5&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
+  if (S.spareLow) path += `&qty=lt.${LOWN}&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
   let notes = {}, lowRows = {};
   const item = (r, showArea) => `<button class="item" data-go="spare/${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
       <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span>${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
-      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < 5 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
+      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < LOWN ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
   const planItem = r => `<button class="item" data-plan="${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
       <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}</span>
       ${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
-      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < 5 ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
+      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < LOWN ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
   try {
     const lc = S.lowCache, cached = fromCache === true && S.spareLow && !q && lc && lc.hid === !!S.spareHid;
     let rows;
@@ -1320,7 +1484,7 @@ async function loadSpares(fromCache) {
       const chip = (k, lbl, list) => `<button data-la="${esc(k)}" class="lachip ${sel === k ? 'on' : ''}">${esc(lbl)}<b class="${list.some(r => r.qty <= 0) ? '' : 'or'}">${list.length}</b></button>`;
       list.innerHTML = `<div class="lachips" id="lach">${chip('all', 'All areas', rows)}${order.map(a => chip(a, a, by[a])).join('')}</div>
         <div class="areahead"><b>${sel === 'all' ? 'All areas' : esc(sel)}</b><span>${shown.length} item${shown.length > 1 ? 's' : ''}</span></div>
-        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => r.qty <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => r.qty > 0).length} low (below 5) <span style="color:#E8710A">●</span></div>${tog}`
+        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => r.qty <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => r.qty > 0).length} low (below ${LOWN}) <span style="color:#E8710A">●</span></div>${tog}`
         + (sel === 'all' ? order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => planItem(r)).join('')).join('') : shown.map(r => planItem(r)).join(''));
       rows.forEach(r => { lowRows[r.id] = r; });
       if (!cached || !S.planAreas) rpc('hsm_plan_areas').then(v => { S.planAreas = v; }).catch(() => { S.planAreas = S.planAreas || { all: false, areas: [] }; });
@@ -1426,8 +1590,18 @@ async function viewSpare(id) {
 }
 
 /* ================= SOP & HIRAC ================= */
+// bottom sheet: choose where something goes. opts = [[key,label]]; returns the key or '' when cancelled
+function pickSheet(title, note, opts, cur) {
+  return new Promise(res => { const md = $('#modal');
+    md.innerHTML = `<div class="sheet" style="max-height:88vh;overflow:auto"><h3>${esc(title)}</h3>${note ? `<p style="word-break:break-all;max-height:84px;overflow:auto;margin:4px 0 8px">${note}</p>` : ''}
+      <div class="list">${opts.map(([k, l]) => `<button class="lrow" data-k="${esc(k)}" style="${k === cur ? 'outline:2px solid var(--red)' : ''}"><span class="tx"><span class="a" style="font-size:16px">${esc(l)}</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('')}</div>
+      <button class="btn ghost block" data-k="" style="margin-top:8px">Cancel</button></div>`;
+    md.classList.remove('hidden'); md.onclick = ev => { const k = ev.target.closest('[data-k]'); if (!k && ev.target !== md) return; md.classList.add('hidden'); md.onclick = null; res(k ? k.dataset.k : ''); }; });
+}
+const DOC_OK = /\.(pdf|docx|xlsx|jpe?g|png)$/i;
+const DOC_NO = 'Only PDF, Word (.docx), Excel (.xlsx) or picture files can be added. Save the file as PDF first – other types cannot be opened inside the app.';
 function viewSop() {
-  $('#app').innerHTML = `${bar('SOP & HIRAC', 'home')}
+  $('#app').innerHTML = `${bar('SOP & HIRAC', 'home', logBtn('sop'))}
     <div class="seg" id="sseg">${[['numbers','SOP No.'],['hirac','HIRAC'],['docs','Documents']].map(([k, l]) => `<button data-t="${k}" class="${S.sopTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="sbody" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>`;
   $('#sseg').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { S.sopTab = b.dataset.t; S.sopQuery = ''; viewSop(); } };
@@ -1490,42 +1664,41 @@ async function viewHirac(no) {
       <p class="hint" style="text-align:center;margin-top:16px">From HSM Electrical HIRAC register</p></div>`;
 }
 async function sopDocs() {
-  const b = $('#sbody'), admin = isModAdmin('sop'); S.docType = S.docType || 'All';
+  const b = $('#sbody'), admin = isModAdmin('sop'); S.docType = S.docType || 'All'; const KINDS = [['SOP', 'SOP'], ['HIRAC', 'HIRAC'], ['DOC', 'Documents']];
   b.innerHTML = `<div class="tabs" id="dt" style="border-top:1px solid var(--line)">${DOC_AREAS.map(a => `<button data-a="${a}" class="${a === S.docArea ? 'on' : ''}">${a}</button>`).join('')}</div>
-    <div class="seg dtype" id="dty">${['All', 'SOP', 'HIRAC'].map(k => `<button data-k="${k}" class="${S.docType === k ? 'on' : ''}">${k}</button>`).join('')}</div>
+    <div class="seg dtype" id="dty">${[['All', 'All'], ...KINDS].map(([k, l]) => `<button data-k="${k}" class="${S.docType === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <main class="scroll" id="dl" style="padding-bottom:90px"><div class="spin">Loading…</div></main>
-    <label class="fab" style="cursor:pointer;bottom:24px">${ic('upload', 22)} Add document<input type="file" id="up" hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"></label>`;
+    <label class="fab" style="cursor:pointer;bottom:24px">${ic('upload', 22)} Add document<input type="file" id="up" hidden accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"></label>`;
   $('#dt').onclick = e => { const x = e.target.closest('[data-a]'); if (!x) return; S.docArea = x.dataset.a; sopDocs(); };
   $('#dty').onclick = e => { const x = e.target.closest('[data-k]'); if (!x) return; S.docType = x.dataset.k; sopDocs(); };
   $('#up').onchange = async e => {
     const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    if (!DOC_OK.test(file.name)) return toast(DOC_NO, 6000);
     if (file.size > 50 * 1024 * 1024) return toast('File is larger than 50 MB');
-    const kind = await new Promise(res => { const md = $('#modal');
-      md.innerHTML = `<div class="sheet"><h3>Add to ${esc(S.docArea)}</h3><p style="word-break:break-all">${esc(file.name)}</p><div class="label" style="margin:8px 0 6px">What is this document?</div>
-        <div class="two"><button class="btn pri" data-k="SOP">SOP</button><button class="btn pri" data-k="HIRAC">HIRAC</button></div><button class="btn ghost block" data-k="">Cancel</button></div>`;
-      md.classList.remove('hidden'); md.onclick = ev => { const k = ev.target.closest('[data-k]'); if (!k && ev.target !== md) return; md.classList.add('hidden'); md.onclick = null; res(k ? k.dataset.k : ''); }; });
-    if (!kind) return;
+    const area = await pickSheet('Add to which area?', esc(file.name), DOC_AREAS.map(a => [a, a]), S.docArea); if (!area) return;
+    const kind = await pickSheet(`Add to ${area} – where?`, esc(file.name), [['SOP', 'SOP'], ['HIRAC', 'HIRAC'], ['DOC', 'Documents (other)']]); if (!kind) return;
+    S.docArea = area; const kl = KINDS.find(k => k[0] === kind)[1];
     const path = `${S.docArea}/${kind}/${file.name.replace(/[\\/#?%]/g, '_')}`;
     toast('Uploading…', 20000);
-    try { await storageUpload(path, file); logAct('sop', `${kind} document added`, `${S.docArea} · ${file.name}`); toast(`${kind} document uploaded`); sopDocs(); }
+    try { await storageUpload(path, file); logAct('sop', `${kl} document added`, `${S.docArea} · ${file.name}`); toast(`Added to ${S.docArea} · ${kl}`); sopDocs(); }
     catch (err) {
-      if (err.exists && admin && await ask('Replace the existing file?', `${file.name} is already in ${S.docArea} / ${kind}.`, 'Replace')) {
-        try { await storageUpload(path, file, SOP_BUCKET, true); logAct('sop', `${kind} document replaced`, `${S.docArea} · ${file.name}`); toast('Document replaced'); sopDocs(); } catch (e2) { netErr(e2); }
+      if (err.exists && admin && await ask('Replace the existing file?', `${file.name} is already in ${S.docArea} / ${kl}.`, 'Replace')) {
+        try { await storageUpload(path, file, SOP_BUCKET, true); logAct('sop', `${kl} document replaced`, `${S.docArea} · ${file.name}`); toast('Document replaced'); sopDocs(); } catch (e2) { netErr(e2); }
       } else if (err.exists) toast('A file with this name already exists'); else netErr(err);
     }
   };
   try {
     const ok = o => o.id && o.name !== '.emptyFolderPlaceholder';
-    const [root, sop, hir] = await Promise.all([storageList(`${S.docArea}/`), storageList(`${S.docArea}/SOP/`).catch(() => []), storageList(`${S.docArea}/HIRAC/`).catch(() => [])]);
+    const [root, sop, hir, dc] = await Promise.all([storageList(`${S.docArea}/`), storageList(`${S.docArea}/SOP/`).catch(() => []), storageList(`${S.docArea}/HIRAC/`).catch(() => []), storageList(`${S.docArea}/DOC/`).catch(() => [])]);
     const all = [...root.filter(ok).map(o => ({ o, kind: 'SOP', path: `${S.docArea}/${o.name}` })), ...sop.filter(ok).map(o => ({ o, kind: 'SOP', path: `${S.docArea}/SOP/${o.name}` })),
-      ...hir.filter(ok).map(o => ({ o, kind: 'HIRAC', path: `${S.docArea}/HIRAC/${o.name}` }))];
+      ...hir.filter(ok).map(o => ({ o, kind: 'HIRAC', path: `${S.docArea}/HIRAC/${o.name}` })), ...dc.filter(ok).map(o => ({ o, kind: 'DOC', path: `${S.docArea}/DOC/${o.name}` }))];
     const items = all.filter(x => S.docType === 'All' || x.kind === S.docType).sort((a, b) => a.o.name.localeCompare(b.o.name));
     const typ = n => (n.split('.').pop() || '').toUpperCase().slice(0, 4);
     const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
-    const row = x => `<button class="lrow" data-p="${esc(x.path)}" style="${admin ? 'flex:1;min-width:0' : ''}"><span class="ic" style="font-size:12px;font-weight:800">${esc(typ(x.o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(x.o.name.replace(/\.[^.]+$/, ''))}</span><span class="b"><span class="dk ${x.kind}">${x.kind}</span>${x.o.metadata ? size(x.o.metadata.size) : ''}${x.o.updated_at ? ' · ' + fmtShort(new Date(x.o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
-    $('#dl').innerHTML = items.length ? `<div class="pad"><div class="label">${items.length} document${items.length > 1 ? 's' : ''} · ${esc(S.docArea)}${S.docType !== 'All' ? ' · ' + S.docType : ''}</div><div class="list">${items.map(x => admin
+    const row = x => `<button class="lrow" data-p="${esc(x.path)}" style="${admin ? 'flex:1;min-width:0' : ''}"><span class="ic" style="font-size:12px;font-weight:800">${esc(typ(x.o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(x.o.name.replace(/\.[^.]+$/, ''))}</span><span class="b"><span class="dk ${x.kind}">${x.kind === 'DOC' ? 'DOCUMENT' : x.kind}</span>${x.o.metadata ? size(x.o.metadata.size) : ''}${x.o.updated_at ? ' · ' + fmtShort(new Date(x.o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
+    $('#dl').innerHTML = items.length ? `<div class="pad"><div class="label">${items.length} document${items.length > 1 ? 's' : ''} · ${esc(S.docArea)}${S.docType !== 'All' ? ' · ' + (S.docType === 'DOC' ? 'Documents' : S.docType) : ''}</div><div class="list">${items.map(x => admin
         ? `<div style="display:flex;align-items:center">${row(x)}<button class="ib" data-del="${esc(x.path)}" aria-label="Delete ${esc(x.o.name)}" style="color:var(--red);margin-right:6px">${ic('trash', 22)}</button></div>` : row(x)).join('')}</div></div>`
-      : `<div class="empty"><b>No ${S.docType === 'All' ? '' : S.docType + ' '}documents in ${esc(S.docArea)} yet</b>Tap “Add document” and choose SOP or HIRAC.</div>`;
+      : `<div class="empty"><b>No ${S.docType === 'All' ? '' : (S.docType === 'DOC' ? '' : S.docType + ' ')}documents in ${esc(S.docArea)} yet</b>Tap “Add document” and choose where to add it.</div>`;
     $('#dl').onclick = async e => {
       const d = e.target.closest('[data-del]');
       if (d) { const name = d.dataset.del.split('/').pop();
@@ -1538,7 +1711,8 @@ async function sopDocs() {
 
 /* ================= DRIVE (PDF manuals, view only) ================= */
 const DRIVE_BUCKET = 'drive-docs';
-const DRIVE_TABS = [['ACPAR', 'ABB AC Drive Parameters'], ['DCPAR', 'ABB DC Drive Parameters'], ['GEFLT', 'GE Drive Fault Codes'], ['ACFLT', 'ABB AC Drive Fault Codes'], ['DCFLT', 'ABB DC Drive Fault Codes']];
+const DRIVE_BASE = [['ACPAR', 'ABB AC Drive Parameters'], ['DCPAR', 'ABB DC Drive Parameters'], ['GEFLT', 'GE Drive Fault Codes'], ['ACFLT', 'ABB AC Drive Fault Codes'], ['DCFLT', 'ABB DC Drive Fault Codes']];
+let DRIVE_TABS = DRIVE_BASE;
 const driveLabel = k => (DRIVE_TABS.find(t => t[0] === k) || [k, k])[1];
 const fmtSize = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
 const driveFiles = async tab => (await storageList(`${tab}/`, DRIVE_BUCKET)).filter(o => o.id && o.name && /\.pdf$/i.test(o.name));
@@ -1546,17 +1720,13 @@ const driveFiles = async tab => (await storageList(`${tab}/`, DRIVE_BUCKET)).fil
 async function viewDrive(tab) {
   const admin = isModAdmin('drive'), tabs = DRIVE_TABS.filter(([k]) => canArea('drive', k));
   if (tab && !tabs.some(t => t[0] === tab)) tab = '';
-  $('#app').innerHTML = `${bar(tab ? driveLabel(tab) : 'Drive', tab ? 'drive' : 'home')}<main class="scroll" id="dr" style="${admin ? 'padding-bottom:150px' : ''}"><div class="spin">Loading…</div></main>
+  $('#app').innerHTML = `${bar(tab ? driveLabel(tab) : 'Drive', tab ? 'drive' : 'home', logBtn('drive'))}<main class="scroll" id="dr" style="${admin ? 'padding-bottom:150px' : ''}"><div class="spin">Loading…</div></main>
     ${admin ? `<label class="fab" style="cursor:pointer;bottom:88px">${ic('upload', 22)} Add document<input type="file" id="dup" hidden multiple accept=".pdf,application/pdf"></label>` : ''}${nav('drive')}`;
   if (admin) $('#dup').onchange = async e => {
     const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
     if (files.some(f => !/\.pdf$/i.test(f.name))) return toast('Only PDF files can be added');
     if (files.some(f => f.size > 100 * 1024 * 1024)) return toast('A file is larger than 100 MB');
-    const target = await new Promise(res => { const md = $('#modal');
-      md.innerHTML = `<div class="sheet"><h3>Add to which tab?</h3><p style="word-break:break-all;max-height:84px;overflow:auto">${files.map(f => esc(f.name)).join('<br>')}</p>
-        <div class="list">${DRIVE_TABS.map(([k, l]) => `<button class="lrow" data-k="${k}" style="${k === tab ? 'outline:2px solid var(--brand,#0B5FFF)' : ''}"><span class="tx"><span class="a" style="font-size:16px">${esc(l)}</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('')}</div>
-        <button class="btn ghost block" data-k="" style="margin-top:8px">Cancel</button></div>`;
-      md.classList.remove('hidden'); md.onclick = ev => { const k = ev.target.closest('[data-k]'); if (!k && ev.target !== md) return; md.classList.add('hidden'); md.onclick = null; res(k ? k.dataset.k : ''); }; });
+    const target = await pickSheet('Add to which tab?', files.map(f => esc(f.name)).join('<br>'), DRIVE_TABS.map(([k, l]) => [k, l]), tab);
     if (!target) return;
     let ok = 0;
     for (const f of files) {
@@ -1575,7 +1745,19 @@ async function viewDrive(tab) {
   if (!tabs.length) { $('#dr').innerHTML = `<div class="empty"><b>No Drive folders for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access.</div>`; return; }
   if (!tab) {
     $('#dr').innerHTML = `<div class="pad"><div class="list">${tabs.map(([k, l]) => `<button class="lrow" data-t="${k}"><span class="ic">${ic('drive', 24)}</span><span class="tx"><span class="a" style="font-size:17px">${esc(l)}</span><span class="b" id="cnt-${k}">&nbsp;</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('')}</div>
+      ${admin ? `<button class="btn block" id="dnf" style="margin-top:14px">${ic('folderplus', 22)} New folder</button>` : ''}
       <p class="hint" style="text-align:center;margin-top:14px">View only. Documents cannot be downloaded.</p></div>`;
+    if (admin) $('#dnf').onclick = () => { const md = $('#modal');
+      md.innerHTML = `<div class="sheet"><h3>New Drive folder</h3><div class="fld"><label for="dfn">Folder name</label><input id="dfn" maxlength="40" placeholder="e.g. Siemens drive manuals" autocomplete="off"></div>
+        <p class="hint" style="margin:6px 0 12px">It appears as a new tab for you. To let others see it, tick it for them in Access.</p><div class="two"><button class="btn ghost" id="dfx">Cancel</button><button class="btn pri" id="dfs">Create</button></div></div>`;
+      md.classList.remove('hidden'); md.onclick = e => { if (e.target === md) md.classList.add('hidden'); }; $('#dfn').focus();
+      $('#dfx').onclick = () => md.classList.add('hidden');
+      $('#dfs').onclick = async () => { const l = $('#dfn').value.trim().replace(/\s+/g, ' ');
+        if (l.length < 2) return toast('Enter a folder name');
+        if (DRIVE_TABS.some(t => t[1].toLowerCase() === l.toLowerCase())) return toast('A folder with this name already exists');
+        const k = 'F' + Date.now().toString(36).toUpperCase(), cur = Array.isArray(SET.drive_folders) ? SET.drive_folders : [];
+        $('#dfs').disabled = true;
+        try { await saveSetting('drive_folders', [...cur, { k, l }]); logAct('drive', 'Folder created', l); md.classList.add('hidden'); toast('Folder created'); viewDrive(); } catch (e) { $('#dfs').disabled = false; netErr(e); } }; };
     $('#dr').onclick = e => { const b = e.target.closest('[data-t]'); if (b) location.hash = '#drive/' + b.dataset.t; };
     tabs.forEach(async ([k]) => { try { const n = (await driveFiles(k)).length; const el = $('#cnt-' + k); if (el) el.textContent = n ? `${n} document${n > 1 ? 's' : ''}` : 'No documents yet'; } catch (e) {} });
     return;
@@ -1587,6 +1769,9 @@ async function viewDrive(tab) {
   $('#dr').innerHTML = `<div class="pad"><div class="label">${items.length} document${items.length === 1 ? '' : 's'}</div>
     <div class="list">${items.length ? items.map(o => admin ? `<div style="display:flex;align-items:center">${row(o)}<button class="ib" data-del="${esc(tab + '/' + o.name)}" aria-label="Remove ${esc(o.name)}" style="color:var(--red);margin-right:6px">${ic('trash', 22)}</button></div>` : row(o)).join('')
       : `<div class="empty"><b>No documents in ${esc(driveLabel(tab))} yet</b>${admin ? 'Tap “Add document” to upload PDF files.' : ''}</div>`}</div></div>`;
+  if (admin && !items.length && !DRIVE_BASE.some(t => t[0] === tab)) $('#dr').insertAdjacentHTML('beforeend', `<div class="pad"><button class="btn block" id="dfd" style="color:var(--red)">${ic('trash', 20)} Delete this empty folder</button></div>`);
+  if ($('#dfd')) $('#dfd').onclick = async () => { const nm = driveLabel(tab); if (!(await ask('Delete this folder?', nm, 'Delete', 'Cancel', true))) return;
+    try { await saveSetting('drive_folders', (SET.drive_folders || []).filter(f => f.k !== tab)); logAct('drive', 'Folder deleted', nm); toast('Folder deleted'); location.hash = '#drive'; } catch (e) { netErr(e); } };
   $('#dr').onclick = async e => {
     const d = e.target.closest('[data-del]');
     if (d) { const name = d.dataset.del.split('/').pop();
@@ -1597,7 +1782,7 @@ async function viewDrive(tab) {
 }
 
 // In-app PDF reader: pages are drawn to canvas (no file, no download or print button), with text search + zoom.
-async function openDriveDoc(path) {
+async function openDriveDoc(path, bucket = DRIVE_BUCKET) {
   const name = path.split('/').pop();
   closeDoc();
   const v = document.createElement('div'); v.id = 'docv'; v.className = 'drv';
@@ -1609,12 +1794,12 @@ async function openDriveDoc(path) {
     <div class="dvz"><button class="ib" id="dvzo" aria-label="Zoom out">${ic('minus', 22)}</button><button class="ib" id="dvzi" aria-label="Zoom in">${ic('plus', 22)}</button></div>`;
   ['contextmenu', 'dragstart', 'copy', 'cut'].forEach(t => v.addEventListener(t, e => e.preventDefault()));
   document.body.appendChild(v); document.body.style.overflow = 'hidden';
-  if (window.HSMNative && HSMNative.secure) { try { HSMNative.secure(true); } catch (e) {} }
+  if (bucket === DRIVE_BUCKET && window.HSMNative && HSMNative.secure) { try { HSMNative.secure(true); } catch (e) {} }
   history.pushState({ docv: 1 }, '');
   $('#docx-close').onclick = () => history.back();
   const body = $('#docb'), live = () => document.body.contains(body);
   try {
-    const url = await storageSignedUrl(path, DRIVE_BUCKET);
+    const url = await storageSignedUrl(path, bucket);
     const res = await fetch(url); if (!res.ok) throw new Error('Could not open document');
     const total = +res.headers.get('content-length') || 0; let buf;
     if (res.body && total) { const rd = res.body.getReader(), parts = []; let got = 0;
@@ -1692,7 +1877,7 @@ async function openDriveDoc(path) {
 async function viewMillProcessSops() {
   const admin = isModAdmin('mill');
   const areas = MILL_AREAS.filter(([f]) => canArea('mill', f));
-  $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home')}<main class="scroll" id="ml" style="${admin ? 'padding-bottom:90px' : ''}"><div class="spin">Loading…</div></main>
+  $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home', logBtn('mill'))}<main class="scroll" id="ml" style="${admin ? 'padding-bottom:90px' : ''}"><div class="spin">Loading…</div></main>
     ${admin ? `<label class="fab" style="cursor:pointer;bottom:88px">${ic('upload', 22)} Add SOP<input type="file" id="mup" hidden accept=".docx,.pdf"></label>` : ''}${nav('mill')}`;
   const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
   if (!areas.length) { $('#ml').innerHTML = `<div class="empty"><b>No areas for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access to your area's SOPs.</div>`; return; }
@@ -1725,8 +1910,9 @@ async function viewMillProcessSops() {
     const file = e.target.files[0]; e.target.value = ''; if (!file) return;
     if (!/\.(docx|pdf)$/i.test(file.name)) return toast('Choose a Word (.docx) or PDF file');
     if (file.size > 50 * 1024 * 1024) return toast('File is larger than 50 MB');
-    const path = `${S.millArea}/${file.name.replace(/[\\/#?%]/g, '_')}`;
-    if (!(await ask(`Add to ${label(S.millArea)}?`, file.name, 'Upload'))) return;
+    const area = await pickSheet('Add to which area?', esc(file.name), MILL_AREAS.map(([k, l]) => [k, l]), S.millArea); if (!area) return;
+    S.millArea = area;
+    const path = `${area}/${file.name.replace(/[\\/#?%]/g, '_')}`;
     toast('Uploading…', 60000);
     try { await storageUpload(path, file, MILL_PROCESS_BUCKET); logAct('mill', 'SOP added', `${label(S.millArea)} · ${file.name}`); toast('SOP added'); draw(); }
     catch (err) {
@@ -1906,7 +2092,7 @@ function viewAdmin() {
 
 /* ================= TEAM ================= */
 async function viewTeam() {
-  $('#app').innerHTML = `${bar('Team', 'home')}
+  $('#app').innerHTML = `${bar('Team', 'home', logBtn('team'))}
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="tq" type="search" placeholder="Search name, area, SAP ID, mobile" aria-label="Search team" value="${esc(S.teamQuery)}"></div></div>
   <main class="scroll" id="tl"><div class="spin">Loading…</div></main>`;
   let rows = [], today = [];
@@ -1948,7 +2134,7 @@ async function viewTeam() {
 
 /* ================= CONTACTS (AMNS phone numbers) ================= */
 async function viewContacts() {
-  $('#app').innerHTML = `${bar('Contacts', 'home')}
+  $('#app').innerHTML = `${bar('Contacts', 'home', logBtn('contacts'))}
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="cq" type="search" placeholder="Search name or number" aria-label="Search contacts" value="${esc(S.contactQuery)}"></div></div>
   <main class="scroll" id="ctl"><div class="spin">Loading…</div></main>`;
   let rows = [];
@@ -1971,7 +2157,7 @@ async function viewContacts() {
 
 /* ================= TBT – HSM ELECTRICAL (tool box talks) ================= */
 async function viewTbt() {
-  $('#app').innerHTML = `${bar('TBT – HSM Electrical', 'home')}
+  $('#app').innerHTML = `${bar('TBT – HSM Electrical', 'home', logBtn('tbt'))}
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="bq" type="search" placeholder="Search topic or point" aria-label="Search TBT" value="${esc(S.tbtQuery)}"></div></div>
   <div class="tabs" id="btabs" role="tablist"></div>
   <main class="scroll" id="btl"><div class="spin">Loading…</div></main>`;
@@ -2091,20 +2277,21 @@ async function viewClearLogs() {
 
 /* ================= ACTIVITY LOG ================= */
 async function viewActivity() {
-  if (!(ME.is_admin || (ME.admin_modules || []).length)) return go('home');
-  S.actMod = S.actMod || 'all';
-  $('#app').innerHTML = `${bar('Activity log', 'profile')}<div class="tabs" id="actt"></div><main class="scroll" id="al2x"><div class="spin">Loading…</div></main>`;
-  let rows = []; try { rows = await rpc('hsm_activity', { p_module: null, p_limit: 500 }) || []; } catch (e) { netErr(e); $('#al2x').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
-  const modName = k => (MODULES.find(m => m[0] === k) || [k, { admin: 'Admin', suggest: 'Suggestions', profile: 'Profile' }[k] || k])[1].replace(/&#39;|'/g, '’');
+  const only = S.actOnly || null;
+  if (only ? !(ME.is_admin || isModAdmin(only)) : !(ME.is_admin || (ME.admin_modules || []).length)) return go('home');
+  S.actMod = only || S.actMod || 'all';
+  const modName = k => (MODULES.find(m => m[0] === k) || [k, { admin: 'Admin', suggest: 'Suggestions', profile: 'Profile' }[k] || k])[1].replace(/&#39;|'/g, '’').replace(/&amp;/g, '&');
+  $('#app').innerHTML = `${bar(only ? `${modName(only)} – activity log` : 'Activity log', only ? (S.actBack || 'home') : 'profile')}${only ? '' : '<div class="tabs" id="actt"></div>'}<main class="scroll" id="al2x"><div class="spin">Loading…</div></main>`;
+  let rows = []; try { rows = await rpc('hsm_activity', { p_module: only, p_limit: 500 }) || []; } catch (e) { netErr(e); $('#al2x').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
   const mods = ['all', ...Array.from(new Set(rows.map(r => r.module).filter(Boolean)))];
   const draw = () => {
-    $('#actt').innerHTML = mods.map(k => `<button data-k="${k}" class="${S.actMod === k ? 'on' : ''}">${k === 'all' ? 'All' : esc(modName(k))}</button>`).join('');
+    if ($('#actt')) $('#actt').innerHTML = mods.map(k => `<button data-k="${k}" class="${S.actMod === k ? 'on' : ''}">${k === 'all' ? 'All' : esc(modName(k))}</button>`).join('');
     const f = rows.filter(r => S.actMod === 'all' || r.module === S.actMod); let lastDay = '';
     $('#al2x').innerHTML = `<div class="pad">${f.length ? f.map(r => { const d = new Date(r.at), day = fmtShort(d), head = day !== lastDay ? `<div class="label" style="margin-top:14px">${day === fmtShort(new Date()) ? 'Today' : day}</div>` : ''; lastDay = day;
       return `${head}<div class="card actv"><span class="tm">${pad2(d.getHours())}:${pad2(d.getMinutes())}</span><div class="tx"><div class="a">${esc(r.action)}</div><div class="b">${esc(r.name || '')} · ${esc(modName(r.module))}${r.detail ? ' · ' + esc(r.detail) : ''}</div></div></div>`; }).join('')
       : '<div class="empty"><b>No activity yet</b>Changes made by team members show up here.</div>'}</div>`;
   };
-  $('#actt').onclick = e => { const b = e.target.closest('[data-k]'); if (!b) return; S.actMod = b.dataset.k; draw(); };
+  if ($('#actt')) $('#actt').onclick = e => { const b = e.target.closest('[data-k]'); if (!b) return; S.actMod = b.dataset.k; draw(); };
   draw();
 }
 
@@ -2204,7 +2391,7 @@ async function viewLeave() {
   S.leaveTab = admin ? (S.leaveTab || 'mine') : (['shift', 'month'].includes(S.leaveTab) ? S.leaveTab : 'mine');
   if (!S.leaveMonth) { const t = new Date(); S.leaveMonth = new Date(t.getFullYear(), t.getMonth(), 1); }
   const m = S.leaveMonth, y = m.getFullYear(), mo = m.getMonth(), first = ymd(m), last = ymd(new Date(y, mo + 1, 0));
-  $('#app').innerHTML = `${bar('Leave Request', 'home')}<main class="scroll" id="lv" style="padding-bottom:96px"><div class="spin">Loading…</div></main>
+  $('#app').innerHTML = `${bar('Leave Request', 'home', logBtn('leave'))}<main class="scroll" id="lv" style="padding-bottom:96px"><div class="spin">Loading…</div></main>
     <button class="fab" id="scnew" style="bottom:160px">${ic('cal', 22)} Shift change request</button>
     <button class="fab" id="lnew" style="bottom:88px">${ic('plus', 22)} Request leave</button>${nav('')}`;
   let rows = []; try { rows = await api(`leave_requests?select=*&from_day=lte.${last}&to_day=gte.${first}&order=from_day,id`); } catch (e) { $('#lv').innerHTML = '<div class="empty"><b>Could not load</b>Check network and try again.</div>'; netErr(e); return; }
@@ -2342,4 +2529,6 @@ async function viewLeave() {
 function uidOfToken() { try { return JSON.parse(atob(SESSION.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch (e) { return null; } }
 
 /* ================= START ================= */
+applySettings(store.get('hsm_set', {}));
 render();
+document.addEventListener('visibilitychange', () => { if (!document.hidden && SESSION) loadSettings().then(ch => { if (ch) softRerender(); }); });
