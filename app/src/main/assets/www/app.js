@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.9';
+const APP_VERSION = '3.10';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -1098,59 +1098,86 @@ async function viewSchedule() {
 
 /* ================= CHECK LISTS ================= */
 const draftKey = code => `hsm_cl2_${code}`;
+// One record per check list for the whole day (any shift): later readings replace earlier ones, so an edited-down value really replaces the old one
+const dayMerge = rows => { const sh = {}; rows.forEach(r => { const a = sh[r.template_code] = sh[r.template_code] || []; if (r.shift && !a.includes(r.shift)) a.push(r.shift); });
+  return mergeEntries(rows.map(r => ({ ...r, shift: '' }))).map(m => ({ ...m, shift: (sh[m.template_code] || []).join('/') })); };
+const tplHave = (t, V) => { let n = 0; t.sections.forEach((s, si) => s.items.forEach((it, ii) => it.cells.forEach((c, fi) => { if (c && V && V[`${si}.${ii}.${fi}`]) n++; }))); return n; };
+const TIDX = {};
+const tplIdx = t => TIDX[t.code] || (TIDX[t.code] = t.sections.flatMap((s, si) => s.items.map((it, ii) => ({ si, ii, txt: (s.title + ' ' + it.name + ' ' + it.cells.map((c, fi) => c ? (s.fields[fi] || {}).l || '' : '').join(' ')).toLowerCase() }))));
+const secStat = (t, si, V) => { let n = 0, h = 0; t.sections[si].items.forEach((it, ii) => it.cells.forEach((c, fi) => { if (c) { n++; if (V && V[`${si}.${ii}.${fi}`]) h++; } })); return { n, h }; };
+const secHit = (t, si, q) => { const w = qWords(q); return w.length ? tplIdx(t).filter(x => x.si === si && w.every(k => x.txt.includes(k))).length : 0; };
+const qWords = q => String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
+const qHit = (t, q) => { const w = qWords(q); if (!w.length) return 0; return tplIdx(t).filter(x => w.every(k => x.txt.includes(k))).length + (w.every(k => t.name.toLowerCase().includes(k)) ? 1 : 0); };
 async function viewChecklist() {
   $('#app').innerHTML = `${bar('Check List', 'home', logBtn('checklist') + (can('clset') ? `<button class="ib" id="clgear" aria-label="Check list settings">${ic('gear', 26)}</button>` : ''))}<main class="scroll" id="cl"><div class="spin">Loading…</div></main>${nav('checklist')}`;
   if ($('#clgear')) $('#clgear').onclick = () => go('clset');
-  const today = ymd(new Date()); S.reportDate = S.reportDate || today;
+  const today = ymd(new Date()); S.reportDate = S.reportDate || today; S.clQ = S.clQ || '';
   try {
     const tpl = await templates();
-    let done = []; try { done = await api(`checklist_entries?select=template_code,check_date,created_at,filled_at,inspected_name,shift&check_date=eq.${today}&order=created_at.desc`); } catch (e) { if (!isNet(e)) throw e; }
-    const waiting = outbox();
-    const last = {}; mergeEntries([...obxEntries(today), ...done]).forEach(d => { (last[d.template_code] = last[d.template_code] || []).push(d); });
+    let done = []; try { done = await api(`checklist_entries?select=template_code,check_date,created_at,filled_at,inspected_name,shift,vals,client_id&check_date=eq.${today}&order=created_at.desc`); } catch (e) { if (!isNet(e)) throw e; }
+    const waiting = outbox(), have = new Set(done.map(r => r.client_id).filter(Boolean));
+    const recs = {}; dayMerge([...obxEntries(today).filter(r => !have.has(r.client_id)), ...done]).forEach(m => { recs[m.template_code] = m; });
     const areas = CL_AREAS.filter(([a]) => tpl.some(t => t.area === a));
     if (!areas.length) { $('#cl').innerHTML = `<div class="empty"><b>No check lists for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access to your area.</div>`; return; }
     if (!areas.some(([a]) => a === S.clArea)) S.clArea = areas[0][0];
-    const list = tpl.filter(t => t.area === S.clArea);
-    const nDone = tpl.filter(t => last[t.code]).length;
-    $('#cl').innerHTML = `<div class="tabs cltabs" id="clt" role="tablist">${areas.map(([a, l]) => { const n = tpl.filter(t => t.area === a), d = n.filter(t => last[t.code]).length;
-        return `<button role="tab" data-a="${a}" class="${a === S.clArea ? 'on' : ''}" aria-selected="${a === S.clArea}">${esc(l)}<span class="cnt ${d === n.length ? 'all' : ''}">${d}/${n.length}</span></button>`; }).join('')}</div>
+    // sub-tree = one section of a check list (e.g. “FM DC Motors – OP side”); an area's sub-trees are all its sections in order
+    const subsOf = a => tpl.filter(t => t.area === a).flatMap(t => t.sections.map((sc, si) => { const m = recs[t.code], dr = store.get(draftKey(t.code)), x = secStat(t, si, m && m.vals);
+      return { t, si, title: sc.title, n: x.n, h: x.h, draft: !!(dr && dr.v && Object.keys(dr.v).some(k => k.startsWith(si + '.') && dr.v[k])) }; }));
+    const multi = a => tpl.filter(t => t.area === a).length > 1, lab = (a, x) => multi(a) ? `${x.t.name} › ${x.title}` : x.title;
+    $('#cl').innerHTML = `<div class="tabs cltabs" id="clt" role="tablist"></div>
+      <div class="clq" style="border-top:1px solid var(--line)"><div class="search">${ic('search', 22)}<input id="clq" type="search" placeholder="Search reading – motor, pump, panel…" aria-label="Search all check lists" value="${esc(S.clQ)}"></div></div>
+      <div class="clstw"><div class="clstl">Sub-trees of ${esc(clAreaName(S.clArea))} · ${fmtDay(new Date())}</div><div class="tabs cltabs clst" id="clst" role="tablist"></div><div class="clmsg" id="clmsg"></div></div>
       <div class="pad">
       ${waiting.length ? `<div class="card obx"><span class="ic">${ic('clock', 24)}</span><div style="flex:1"><div class="t">${waiting.length} check list${waiting.length > 1 ? 's' : ''} saved on this phone</div>
         <div class="s">${waiting.some(x => x.err) ? 'Upload problem: ' + esc(waiting.find(x => x.err).err) : 'Will upload by itself when the network is back'}</div></div><button class="btn" id="obxgo">Upload now</button></div>` : ''}
       <button class="card actcard" id="actc" data-go="actions"><span class="ic">${ic('alert', 26)}</span><span class="tx"><span class="a">Daily action required</span><span class="b" id="actn">Checking abnormal readings…</span></span><span class="chev">${ic('chev', 20)}</span></button>
-      <div class="label">${esc(clAreaName(S.clArea))} · ${fmtDay(new Date())}</div>
-      ${list.map(t => {
-        const d = last[t.code], dr = store.get(draftKey(t.code));
-        const cls = d ? (d.every(x => x.local) ? 'draft' : 'done') : dr ? 'draft' : '';
-        const b = d ? `${d.some(x => x.local) ? 'Saved on phone' : 'Done'} · ${d.map(x => `${esc(x.shift || '')} ${new Date(x.filled_at || x.created_at).toTimeString().slice(0, 5)}${x.nparts > 1 ? ` (${x.nparts} parts)` : ''}`).join(', ')} · ${esc(d.map(x => x.names.map(firstName).join('/')).filter(Boolean)[0] || '')}`
-          : dr ? 'Draft saved – not submitted' : `${itemCount(t)} readings · not done today`;
-        return `<button class="card clcard ${cls}" data-go="cl/${esc(t.code)}"><span class="ic">${ic(d ? 'ok' : dr ? 'clock' : 'check', 24)}</span><span class="tx"><span class="a">${esc(t.name)}</span><span class="b">${b}</span></span><span class="chev">${ic('chev', 20)}</span></button>`;
-      }).join('')}
-      <div class="card report" style="margin-top:18px"><div class="row"><span class="ic">${ic('xls', 26)}</span><div style="flex:1"><div class="t">Daily report (Excel)</div><div class="s">All check lists of the day${tpl.length < 11 ? ' (your areas)' : ''} in the inspection-sheet format · ${nDone} done today</div></div></div>
+      <div class="card report" style="margin-top:18px"><div class="row"><span class="ic">${ic('xls', 26)}</span><div style="flex:1"><div class="t">${esc(clAreaName(S.clArea))} – final report (Excel)</div><div class="s">Save / Share works only when <b>every sub-tree</b> of this area is filled for the date.</div></div></div>
         <div class="row"><input type="date" id="rdate" value="${S.reportDate}" max="${today}" aria-label="Report date"></div>
         <div class="two"><button class="btn" id="rsave">${ic('download')} Save</button><button class="btn pri" id="rshare">${ic('share')} Share / Mail</button></div></div></div>`;
+    const draw = () => { const q = S.clQ.trim(), list = subsOf(S.clArea);
+      $('#clt').innerHTML = areas.map(([a, l]) => { const n = subsOf(a), d = n.filter(x => x.h >= x.n).length, hits = q ? n.filter(x => secHit(x.t, x.si, q)).length : 0;
+        return `<button role="tab" data-a="${a}" class="${a === S.clArea ? 'on' : ''}" aria-selected="${a === S.clArea}">${esc(l)}<span class="cnt ${d === n.length ? 'all' : ''}">${d}/${n.length}</span>${hits && a !== S.clArea ? `<i class="mk">${hits}</i>` : ''}</button>`; }).join('');
+      $('#clst').innerHTML = list.map((x, i) => { const full = x.h >= x.n, hit = q && secHit(x.t, x.si, q);
+        return `<button type="button" role="tab" data-i="${i}" class="${full ? 'ok' : x.h || x.draft ? 'part' : ''}${hit ? ' hit' : ''}">${esc(lab(S.clArea, x))}<span class="cnt ${full ? 'all' : ''}">${x.h}/${x.n}</span>${x.draft && !full ? '<i class="dr" title="Draft saved"></i>' : ''}</button>`; }).join('');
+      const pend = list.filter(x => x.h < x.n);
+      let msg = pend.length ? `<b>Pending:</b> ${pend.map(x => `${esc(lab(S.clArea, x))} (${x.n - x.h} left)`).join(', ')}` : `<span style="color:var(--green)"><b>All sub-trees filled today.</b></span>`;
+      if (q) { const here = list.filter(x => secHit(x.t, x.si, q)), other = areas.filter(([a]) => a !== S.clArea).map(([a, l]) => [l, subsOf(a).filter(x => secHit(x.t, x.si, q)).length]).filter(([, n]) => n);
+        msg = (!here.length && !other.length) ? `<span style="color:var(--red)"><b>No reading matches “${esc(q)}”.</b></span>` : `<b>${here.length ? `${here.length} sub-tree${here.length > 1 ? 's' : ''} here ${here.length > 1 ? 'have' : 'has'} it – tap the highlighted one.` : 'No match in this area.'}</b>${other.length ? ` Also in: ${other.map(([l, n]) => `${esc(l)} (${n})`).join(', ')}` : ''}`; }
+      $('#clmsg').innerHTML = msg;
+      const on = $('#clt .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); };
+    draw();
     abnormalFor(today).then(d => { const el = $('#actn'); if (!el) return; const n = d.items.length;
       el.innerHTML = n ? `<b style="color:var(--red)">${n} abnormal reading${n > 1 ? 's' : ''}</b> · tap to see area-wise` : 'All readings normal today'; if (n) $('#actc').classList.add('bad'); }).catch(() => { const el = $('#actn'); if (el) el.textContent = 'Tap to open'; });
-    const on = $('#clt .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
     $('#clt').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; S.clArea = b.dataset.a; viewChecklist(); };
+    $('#clst').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; const x = subsOf(S.clArea)[+b.dataset.i], q = S.clQ.trim();
+      S.clSec = { code: x.t.code, v: String(x.si) }; S.clJump = q && secHit(x.t, x.si, q) ? { code: x.t.code, q } : null; go('cl/' + x.t.code); };
+    $('#clq').oninput = e => { S.clQ = e.target.value; draw(); };
     $('#rdate').onchange = e => { S.reportDate = e.target.value || today; };
-    $('#rsave').onclick = () => dailyReport(S.reportDate, false);
-    $('#rshare').onclick = () => dailyReport(S.reportDate, true);
+    $('#rsave').onclick = () => areaReport(S.clArea, S.reportDate, false);
+    $('#rshare').onclick = () => areaReport(S.clArea, S.reportDate, true);
     if ($('#obxgo')) $('#obxgo').onclick = async () => { toast('Uploading…'); const n = await flushOutbox(); if (!n && outbox().length) toast('Still no network – will try again automatically'); };
   } catch (e) { $('#cl').innerHTML = '<div class="empty"><b>Could not load check lists</b>Check network and try again.</div>'; netErr(e); }
 }
-async function dailyReport(day, share) {
-  toast('Preparing Excel…', 8000);
+// Final Excel of ONE area – only when every sub-tree (check list) of the area is completely filled for that date
+async function areaReport(area, day, share) {
+  toast('Checking sub-trees…', 8000);
   try {
-    const tpl = await templates();
+    const tpl = await templates(), list = tpl.filter(t => t.area === area);
     let rows = [], off = false;
-    try { rows = await api(`checklist_entries?select=*&check_date=eq.${day}&order=created_at`); } catch (e) { if (!isNet(e)) throw e; off = true; }
+    try { rows = await api(`checklist_entries?select=*&check_date=eq.${day}&order=created_at`, { fresh: true }); } catch (e) { if (!isNet(e)) throw e; off = true; }
     const have = new Set(rows.map(r => r.client_id).filter(Boolean));
-    rows = [...rows, ...obxEntries(day).filter(r => !have.has(r.client_id))].filter(r => tpl.some(t => t.code === r.template_code));
-    if (!rows.length) { toast(off ? 'No network, and no check lists for this day on this phone' : `No check lists submitted on ${fmtShort(fromYmd(day))}`); return; }
+    rows = [...rows, ...obxEntries(day).filter(r => !have.has(r.client_id))].filter(r => list.some(t => t.code === r.template_code));
+    const merged = dayMerge(rows);
+    const pend = list.flatMap(t => { const m = merged.find(x => x.template_code === t.code); return t.sections.map((sc, si) => { const x = secStat(t, si, m && m.vals); return { name: (list.length > 1 ? t.name + ' › ' : '') + sc.title, n: x.n, h: x.h }; }); }).filter(x => x.h < x.n);
+    if (pend.length) {
+      const m = $('#modal'); m.innerHTML = `<div class="sheet"><h3>Sub-tree pending</h3><p class="hint" style="margin:4px 0 10px">${esc(clAreaName(area))} report for ${fmtShort(fromYmd(day))} can be saved or shared only after every sub-tree is filled. These are still pending:</p>
+        ${pend.map(x => `<div class="pendr"><b>${esc(x.name)}</b><span>${x.h ? `${x.n - x.h} of ${x.n} left` : 'not started'}</span></div>`).join('')}
+        <button class="btn pri block" id="pdok" style="margin-top:14px">OK</button></div>`;
+      m.classList.remove('hidden'); const close = () => m.classList.add('hidden'); $('#pdok').onclick = close; m.onclick = e => { if (e.target === m) close(); }; return; }
+    if (!list.length) { toast('No check lists in this area'); return; }
     if (off || OFFLINE) toast('No network: report made from data on this phone', 4000);
-    const buf = await xl().dailyWorkbook(tpl, mergeEntries(rows), day);
-    deliver(buf, `HSM E&A Daily Checklist ${fmtShort(fromYmd(day))}.xlsx`, share);
+    const buf = await xl().dailyWorkbook(list, merged, day);
+    deliver(buf, `HSM E&A ${clAreaName(area)} Checklist ${fmtShort(fromYmd(day))}.xlsx`, share);
   } catch (e) { netErr(e); }
 }
 async function recordReport(tpl, entry, share) {
@@ -1187,7 +1214,9 @@ async function viewChecklistFill(code) {
   let t; try { t = (await templates()).find(x => x.code === code); } catch (e) { netErr(e); }
   if (!t) { $('#app').innerHTML = `${bar('Check List', 'checklist')}<div class="empty"><b>Check list not found</b>You may not have access to this area.</div>`; return; }
   const total = itemCount(t), day = ymd(new Date());
-  const dr = store.get(draftKey(code)) || { v: {}, shift: curShift(), remarks: '' }; const V = dr.v;
+  let dr = store.get(draftKey(code)); if (dr && dr.d && dr.d !== day) { store.del(draftKey(code)); dr = null; }   // a draft belongs to its own date
+  dr = dr || { v: {}, shift: curShift(), remarks: '' }; dr.d = day; const V = dr.v;
+  const jump = S.clJump && S.clJump.code === code ? S.clJump.q : ''; S.clJump = null;
   // Readings already submitted TODAY for this check list (by anybody, any shift): shown in green, only the rest is entered now. Resets by itself next day.
   let priorRows = []; try { priorRows = await dayEntries(code, day); } catch (e) { netErr(e); }
   const prior = priorRows.length ? mergeEntries(priorRows.map(r => ({ ...r, shift: '' })))[0] : null, P = prior ? prior.vals : {};
@@ -1237,6 +1266,12 @@ async function viewChecklistFill(code) {
   const upd = () => { const n = filled(); $('#pbar').style.width = Math.min(100, 100 * n / total) + '%'; $('#clsub').innerHTML = `Submit <span style="font-size:15px;font-weight:600;opacity:.85">${n}/${total}</span>`; updChips(); };
   const persist = () => { dr.remarks = $('#clrem').value; store.set(draftKey(code), dr); upd(); };
   drawChips(); applyFilter(); upd();
+  // coming from a search: mark the matching readings and land on the first one; otherwise come back to where you stopped
+  S.clPos = S.clPos || {};
+  if (jump) { const w = qWords(jump); const hits = $$('.clitem', f).filter(it => w.every(k => (it.dataset.n + ' ' + it.closest('.clsecw').dataset.t).includes(k)));
+    hits.forEach(it => it.classList.add('hit')); if (hits[0]) { hits[0].classList.add('flash'); setTimeout(() => hits[0].scrollIntoView({ block: 'center' }), 60); } }
+  else if (S.clPos[code] && S.clPos[code].d === day) setTimeout(() => { f.scrollTop = S.clPos[code].y; }, 30);
+  f.addEventListener('scroll', () => { S.clPos[code] = { d: day, y: f.scrollTop }; }, { passive: true });
   if ($('#clsc')) $('#clsc').onclick = e => { const b = e.target.closest('[data-sc]'); if (!b) return; selSec = b.dataset.sc; S.clSec = { code, v: selSec };
     $$('#clsc button').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); }); applyFilter(); f.scrollTop = 0; };
   $('#clq').oninput = e => { qtxt = e.target.value; applyFilter(); };
@@ -1281,7 +1316,7 @@ async function viewChecklistFill(code) {
 
 /* ================= CHECK LIST SETTINGS (red-alert limits per area / sub-area) ================= */
 async function viewClSettings() {
-  $('#app').innerHTML = `${bar('Check list settings', 'checklist')}<main class="scroll" id="cs"><div class="spin">Loading…</div></main>`;
+  $('#app').innerHTML = `${bar('Check list settings', 'checklist')}<div class="tabs cltabs" id="cst" role="tablist"></div><main class="scroll" id="cs"><div class="spin">Loading…</div></main>`;
   let tpl; try { tpl = await templates(); } catch (e) { netErr(e); $('#cs').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
   const areas = CL_AREAS.filter(([a]) => tpl.some(t => t.area === a) && canArea('clset', a));
   if (!areas.length) { $('#cs').innerHTML = `<div class="empty"><b>No areas for you yet</b>Ask ${esc(ADMIN_NAME)} for access to Checklist settings.</div>`; return; }
@@ -1289,12 +1324,12 @@ async function viewClSettings() {
   const hasTemp = (t, si) => t.sections[si].items.some((it, ii) => it.cells.some((c, fi) => c && ftype(t.sections[si], it, fi) === 't'));
   const draw = () => {
     const list = tpl.filter(t => t.area === S.csArea);
-    $('#cs').innerHTML = `<div class="tabs cltabs" id="cst">${areas.map(([a, l]) => `<button data-a="${a}" class="${a === S.csArea ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>
-      <div class="pad"><p class="hint" style="margin:0 0 10px">A temperature reading turns <b style="color:var(--red)">red</b> when it is above “Red above” (or below “Red below”, if filled). Default: above 100. Changes apply to everyone from now on.</p>
+    $('#cst').innerHTML = areas.map(([a, l]) => `<button role="tab" data-a="${a}" class="${a === S.csArea ? 'on' : ''}" aria-selected="${a === S.csArea}">${esc(l)}</button>`).join('');
+    $('#cs').innerHTML = `<div class="pad csp"><p class="hint" style="margin:0 0 10px">A temperature reading turns <b style="color:var(--red)">red</b> when it is above “Red above” (or below “Red below”, if filled). Default: above 100. Changes apply to everyone from now on.</p>
       ${list.map(t => `<div class="label" style="margin-top:14px">${esc(t.name)}</div>` + t.sections.map((s, si) => { if (!hasTemp(t, si)) return ''; const l = limOf(t.code, si);
         return `<div class="card cslim" data-k="${esc(t.code)}|${si}" style="padding:12px;margin-bottom:8px"><div style="font-weight:700;margin-bottom:8px">${esc(s.title)}</div>
           <div class="two"><div class="fld"><label>Red above (°C)</label><input type="number" inputmode="decimal" class="hi" value="${l.hi}"></div>
-          <div class="fld"><label>Red below (°C) – optional</label><input type="number" inputmode="decimal" class="lo" value="${l.lo != null ? l.lo : ''}" placeholder="none"></div></div></div>`; }).join('')).join('') || '<div class="empty"><b>No check lists in this area</b></div>'}
+          <div class="fld"><label>Red below (°C)</label><input type="number" inputmode="decimal" class="lo" value="${l.lo != null ? l.lo : ''}" placeholder="optional"></div></div></div>`; }).join('')).join('') || '<div class="empty"><b>No check lists in this area</b></div>'}
       <button class="btn pri block" id="css" style="margin:14px 0 24px">Save ${esc(clAreaName(S.csArea))} limits</button></div>`;
     $('#cst').onclick = e => { const b = e.target.closest('[data-a]'); if (b) { S.csArea = b.dataset.a; draw(); } };
     $('#css').onclick = async () => {
@@ -1317,8 +1352,10 @@ async function abnormalFor(day) {
   const have = new Set(rows.map(r => r.client_id).filter(Boolean));
   rows = [...rows, ...obxEntries(day).filter(r => !have.has(r.client_id))];
   const items = [], notes = [];
-  mergeEntries(rows).forEach(r => {
-    const t = tpl.find(x => x.code === r.template_code); if (!t || !canArea('checklist', t.area)) return;
+  // only the areas given to this person (admins / check list admins: all); no area list = nothing, ask admin
+  const mine = ME && ME.areas && Array.isArray(ME.areas.checklist) ? ME.areas.checklist : [], seeAll = isModAdmin('checklist');
+  dayMerge(rows).forEach(r => {
+    const t = tpl.find(x => x.code === r.template_code); if (!t || !(seeAll || mine.includes(t.area))) return;
     t.sections.forEach((s, si) => s.items.forEach((it, ii) => it.cells.forEach((c, fi) => {
       const v = c && (r.vals || {})[`${si}.${ii}.${fi}`]; if (!v) return;
       const hot = isHot(ftype(s, it, fi), v, limOf(t.code, si));
@@ -1344,7 +1381,7 @@ async function viewActions() {
   const doneN = new Set(); // check lists of the day that were filled
   $('#ac').innerHTML = `<div class="pad">
     <div class="card actsum ${d.items.length ? 'bad' : 'good'}"><span class="ic">${ic(d.items.length ? 'warn' : 'ok', 28)}</span><div style="flex:1"><div class="t">${d.items.length ? `${d.items.length} abnormal reading${d.items.length > 1 ? 's' : ''} need action` : 'All readings normal'}</div>
-      <div class="s">${d.items.length ? `${nhot} out of limit · ${nnok} NOT OK` : 'No reading out of limit and no NOT OK so far'}${ME.is_admin || isModAdmin('checklist') ? ' · all areas' : ' · your areas'}</div></div></div>
+      <div class="s">${d.items.length ? `${nhot} out of limit · ${nnok} NOT OK` : 'No reading out of limit and no NOT OK so far'}${isModAdmin('checklist') ? ' · all areas' : ' · your areas only'}</div></div></div>
     <div class="row" style="margin:12px 0"><input type="date" id="adate" value="${S.actDay}" max="${today}" aria-label="Date"></div>
     ${d.items.length ? `<div class="two" style="margin-bottom:6px"><button class="btn" id="axl">${ic('xls')} Excel</button><button class="btn pri" id="ashare">${ic('share')} Share</button></div>` : ''}
     ${CL_AREAS.filter(([a]) => by[a]).map(([a, n]) => `<div class="label" style="margin-top:16px">${esc(n)} · ${by[a].length}</div><div class="card actl">${by[a].map(i => `<button class="actr ${i.kind}" data-go="cl/${esc(i.code)}">

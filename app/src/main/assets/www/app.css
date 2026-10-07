@@ -667,3 +667,27 @@ mark.hlm.cur{background:#FF9F1A;outline:2px solid #FF7800}
 .dk.DOC{background:#E7F5EA;color:#17803A}
 a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .nm[data-nm],.pp[data-nm]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+
+/* v3.10 */
+.tabs{scroll-padding-left:14px;scroll-padding-right:14px}
+.clstw{background:#fff;border-bottom:1px solid var(--line);flex-shrink:0}
+.clstl{padding:10px 16px 0;font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777)}
+.clst{box-shadow:none!important;background:#fff!important;padding-top:8px!important}
+.clst button{height:auto!important;min-height:48px;padding:6px 16px!important;border-radius:16px!important;line-height:1.2;position:relative}
+.clst button.part{border-color:var(--amber,#E69100);background:#FFF8EA}
+.clst button.ok{border-color:var(--green,#1B8F4C);background:var(--green-50,#E8F6EE);color:var(--green,#1B8F4C)}
+.clst button.hit{background:#FFE98A!important;border-color:#FF9F1A!important;color:#111!important;box-shadow:0 0 0 3px rgba(255,159,26,.4)!important;animation:hitpulse 1.2s ease 3}
+@keyframes hitpulse{50%{transform:scale(1.05)}}
+.clst .dr{position:absolute;top:5px;right:7px;width:9px;height:9px;border-radius:50%;background:var(--amber,#E69100)}
+.cltabs .mk{display:inline-block;margin-left:6px;min-width:18px;padding:1px 5px;border-radius:9px;background:#FF9F1A;color:#fff;font-size:11.5px;font-style:normal;font-weight:800;text-align:center}
+.clmsg{padding:2px 16px 10px;font-size:14.5px;line-height:1.35}
+.pendr{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:12px;background:#FFF4E5;font-size:15px}
+.pendr span{color:var(--red,#C8102E);font-weight:700;text-align:right}
+.clitem.hit{background:#FFF8E1;border-radius:12px;outline:2px solid #FFB300}
+.clitem.flash{animation:clflash 1.1s ease 3}
+@keyframes clflash{50%{background:#FFD54F}}
+#cst{flex-shrink:0;position:relative;z-index:2}
+.csp .label{padding-left:4px}
+.cslim .two{align-items:end}
+.cslim .fld label{min-height:20px;display:block;white-space:nowrap}
+.cslim .fld input{width:100%}
