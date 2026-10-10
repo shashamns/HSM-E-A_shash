@@ -1578,6 +1578,7 @@ async function viewSpare(id) {
   }
   const locs = () => [...new Set([...(LOCS || []), 'Basement Cupboard', 'FM TPS L1 Cupboard', 'Shift cupboard 1'])].sort((x, y) => x.localeCompare(y));
   const now = new Date(); let chg = 0;
+  const stype = s.cupboard ? 'Cupboard' : s.rack ? 'Rack' : (S.spSt || 'Cupboard');
   $('#app').innerHTML = `${bar(isNew ? 'Add Spare' : 'Update Spare', 'spares')}
   ${isNew ? '' : `<div class="cur"><span class="k">Current stock</span><span class="v">${s.qty} Nos</span></div>${(s.places || 1) > 1 ? `<div class="hint" style="padding:6px 16px 0;font-weight:600">Plant total of this item: <b>${s.item_total}</b> Nos in ${s.places} places – low stock is judged on this total.</div>` : ''}`}
   <main class="scroll"><form class="f" id="sf" autocomplete="off">
@@ -1590,11 +1591,12 @@ async function viewSpare(id) {
     <div class="fld"><label for="f-qty">${isNew ? 'Opening quantity' : 'Update quantity'}</label>
       <div class="step"><button type="button" id="dec" aria-label="Decrease">${ic('minus', 28)}</button><input id="f-qty" inputmode="numeric" value="0"><button type="button" class="plus" id="inc" aria-label="Increase">${ic('plus', 28)}</button></div>
       <span class="hint" id="qhint">${isNew ? 'Stock you are adding now' : 'Minus = issued / used · Plus = received'}</span></div>
+    <div class="fld"><label for="f-st">Kept in</label>${combo('f-st', stype, false)}</div>
+    <div id="cupbox"><div class="two"><div class="fld"><label for="f-cup">Cupboard No.</label>${combo('f-cup', s.cupboard, true, 'Choose or type')}</div>
+      <div class="fld"><label for="f-key">Cupboard Key No.</label><input id="f-key" value="${esc(s.cupboard_key || '')}"></div></div></div>
+    <div id="rackbox"><div class="fld"><label for="f-rack">Rack No.</label>${combo('f-rack', s.rack, true, 'Choose or type')}</div></div>
     <div class="fld"><label for="f-loc">Location</label>${combo('f-loc', s.location, true, 'Tap to choose or type a new one')}</div>
-    <div class="two"><div class="fld"><label for="f-rack">Rack No.</label><input id="f-rack" value="${esc(s.rack || '')}"></div>
-      <div class="fld"><label for="f-type">Material type</label>${combo('f-type', s.material_type || 'Spare', false)}</div></div>
-    <div class="two"><div class="fld"><label for="f-cup">Cupboard No.</label><input id="f-cup" value="${esc(s.cupboard || '')}"></div>
-      <div class="fld"><label for="f-key">Cupboard Key No.</label><input id="f-key" value="${esc(s.cupboard_key || '')}"></div></div>
+    <div class="fld"><label for="f-type">Material type</label>${combo('f-type', s.material_type || 'Spare', false)}</div>
     <div class="fld"><label for="f-rem">Remark (used for)</label><textarea id="f-rem" rows="2" placeholder="e.g. Replaced faulty module in F1 panel"></textarea></div>
     <div class="two"><div class="fld"><label>Updated by</label><input readonly value="${esc(ME.name)}"></div><div class="fld"><label>Date · time</label><input readonly value="${fmtShort(now)} ${pad2(now.getHours())}:${pad2(now.getMinutes())}"></div></div>
     ${log.length ? `<div><div class="label" style="margin-top:6px">Recent updates</div><div class="list">${log.map(h => `<div class="lrow"><span class="tag ${h.change < 0 ? 'red' : h.change > 0 ? 'green' : ''}">${h.change > 0 ? '+' : ''}${h.change}</span><span class="tx"><span class="a" style="font-size:15.5px">${esc(h.remark || (h.change ? 'Stock updated' : 'Details edited'))}</span><span class="b">→ ${h.qty_after} Nos · ${esc(h.updated_by || '')} · ${fmtStamp(h.created_at)}</span></span></div>`).join('')}</div></div>` : ''}
@@ -1604,16 +1606,26 @@ async function viewSpare(id) {
   wireCombo('f-area', SPARE_AREAS.includes(s.area) ? SPARE_AREAS : [...SPARE_AREAS, s.area], false);
   wireCombo('f-loc', locs, true);
   wireCombo('f-type', ['Spare', 'Consumable', 'Tool'], false);
+  // what the store already knows: items (name + model decide “same item”), and the cupboards / racks with their key and place
+  let cat = S.spCat || null, places = S.spPl || { cup: [], rack: [] };
+  if (!cat) api('spares_v?select=material,model,make,description,item_code,material_type,ik,rack,cupboard,cupboard_key,location&order=material', { fresh: true }).then(rs => { const m = {}, cu = {}, rk = {};
+    (rs || []).forEach(r => { const o = m[r.ik], sc = x => String(x.description || '').length + String(x.item_code || '').length; if (!o || sc(r) > sc(o)) m[r.ik] = r;
+      if (r.cupboard) cu[[r.cupboard, r.cupboard_key, r.location].join('|')] = { cupboard: r.cupboard, key: r.cupboard_key || '', location: r.location || '' };
+      if (r.rack) rk[[r.rack, r.location].join('|')] = { rack: r.rack, location: r.location || '' }; });
+    cat = S.spCat = Object.values(m); places = S.spPl = { cup: Object.values(cu), rack: Object.values(rk) }; }).catch(() => {});
+  const stSync = () => { const t = $('#f-st').value; $('#cupbox').hidden = t !== 'Cupboard'; $('#rackbox').hidden = t !== 'Rack'; };
+  wireCombo('f-st', ['Cupboard', 'Rack'], false); $('#f-st').addEventListener('change', () => { S.spSt = $('#f-st').value; stSync(); }); stSync();
+  const lab = {};
+  wireCombo('f-cup', () => places.cup.map(c => { const l = `${c.cupboard}${c.key ? ' · Key ' + c.key : ''}${c.location ? ' · ' + c.location : ''}`; lab[l] = c; return l; }), true);
+  wireCombo('f-rack', () => places.rack.map(c => { const l = `Rack ${c.rack}${c.location ? ' · ' + c.location : ''}`; lab[l] = c; return l; }), true);
+  $('#f-cup').addEventListener('change', () => { const c = lab[$('#f-cup').value]; if (c) { $('#f-cup').value = c.cupboard; $('#f-key').value = c.key; $('#f-loc').value = c.location; } });
+  $('#f-rack').addEventListener('change', () => { const c = lab[$('#f-rack').value]; if (c) { $('#f-rack').value = c.rack; $('#f-loc').value = c.location; } });
   if (isNew) {   // an item that is already in the store (any area) brings its details along: item, model, description, make, code, type – never place or quantity
-    let cat = S.spCat || null;
-    if (!cat) api('spares_v?select=material,model,make,description,item_code,material_type,ik&order=material', { fresh: true }).then(rs => { const m = {};
-      (rs || []).forEach(r => { const o = m[r.ik]; if (!o || String(r.description || '').length + String(r.item_code || '').length > String(o.description || '').length + String(o.item_code || '').length) m[r.ik] = r; });
-      cat = S.spCat = Object.values(m); }).catch(() => {});
     const fillFrom = r => { $('#f-mat').value = r.material || ''; $('#f-model').value = r.model || ''; $('#f-desc').value = r.description || ''; $('#f-make').value = r.make || ''; $('#f-code').value = r.item_code || '';
       if (r.material_type) $('#f-type').value = r.material_type; toast('Details filled from the item already in the store – add only quantity and place', 4200); };
     const sug = (inp, list) => { const hide = () => list.classList.add('hidden');
-      const show = () => { const w = inp.value.toLowerCase().split(/\s+/).filter(Boolean); if (!cat || !w.length || inp.value.trim().length < 2) return hide();
-        const hit = cat.filter(r => { const t = [r.material, r.model, r.make, r.item_code].join(' ').toLowerCase(); return w.every(k => t.includes(k)); }).slice(0, 8);
+      const show = () => { const nz = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''), w = inp.value.toLowerCase().split(/\s+/).map(nz).filter(Boolean); if (!cat || !w.length || inp.value.trim().length < 2) return hide();
+        const hit = cat.filter(r => { const t = nz([r.material, r.model, r.make, r.item_code].join(' ')); return w.every(k => t.includes(k)); }).slice(0, 8);
         if (!hit.length) return hide();
         list.innerHTML = hit.map((r, i) => `<button type="button" data-i="${i}"><b>${esc(r.material)}</b><br><small style="color:var(--ink-2)">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</small></button>`).join(''); list._hit = hit; list.classList.remove('hidden'); };
       inp.addEventListener('input', show); inp.addEventListener('blur', () => setTimeout(hide, 150));
@@ -1627,10 +1639,16 @@ async function viewSpare(id) {
   qi.onchange = () => setQ(parseInt(qi.value.replace('+', ''), 10) || 0);
   $('#cancel').onclick = () => history.length > 1 ? history.back() : go('spares');
   $('#save').onclick = async () => {
-    const v = id => $(id).value.trim() || null;
-    const f = { area: $('#f-area').value, material: v('#f-mat'), model: v('#f-model'), description: v('#f-desc'), make: v('#f-make'), item_code: v('#f-code'),
-      location: v('#f-loc'), rack: v('#f-rack'), material_type: $('#f-type').value, cupboard: v('#f-cup'), cupboard_key: v('#f-key') };
+    const v = id => $(id).value.trim() || null, c = id => $(id).value.trim();   // c: empty text clears the field on an edit
+    const st = $('#f-st').value, nz = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const f = { area: $('#f-area').value, material: v('#f-mat'), model: isNew ? v('#f-model') : c('#f-model'), description: isNew ? v('#f-desc') : c('#f-desc'), make: isNew ? v('#f-make') : c('#f-make'), item_code: isNew ? v('#f-code') : c('#f-code'),
+      location: isNew ? v('#f-loc') : c('#f-loc'), material_type: $('#f-type').value,
+      rack: st === 'Rack' ? (isNew ? v('#f-rack') : c('#f-rack')) : (isNew ? (s.rack || null) : (s.rack || '')),
+      cupboard: st === 'Cupboard' ? (isNew ? v('#f-cup') : c('#f-cup')) : (isNew ? null : ''), cupboard_key: st === 'Cupboard' ? (isNew ? v('#f-key') : c('#f-key')) : (isNew ? null : '') };
     if (!f.material) { toast('Enter the item name'); $('#f-mat').focus(); return; }
+    // same item = same name + model (spaces, commas, capitals ignored): write it exactly as the store already has it, and bring its description if left empty
+    const known = isNew && cat && cat.find(r => nz(r.material) === nz(f.material) && nz(r.model) === nz(f.model));
+    if (known) { f.material = known.material; f.model = known.model || f.model; if (!f.description) f.description = known.description || null; if (!f.make) f.make = known.make || null; if (!f.item_code) f.item_code = known.item_code || null; }
     const remark = v('#f-rem'); const by = `${ME.name} (${ME.username})`;
     const btn = $('#save'); btn.disabled = true; btn.textContent = 'Saving…';
     try {
