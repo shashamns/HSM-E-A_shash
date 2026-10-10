@@ -712,3 +712,5 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .cltabs .mk{background:#1E6FEB!important}
 .clitem.hit{background:#E3EEFF!important;outline:2px solid #1E6FEB!important}
 @keyframes clflash{50%{background:#9EC3FF}}
+/* v3.11 plant-wide total */
+.qty .ptot{display:block;margin-top:3px;font-size:11px;font-weight:700;line-height:1.1;opacity:.85;white-space:nowrap}

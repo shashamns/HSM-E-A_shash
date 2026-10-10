@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.11';
+const APP_VERSION = '3.12';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -681,7 +681,7 @@ async function viewHome() {
       cS ? soft(api(`shift_roster?select=name,shift,area,ranking&day=eq.${today}&order=ranking,name`)) : null,
       cC ? templates() : [],
       cC ? soft(api(`checklist_entries?select=template_code&check_date=eq.${today}`)) : null,
-      cP ? soft(api(`spares?select=id,qty&qty=lt.${LOWN}&low_hidden=eq.false`)) : null]);
+      cP ? soft(api(`spares_v?select=ik,item_total&item_total=lt.${LOWN}&low_hidden=eq.false`).then(rs => { const m = {}; (rs || []).forEach(r => { m[r.ik] = { qty: r.item_total }; }); return Object.values(m); })) : null]);
     if (cS && $('#hcrew')) {
       roster = roster || [];
       const crew = roster.filter(r => r.shift === sh);
@@ -1487,19 +1487,22 @@ function viewSpares() {
 async function loadSpares(fromCache) {
   const list = $('#list'); if (!list) return;
   const q = S.spareQuery.replace(/[,()*"]/g, ' ').trim(); const e = encodeURIComponent(q);
-  let path = 'spares?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden&order=qty,material,id';
+  // plant-wide total per item (same item in many cupboards / areas is added up; low / nil is judged on that total)
+  let path = `spares_v?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden,item_total,places&order=${S.spareLow ? 'item_total' : 'qty'},material,id`;
   if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*,cupboard.ilike.*${e}*,cupboard_key.ilike.*${e}*)`;
-  if (S.spareLow) path += `&qty=lt.${LOWN}&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
+  if (S.spareLow) path += `&item_total=lt.${LOWN}&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
   let notes = {}, lowRows = {};
+  const tot = r => r.item_total != null ? r.item_total : r.qty, many = r => (r.places || 1) > 1;
+  const qtyBox = (r, big) => `<span class="qty ${tot(r) <= 0 ? 'nil' : tot(r) < LOWN ? 'low' : ''}"><b>${big ? tot(r) : r.qty}</b><span>${tot(r) <= 0 ? 'NIL' : big ? 'TOTAL' : 'QTY'}</span>${many(r) ? `<small class="ptot">${big ? `here ${r.qty}` : `Total ${tot(r)}`}</small>` : ''}</span>`;
   const item = (r, showArea) => `<button class="item" data-go="spare/${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
       <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span>${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
-      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < LOWN ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
+      ${qtyBox(r)}</button>`;
   const planItem = r => `<button class="item" data-plan="${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
       <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}</span>
       ${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
-      <span class="qty ${r.qty <= 0 ? 'nil' : r.qty < LOWN ? 'low' : ''}"><b>${r.qty}</b><span>${r.qty <= 0 ? 'NIL' : 'QTY'}</span></span></button>`;
+      ${qtyBox(r, true)}</button>`;
   try {
     const lc = S.lowCache, cached = fromCache === true && S.spareLow && !q && lc && lc.hid === !!S.spareHid;
     let rows;
@@ -1516,12 +1519,12 @@ async function loadSpares(fromCache) {
       const by = {}; rows.forEach(r => (by[r.area] = by[r.area] || []).push(r));
       const order = [...SPARE_AREAS.filter(a => by[a]), ...Object.keys(by).filter(a => !SPARE_AREAS.includes(a))];
       if (S.lowArea !== 'all' && !by[S.lowArea]) S.lowArea = 'all';
-      const sel = S.lowArea || 'all', z = rows.filter(r => r.qty <= 0).length;
+      const sel = S.lowArea || 'all', z = rows.filter(r => tot(r) <= 0).length;
       const shown = sel === 'all' ? rows : by[sel];
-      const chip = (k, lbl, list) => `<button data-la="${esc(k)}" class="lachip ${sel === k ? 'on' : ''}">${esc(lbl)}<b class="${list.some(r => r.qty <= 0) ? '' : 'or'}">${list.length}</b></button>`;
+      const chip = (k, lbl, list) => `<button data-la="${esc(k)}" class="lachip ${sel === k ? 'on' : ''}">${esc(lbl)}<b class="${list.some(r => tot(r) <= 0) ? '' : 'or'}">${list.length}</b></button>`;
       list.innerHTML = `<div class="lachips" id="lach">${chip('all', 'All areas', rows)}${order.map(a => chip(a, a, by[a])).join('')}</div>
         <div class="areahead"><b>${sel === 'all' ? 'All areas' : esc(sel)}</b><span>${shown.length} item${shown.length > 1 ? 's' : ''}</span></div>
-        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => r.qty <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => r.qty > 0).length} low (below ${LOWN}) <span style="color:#E8710A">●</span></div>${tog}`
+        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => tot(r) <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => tot(r) > 0).length} low (below ${LOWN}) <span style="color:#E8710A">●</span></div>${tog}`
         + (sel === 'all' ? order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => planItem(r)).join('')).join('') : shown.map(r => planItem(r)).join(''));
       rows.forEach(r => { lowRows[r.id] = r; });
       if (!cached || !S.planAreas) rpc('hsm_plan_areas').then(v => { S.planAreas = v; }).catch(() => { S.planAreas = S.planAreas || { all: false, areas: [] }; });
@@ -1568,14 +1571,15 @@ async function viewSpare(id) {
   let s = { area: S.spareArea, item_code: '', material: '', model: '', description: '', material_type: 'Spare', make: '', qty: 0, location: '', rack: '', cupboard: '', cupboard_key: '' }, log = [];
   try { const l = await rpc('hsm_spare_locations'); if (Array.isArray(l)) LOCS = l; } catch (e) { if (!isNet(e)) netErr(e); }
   if (!isNew) {
-    try { const [r, l] = await Promise.all([api(`spares?id=eq.${encodeURIComponent(id)}&select=*`), api(`spare_log?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=6`)]);
-      if (!r.length) { $('#sd').innerHTML = '<div class="empty"><b>Spare not found</b></div>'; return; } s = r[0]; log = l;
+    try { const [r, l, tt] = await Promise.all([api(`spares?id=eq.${encodeURIComponent(id)}&select=*`), api(`spare_log?spare_id=eq.${encodeURIComponent(id)}&select=*&order=created_at.desc&limit=6`),
+        api(`spares_v?id=eq.${encodeURIComponent(id)}&select=item_total,places`).catch(() => [])]);
+      if (!r.length) { $('#sd').innerHTML = '<div class="empty"><b>Spare not found</b></div>'; return; } s = r[0]; log = l; if (tt && tt[0]) { s.item_total = tt[0].item_total; s.places = tt[0].places; }
     } catch (e) { netErr(e); $('#sd').innerHTML = '<div class="empty"><b>Could not load</b></div>'; return; }
   }
   const locs = () => [...new Set([...(LOCS || []), 'Basement Cupboard', 'FM TPS L1 Cupboard', 'Shift cupboard 1'])].sort((x, y) => x.localeCompare(y));
   const now = new Date(); let chg = 0;
   $('#app').innerHTML = `${bar(isNew ? 'Add Spare' : 'Update Spare', 'spares')}
-  ${isNew ? '' : `<div class="cur"><span class="k">Current stock</span><span class="v">${s.qty} Nos</span></div>`}
+  ${isNew ? '' : `<div class="cur"><span class="k">Current stock</span><span class="v">${s.qty} Nos</span></div>${(s.places || 1) > 1 ? `<div class="hint" style="padding:6px 16px 0;font-weight:600">Plant total of this item: <b>${s.item_total}</b> Nos in ${s.places} places – low stock is judged on this total.</div>` : ''}`}
   <main class="scroll"><form class="f" id="sf" autocomplete="off">
     <div class="fld"><label for="f-area">Area</label>${combo('f-area', s.area, false)}</div>
     <div class="fld"><label for="f-mat">Item</label><input id="f-mat" value="${esc(s.material)}" required></div>
