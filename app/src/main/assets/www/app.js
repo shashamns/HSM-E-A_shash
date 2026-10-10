@@ -1582,8 +1582,8 @@ async function viewSpare(id) {
   ${isNew ? '' : `<div class="cur"><span class="k">Current stock</span><span class="v">${s.qty} Nos</span></div>${(s.places || 1) > 1 ? `<div class="hint" style="padding:6px 16px 0;font-weight:600">Plant total of this item: <b>${s.item_total}</b> Nos in ${s.places} places – low stock is judged on this total.</div>` : ''}`}
   <main class="scroll"><form class="f" id="sf" autocomplete="off">
     <div class="fld"><label for="f-area">Area</label>${combo('f-area', s.area, false)}</div>
-    <div class="fld"><label for="f-mat">Item</label><input id="f-mat" value="${esc(s.material)}" required></div>
-    <div class="fld"><label for="f-model">Type / Model</label><input id="f-model" value="${esc(s.model || '')}"></div>
+    <div class="fld"><label for="f-mat">Item</label><div class="combo" data-sug><input id="f-mat" value="${esc(s.material)}" required autocomplete="off" style="padding-right:12px!important"><div class="cbl hidden" id="sg-mat"></div></div>${isNew ? '<span class="hint">Type the name – an item already in the store fills its details by itself</span>' : ''}</div>
+    <div class="fld"><label for="f-model">Type / Model</label><div class="combo" data-sug><input id="f-model" value="${esc(s.model || '')}" autocomplete="off" style="padding-right:12px!important"><div class="cbl hidden" id="sg-model"></div></div></div>
     <div class="fld"><label for="f-desc">Item description</label><textarea id="f-desc" rows="2">${esc(s.description || '')}</textarea></div>
     <div class="two"><div class="fld"><label for="f-make">Make (OEM)</label><input id="f-make" value="${esc(s.make || '')}"></div>
       <div class="fld"><label for="f-code">HSM Item Code</label><input id="f-code" value="${esc(s.item_code || '')}" autocapitalize="characters"></div></div>
@@ -1604,6 +1604,23 @@ async function viewSpare(id) {
   wireCombo('f-area', SPARE_AREAS.includes(s.area) ? SPARE_AREAS : [...SPARE_AREAS, s.area], false);
   wireCombo('f-loc', locs, true);
   wireCombo('f-type', ['Spare', 'Consumable', 'Tool'], false);
+  if (isNew) {   // an item that is already in the store (any area) brings its details along: item, model, description, make, code, type – never place or quantity
+    let cat = S.spCat || null;
+    if (!cat) api('spares_v?select=material,model,make,description,item_code,material_type,ik&order=material', { fresh: true }).then(rs => { const m = {};
+      (rs || []).forEach(r => { const o = m[r.ik]; if (!o || String(r.description || '').length + String(r.item_code || '').length > String(o.description || '').length + String(o.item_code || '').length) m[r.ik] = r; });
+      cat = S.spCat = Object.values(m); }).catch(() => {});
+    const fillFrom = r => { $('#f-mat').value = r.material || ''; $('#f-model').value = r.model || ''; $('#f-desc').value = r.description || ''; $('#f-make').value = r.make || ''; $('#f-code').value = r.item_code || '';
+      if (r.material_type) $('#f-type').value = r.material_type; toast('Details filled from the item already in the store – add only quantity and place', 4200); };
+    const sug = (inp, list) => { const hide = () => list.classList.add('hidden');
+      const show = () => { const w = inp.value.toLowerCase().split(/\s+/).filter(Boolean); if (!cat || !w.length || inp.value.trim().length < 2) return hide();
+        const hit = cat.filter(r => { const t = [r.material, r.model, r.make, r.item_code].join(' ').toLowerCase(); return w.every(k => t.includes(k)); }).slice(0, 8);
+        if (!hit.length) return hide();
+        list.innerHTML = hit.map((r, i) => `<button type="button" data-i="${i}"><b>${esc(r.material)}</b><br><small style="color:var(--ink-2)">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</small></button>`).join(''); list._hit = hit; list.classList.remove('hidden'); };
+      inp.addEventListener('input', show); inp.addEventListener('blur', () => setTimeout(hide, 150));
+      list.addEventListener('mousedown', e => e.preventDefault());
+      list.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) { fillFrom(list._hit[+b.dataset.i]); hide(); } }); };
+    sug($('#f-mat'), $('#sg-mat')); sug($('#f-model'), $('#sg-model'));
+  }
   const qi = $('#f-qty');
   const setQ = v => { chg = isNew ? Math.max(0, v) : Math.max(-s.qty, v); qi.value = (!isNew && chg > 0 ? '+' : '') + chg; if (!isNew) $('#qhint').textContent = chg ? `New stock will be ${s.qty + chg} Nos` : 'Minus = issued / used · Plus = received'; };
   $('#dec').onclick = () => setQ(chg - 1); $('#inc').onclick = () => setQ(chg + 1);
