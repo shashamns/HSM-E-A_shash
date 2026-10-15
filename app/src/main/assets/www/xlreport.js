@@ -28,6 +28,40 @@
   const isHot = (type, v, code, si) => { if (type !== 't' || v == null || v === '' || isNaN(parseFloat(v))) return false; const x = parseFloat(v), l = (typeof window.clLim === 'function' ? window.clLim(code, si) : null) || { hi: 100, lo: null }; return x > l.hi || (l.lo != null && x < l.lo); };
   const fieldType = (sec, item, fi) => item.t || ((sec.fields && sec.fields[fi]) || {}).t || 's';
 
+
+  // ---- on-screen preview of a worksheet (same cells, merges, colours, borders as the Excel file) ----
+  const colW = (ws, c) => { const w = (ws.getColumn(c) || {}).width; return Math.round((w || 8.43) * 7 + 5); };
+  const argbCss = col => col && typeof col.argb === 'string' && col.argb.length === 8 ? '#' + col.argb.slice(2) : '';
+  const escH = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const cellShow = c => { const v = c.value; if (v == null) return ''; if (v instanceof Date) return fmtDate(v.toISOString().slice(0, 10));
+    if (typeof v === 'object' && v.richText) return v.richText.map(t => t.text).join(''); if (typeof v === 'object' && 'result' in v) return String(v.result ?? '');
+    if (typeof v === 'object' && v.text) return String(v.text); return String(v); };
+  function sheetToHtml(ws) {
+    const cols = ws.columnCount || 1, rows = ws.rowCount || 1, skip = {}, span = {};
+    ((ws.model && ws.model.merges) || []).forEach(rg => { const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(rg); if (!m) return;
+      const cn = s => s.split('').reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0), c1 = cn(m[1]), r1 = +m[2], c2 = cn(m[3]), r2 = +m[4];
+      span[r1 + ',' + c1] = [r2 - r1 + 1, c2 - c1 + 1]; for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) if (r !== r1 || c !== c1) skip[r + ',' + c] = 1; });
+    let wTot = 0; const cg = []; for (let c = 1; c <= cols; c++) { const w = colW(ws, c); wTot += w; cg.push(`<col style="width:${w}px">`); }
+    const bd = b => b && b.style ? `1px solid ${argbCss(b.color) || '#000'}` : '';
+    let h = ''; 
+    for (let r = 1; r <= rows; r++) {
+      const row = ws.getRow(r), ht = Math.round((row.height || 15) * 1.333);
+      let tr = '';
+      for (let c = 1; c <= cols; c++) {
+        if (skip[r + ',' + c]) continue;
+        const cell = row.getCell(c), sp = span[r + ',' + c], st = cell.style || {}, f = st.font || {}, a = st.alignment || {}, b = st.border || {};
+        const bg = st.fill && st.fill.type === 'pattern' && st.fill.pattern !== 'none' ? argbCss(st.fill.fgColor) : '';
+        const css = [bg ? `background:${bg}` : '', f.color && argbCss(f.color) ? `color:${argbCss(f.color)}` : '', f.bold ? 'font-weight:700' : '', f.italic ? 'font-style:italic' : '', f.size ? `font-size:${Math.round(f.size * 1.333)}px` : '',
+          a.horizontal ? `text-align:${a.horizontal === 'centerContinuous' ? 'center' : a.horizontal}` : (typeof cell.value === 'number' ? 'text-align:right' : ''), a.vertical ? `vertical-align:${a.vertical === 'middle' ? 'middle' : a.vertical}` : 'vertical-align:bottom',
+          a.wrapText ? 'white-space:pre-wrap' : 'white-space:nowrap;overflow:hidden',
+          bd(b.top) ? `border-top:${bd(b.top)}` : '', bd(b.bottom) ? `border-bottom:${bd(b.bottom)}` : '', bd(b.left) ? `border-left:${bd(b.left)}` : '', bd(b.right) ? `border-right:${bd(b.right)}` : ''].filter(Boolean).join(';');
+        tr += `<td${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ''} style="${css}">${escH(cellShow(cell)).replace(/\n/g, '<br>')}</td>`;
+      }
+      h += `<tr style="height:${ht}px">${tr}</tr>`;
+    }
+    return { html: `<table class="xlp" style="width:${wTot}px;table-layout:fixed;border-collapse:collapse"><colgroup>${cg.join('')}</colgroup><tbody>${h}</tbody></table>`, width: wTot };
+  }
+
   function write(ws, spec, value, opts) {
     if (!spec || value == null || value === '') return;
     let mode = '', ref = spec;
@@ -167,6 +201,47 @@
       return out.xlsx.writeBuffer();
     }
 
+
+    // Whole roster of a month: one row per person, one column per day (what was actually rostered / changed)
+    async function rosterWorkbook(rows, year, month0, label) {
+      const out = new ExcelJS.Workbook(); out.creator = 'HSM E&A App';
+      const nD = new Date(year, month0 + 1, 0).getDate(), W = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const people = {}; rows.forEach(r => { const k = (r.sap_id ? 's' + r.sap_id : 'n' + String(r.name).toLowerCase()); const p = people[k] = people[k] || { name: r.name, sap: r.sap_id || '', area: r.area || '', rank: r.ranking == null ? 9999 : r.ranking, d: {} }; p.d[+r.day.slice(8, 10)] = r.shift; if (r.area) p.area = r.area; });
+      const list = Object.values(people).sort((a, b) => String(a.area).localeCompare(String(b.area)) || a.rank - b.rank || a.name.localeCompare(b.name));
+      const ws = out.addWorksheet('Roster ' + label.slice(0, 20));
+      const FILL = { A: 'FFDCE9FB', B: 'FFFFF1D6', C: 'FFE5DEF8', G: 'FFE0F1E4', L: 'FFFADADA', WO: 'FFEAEAEA' };
+      const fillOf = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+      const thin = { style: 'thin', color: { argb: 'FFBBBBBB' } }, box = { top: thin, left: thin, bottom: thin, right: thin };
+      const cols = [{ width: 5 }, { width: 28 }, { width: 11 }, { width: 18 }]; for (let d = 1; d <= nD; d++) cols.push({ width: 4.6 }); ['A','B','C','G','L','WO','Duty days'].forEach((t, i) => cols.push({ width: i === 6 ? 10 : 5.5 }));
+      ws.columns = cols;
+      ws.addRow([`HSM E&A – Shift roster   ${label}`]).font = { bold: true, size: 14 };
+      const h1 = ws.addRow(['Sl.', 'Name', 'SAP ID', 'Area']), h2 = ws.addRow(['', '', '', '']);
+      for (let d = 1; d <= nD; d++) { h1.getCell(4 + d).value = d; h2.getCell(4 + d).value = W[new Date(year, month0, d).getDay()]; }
+      ['A','B','C','G','L','WO','Duty days'].forEach((t, i) => { h1.getCell(4 + nD + 1 + i).value = t; });
+      [h1, h2].forEach(r => { r.font = { bold: true, color: { argb: 'FFFFFFFF' } }; r.alignment = { horizontal: 'center', vertical: 'middle' };
+        for (let c = 1; c <= 4 + nD + 7; c++) { const cell = r.getCell(c); cell.fill = fillOf('FFC8102E'); cell.border = box; } });
+      for (let d = 1; d <= nD; d++) if (new Date(year, month0, d).getDay() === 0) { h2.getCell(4 + d).font = { bold: true, color: { argb: 'FFFFE08A' } }; }
+      list.forEach((p, i) => {
+        const cnt = { A: 0, B: 0, C: 0, G: 0, L: 0, WO: 0 }; const row = ws.addRow([i + 1, p.name, p.sap, p.area]);
+        for (let d = 1; d <= nD; d++) { const s = p.d[d] || ''; const c = row.getCell(4 + d); c.value = s; if (s) { cnt[s] = (cnt[s] || 0) + 1; if (FILL[s]) c.fill = fillOf(FILL[s]); if (s === 'L') c.font = { bold: true, color: { argb: 'FFA32D2D' } }; } }
+        ['A','B','C','G','L','WO'].forEach((k, j) => { row.getCell(4 + nD + 1 + j).value = cnt[k] || 0; });
+        row.getCell(4 + nD + 7).value = cnt.A + cnt.B + cnt.C + cnt.G; row.getCell(4 + nD + 7).font = { bold: true };
+        row.eachCell({ includeEmpty: true }, (c, n) => { c.border = box; if (n > 4) c.alignment = { horizontal: 'center', vertical: 'middle' }; });
+      });
+      ws.views = [{ state: 'frozen', xSplit: 4, ySplit: 3 }];
+      const sm = out.addWorksheet('Summary'); sm.columns = [{ width: 5 }, { width: 28 }, { width: 11 }, { width: 18 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 11 }];
+      sm.addRow([`Duty summary   ${label}`]).font = { bold: true, size: 14 };
+      const sh = sm.addRow(['Sl.', 'Name', 'SAP ID', 'Area', 'A', 'B', 'C', 'General', 'Leave', 'Weekly off', 'Duty days']); sh.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      sh.eachCell(c => { c.fill = fillOf('FFC8102E'); c.alignment = { horizontal: 'center' }; });
+      list.forEach((p, i) => { const v = Object.values(p.d), n = k => v.filter(x => x === k).length; sm.addRow([i + 1, p.name, p.sap, p.area, n('A'), n('B'), n('C'), n('G'), n('L'), n('WO'), n('A') + n('B') + n('C') + n('G')]); });
+      return out.xlsx.writeBuffer();
+    }
+
+    // Preview of one record as it will look in the Excel file
+    async function recordPreview(tpl, entry) {
+      const wb = await openTemplate(tpl.file); const ws = sheetOf(wb, tpl); fillSheet(ws, tpl, entry); return sheetToHtml(ws);
+    }
+
     // Abnormal readings of a day (temperature > 100, NOT OK), area-wise
     async function actionsWorkbook(items, notes, isoDate, areaName) {
       const out = new ExcelJS.Workbook(); out.creator = 'HSM E&A App';
@@ -197,7 +272,7 @@
       return out.xlsx.writeBuffer();
     }
 
-    return { recordWorkbook, dailyWorkbook, sparesWorkbook, actionsWorkbook, leaveWorkbook };
+    return { recordWorkbook, dailyWorkbook, sparesWorkbook, actionsWorkbook, leaveWorkbook, rosterWorkbook, recordPreview };
   }
 
   function hotCount(tpl, V) {

@@ -51,6 +51,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // No screenshots, no screen recording, and a blank preview in the recent-apps list – in the whole app
+        getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE, android.view.WindowManager.LayoutParams.FLAG_SECURE);
 
         final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .setDomain(APP_HOST)
@@ -122,13 +124,10 @@ public class MainActivity extends Activity {
 
     /** Called from the web app: window.HSMNative.* */
     class NativeBridge {
-        /** Drive reader: blocks screenshots and screen recording while a protected PDF is open. */
+        /** The whole app is protected from screenshots now (FLAG_SECURE set in onCreate), so this never lifts it. */
         @JavascriptInterface
         public void secure(final boolean on) {
-            runOnUiThread(() -> {
-                if (on) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
-                else getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
-            });
+            runOnUiThread(() -> getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE));
         }
 
         /** Saves a file to Downloads/HSM EA and optionally opens the share sheet (Gmail, Outlook, WhatsApp…). */
@@ -213,6 +212,7 @@ public class MainActivity extends Activity {
                 PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(NotifyWorker.class, 15, TimeUnit.MINUTES)
                         .setConstraints(cons).build();
                 WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork("hsm_notify", ExistingPeriodicWorkPolicy.KEEP, req);
+                NotifyWorker.scheduleDuty(getApplicationContext());
                 runOnUiThread(() -> askNotifyPermission());
             } catch (Exception ignored) { }
         }
@@ -223,6 +223,7 @@ public class MainActivity extends Activity {
             try {
                 getSharedPreferences(NotifyWorker.PREFS, MODE_PRIVATE).edit().clear().apply();
                 WorkManager.getInstance(getApplicationContext()).cancelUniqueWork("hsm_notify");
+                WorkManager.getInstance(getApplicationContext()).cancelUniqueWork("hsm_duty");
             } catch (Exception ignored) { }
         }
 

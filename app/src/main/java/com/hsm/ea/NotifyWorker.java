@@ -21,7 +21,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Calendar;
 import java.util.HashSet;
+import java.util.TimeZone;
+import androidx.work.WorkManager;
+import java.util.concurrent.TimeUnit;
 import java.util.Set;
 
 /**
@@ -38,6 +42,19 @@ public class NotifyWorker extends Worker {
 
     public NotifyWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
+    }
+
+    /** One extra check every day at 8 PM IST so "Tomorrow is your A shift" arrives at 8 o'clock, not at the next 15-minute slot. */
+    static void scheduleDuty(Context ctx) {
+        Calendar c = Calendar.getInstance(TimeZone.getTimeZone("Asia/Kolkata"));
+        long now = c.getTimeInMillis();
+        c.set(Calendar.HOUR_OF_DAY, 20); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 5); c.set(Calendar.MILLISECOND, 0);
+        if (c.getTimeInMillis() <= now) c.add(Calendar.DAY_OF_YEAR, 1);
+        long delay = Math.max(c.getTimeInMillis() - now, 1000);
+        androidx.work.Constraints cons = new androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build();
+        androidx.work.PeriodicWorkRequest req = new androidx.work.PeriodicWorkRequest.Builder(NotifyWorker.class, 24, TimeUnit.HOURS)
+                .setInitialDelay(delay, TimeUnit.MILLISECONDS).setConstraints(cons).build();
+        WorkManager.getInstance(ctx).enqueueUniquePeriodicWork("hsm_duty", androidx.work.ExistingPeriodicWorkPolicy.KEEP, req);
     }
 
     @NonNull
@@ -90,7 +107,7 @@ public class NotifyWorker extends Worker {
         if (nm == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel ch = new NotificationChannel(CHANNEL, "Approvals & updates", NotificationManager.IMPORTANCE_HIGH);
-            ch.setDescription("Approvals, leave requests and suggestions");
+            ch.setDescription("Tomorrow's duty, approvals, leave requests and suggestions");
             nm.createNotificationChannel(ch);
         }
         Intent open = new Intent(ctx, MainActivity.class);

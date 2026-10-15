@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.12';
+const APP_VERSION = '3.13';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -241,9 +241,11 @@ function softRerender() {
     if (sy) [150, 450].forEach(t => setTimeout(() => { const m = document.querySelector('main.scroll'); if (m) m.scrollTop = sy; }, t));
   }, 200);
 }
+// Right after the app is opened (or comes back after a while / on a new day) every screen asks the cloud first, so yesterday's saved copy is never shown as today's status
+let FRESH_UNTIL = Date.now() + 8000;
 async function api(path, opts = {}) {
   const get = !opts.method || opts.method === 'GET';
-  if (get && !opts.prefer && !opts.fresh && SWR_OK.test(path) && !/select=\*/.test(path)) {
+  if (get && !opts.prefer && !opts.fresh && Date.now() > FRESH_UNTIL && SWR_OK.test(path) && !/select=\*/.test(path)) {
     const c = cacheGet(path); if (c != null) { revalidate(path, c); return c; }
   }
   try {
@@ -493,6 +495,12 @@ const S = { spareArea: SPARE_AREAS[0], spareQuery: '', spareLow: false, sopTab: 
             calMonth: null, calSel: null, schedEdit: false, clArea: null, tbtArea: null, contactQuery: '', tbtQuery: '', teamQuery: '', reqTab: 'pending', reportDate: null, millArea: 'CB' };
 const go = h => { location.hash = h; };
 window.addEventListener('hashchange', render);
+/* Back returns to the same place: the scroll position of every page is remembered, and coming back to a page puts you where you were
+ * (the same tab / search / area are already kept in S). Opening a page fresh from a menu starts at the top. */
+const POS = {}; let NAVH = [], lastH = null;
+document.addEventListener('scroll', e => { const t = e.target; if (lastH != null && t && t.classList && t.classList.contains('scroll')) POS[lastH] = t.scrollTop; }, true);
+function restorePos(y) { let n = 0; const tick = () => { const m = document.querySelector('main.scroll'); if (!m) return;
+  if (m.scrollHeight - m.clientHeight >= y - 2 || n > 30) { m.scrollTop = y; if (n > 30 || m.scrollTop >= y - 2) return; } n++; setTimeout(tick, 80); }; tick(); }
 document.addEventListener('click', e => {
   const lg = e.target.closest('[data-log]'); if (lg) { S.actOnly = lg.dataset.log; S.actMod = lg.dataset.log; S.actBack = (location.hash.replace(/^#\/?/, '') || 'home'); go('activity'); return; }
   const g = e.target.closest('[data-go]'); if (g) { if (g.dataset.go === 'activity') { S.actOnly = null; S.actMod = 'all'; } go(g.dataset.go); return; }
@@ -524,6 +532,9 @@ async function refreshMe() {
 }
 function render() {
   window.scrollTo(0, 0);
+  const hh0 = location.hash.replace(/^#\/?/, '') || 'home'; let backNav = false;
+  if (hh0 !== lastH) { if (NAVH.length > 1 && NAVH[NAVH.length - 2] === hh0) { NAVH.pop(); backNav = true; } else NAVH.push(hh0);
+    if (NAVH.length > 80) NAVH.shift(); lastH = hh0; if (!backNav) delete POS[hh0]; }
   const md = $('#modal'); if (md && !md.classList.contains('hidden')) { md.classList.add('hidden'); md.onclick = null; }
   if (!SESSION || !ME) return viewLogin();
   refreshMe(); initNotify(); initSettings();
@@ -536,6 +547,7 @@ function render() {
     contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
   (routes[page] || viewHome)();
+  if (backNav && POS[hh0]) restorePos(POS[hh0]);
 }
 const logBtn = m => (ME && (ME.is_admin || isModAdmin(m))) ? `<button class="ib" data-log="${m}" aria-label="Activity log of this module">${ic('list', 24)}</button>` : '';
 const bar = (title, backTo, extra = '') => `<header class="bar">${backTo ? `<button class="ib back" aria-label="Back" data-back="${backTo}">${ic('back', 26)}</button>` : ''}<h1>${esc(title)}</h1>${extra}</header>`;
@@ -971,7 +983,60 @@ async function contactSheet(name) {
     <button class="btn ghost block" id="cx" style="margin-top:12px">Close</button></div>`;
   md.classList.remove('hidden'); md.onclick = e => { if (e.target === md) md.classList.add('hidden'); }; $('#cx').onclick = () => md.classList.add('hidden');
 }
+const schedSeg = () => `<div class="seg schseg" id="schseg"><button data-v="day" class="${S.schedView !== 'month' ? 'on' : ''}">${ic('cal', 18)} Day view</button><button data-v="month" class="${S.schedView === 'month' ? 'on' : ''}">${ic('check', 18)} My month</button></div>`;
+const wireSeg = () => { const e = $('#schseg'); if (e) e.onclick = ev => { const b = ev.target.closest('[data-v]'); if (!b || (b.dataset.v === 'month') === (S.schedView === 'month')) return; S.schedView = b.dataset.v; viewSchedule(); }; };
+// admin only: whole-team roster of a month (who had which duty on each day) as Excel
+function rosterCard() {
+  if (!isModAdmin('schedule')) return '';
+  const n = new Date(), pm = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+  return `<section class="card rexp"><div class="row"><span class="ic">${ic('xls', 26)}</span><div style="flex:1"><div class="t">Export shift roster (Excel)</div><div class="s">All team members, every day of the month, with A / B / C / General / Leave / Weekly-off counts and duty days. Only admins see this.</div></div></div>
+    <div class="row"><input type="month" id="rxm" value="${pm.getFullYear()}-${pad2(pm.getMonth() + 1)}" max="${n.getFullYear()}-${pad2(n.getMonth() + 1)}" aria-label="Month"></div>
+    <button class="btn pri block" id="rxg">${ic('download', 20)} Download roster</button></section>`;
+}
+function wireRoster() {
+  const b = $('#rxg'); if (!b) return;
+  b.onclick = async () => { const v = $('#rxm').value; if (!/^\d{4}-\d{2}$/.test(v)) return toast('Choose a month');
+    const y = +v.slice(0, 4), mo = +v.slice(5) - 1, nD = new Date(y, mo + 1, 0).getDate(); b.disabled = true; toast('Collecting roster…', 15000);
+    try { const jobs = []; for (let d = 1; d <= nD; d += 3) jobs.push(api(`shift_roster?select=day,name,shift,area,ranking,sap_id&day=gte.${y}-${pad2(mo + 1)}-${pad2(d)}&day=lte.${y}-${pad2(mo + 1)}-${pad2(Math.min(nD, d + 2))}&order=day,name&limit=3000`, { fresh: true }));
+      const rows = (await Promise.all(jobs)).flat(); if (!rows.length) { toast('No roster for ' + MONTHS[mo] + ' ' + y); return; }
+      deliver(await xl().rosterWorkbook(rows, y, mo, `${MONTHS[mo]} ${y}`), `HSM E&A Shift Roster ${MONTHS[mo]} ${y}.xlsx`, false);
+      logAct('schedule', 'Roster exported', `${MONTHS[mo]} ${y} · ${new Set(rows.map(r => r.name)).size} people`);
+    } catch (e) { netErr(e); } finally { b.disabled = false; } };
+}
+// the signed-in person's own duty for a whole month in one view
+async function viewMyMonth() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (!S.myMonth) S.myMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const m = S.myMonth, y = m.getFullYear(), mo = m.getMonth(), nD = new Date(y, mo + 1, 0).getDate();
+  $('#app').innerHTML = `${bar('Shift Schedule', 'home', logBtn('schedule'))}<main class="scroll" id="sc"><div class="pad">${schedSeg()}<div class="spin">Loading…</div></div></main>${nav('schedule')}`;
+  wireSeg();
+  const mine = {}; let failed = false;
+  try {
+    const q = f => api(`shift_roster?select=day,shift,name,sap_id&day=gte.${ymd(m)}&day=lte.${ymd(new Date(y, mo, nD))}&or=(${f})&limit=1000`);
+    const nameF = 'name.ilike.' + encodeURIComponent('*' + String(ME.name).trim().split(/\s+/).pop().replace(/[,()*]/g, '') + '*');
+    let rows = ME.sap_id ? await q('sap_id.eq.' + encodeURIComponent(ME.sap_id)) : [];
+    if (!rows.length) rows = await q(nameF);
+    rows.filter(r => (ME.sap_id && r.sap_id === ME.sap_id) || sameName(r.name, ME.name)).forEach(r => { mine[r.day] = r.shift; });
+  } catch (e) { failed = true; netErr(e); }
+  const cnt = { A: 0, B: 0, C: 0, G: 0, L: 0, WO: 0 }; Object.values(mine).forEach(k => { if (cnt[k] != null) cnt[k]++; });
+  const lead = (new Date(y, mo, 1).getDay() + 6) % 7; let cells = ''; for (let i = 0; i < lead; i++) cells += '<span></span>';
+  for (let d = 1; d <= nD; d++) { const dt = new Date(y, mo, d), k = ymd(dt), sh = mine[k], isT = +dt === +today;
+    cells += `<button type="button" class="mc ${sh ? 's-' + sh.toLowerCase() : 'none'}${isT ? ' today' : ''}${+dt < +today ? ' past' : ''}" data-day="${k}" aria-label="${d} ${MONTHS[mo]}, ${sh ? SHIFT_NAME[sh] : 'no duty'}"><i>${d}</i><b>${sh || '–'}</b></button>`; }
+  const have = Object.keys(mine).length;
+  $('#sc').innerHTML = `<div class="pad">${schedSeg()}
+    <section class="card mymonth"><div class="cal-h"><button class="ib" id="mpm" aria-label="Previous month">${ic('back')}</button><div class="mt"><h2>${MONTHS[mo]} ${y}</h2><span>${esc(ME.name)}</span></div><button class="ib" id="mnm" aria-label="Next month">${ic('chev')}</button></div>
+      ${have ? `<div class="msum">${[['A', 'A'], ['B', 'B'], ['C', 'C'], ['G', 'General'], ['L', 'Leave'], ['WO', 'Off']].map(([k, l]) => `<span class="s-${k.toLowerCase()}"><b>${cnt[k]}</b>${l}</span>`).join('')}</div>` : ''}
+      <div class="wk"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      <div class="mgrid">${cells}</div>
+      ${have ? `<p class="hint" style="margin:12px 4px 0;text-align:center">Tap a day to see the whole crew · ${cnt.A + cnt.B + cnt.C + cnt.G} duty days${cnt.L ? ` · ${cnt.L} leave` : ''}</p>` : `<div class="empty" style="padding:18px 8px">${failed ? 'Could not load – check network.' : 'No schedule uploaded for you in this month.'}</div>`}
+    </section>${rosterCard()}</div>`;
+  wireSeg(); wireRoster();
+  $('#mpm').onclick = () => { S.myMonth = new Date(y, mo - 1, 1); viewMyMonth(); };
+  $('#mnm').onclick = () => { S.myMonth = new Date(y, mo + 1, 1); viewMyMonth(); };
+  $('#sc').addEventListener('click', e => { const b = e.target.closest('.mc'); if (!b) return; S.calSel = fromYmd(b.dataset.day); S.calMonth = new Date(S.calSel.getFullYear(), S.calSel.getMonth(), 1); S.calOpen = false; S.schedView = 'day'; viewSchedule(); });
+}
 async function viewSchedule() {
+  if (S.schedView === 'month') return viewMyMonth();
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (!S.calMonth) S.calMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   if (!S.calSel) S.calSel = new Date(today);
@@ -1010,6 +1075,7 @@ async function viewSchedule() {
   general.forEach(r => (areaMap[r.area || 'Other'] = areaMap[r.area || 'Other'] || []).push(r));
   const isToday = +S.calSel === +today;
   $('#sc').innerHTML = `<div class="pad">
+    ${schedSeg()}
     <button class="calpick ${S.calOpen ? 'open' : ''}" id="calt" aria-expanded="${!!S.calOpen}">${ic('cal', 22)}<span>${fmtDay(S.calSel)}</span><span class="cv">${ic('chev', 20)}</span></button>
     <section class="card ${S.calOpen ? '' : 'hidden'}" id="calbox" style="padding:8px 12px 14px;margin-bottom:14px">
       <div class="cal-h"><button class="ib" id="pm" aria-label="Previous month">${ic('back')}</button><h2>${MONTHS[mo]} ${y}</h2><button class="ib" id="nm" aria-label="Next month">${ic('chev')}</button></div>
@@ -1028,7 +1094,8 @@ async function viewSchedule() {
     </section>
     ${general.length ? `<section class="card" style="overflow:hidden"><div class="boxh g-area"><h2>Area-wise · General Shift</h2></div>
       ${Object.keys(areaMap).sort().map(a => `<div class="arow"><span class="an">${esc(a)}</span><div>${areaMap[a].map(p => `<div class="pp${edit && canEdP(p) ? ' ed' : ''}${sameName(p.name, ME.name) ? ' me' : ''}" data-nm="${esc(p.name)}" ${edit && canEdP(p) ? `data-p="${esc(p.name)}" role="button" tabindex="0"` : ''}><span>${esc(p.name)}</span>${p.edited_by ? `<span class="edmark">${ic('edit', 13)}</span>` : ''}</div>`).join('')}</div></div>`).join('')}
-    </section>` : ''}</div>`;
+    </section>` : ''}${rosterCard()}</div>`;
+  wireSeg(); wireRoster();
   $('#pm').onclick = () => { S.calMonth = new Date(y, mo - 1, 1); viewSchedule(); };
   $('#nm').onclick = () => { S.calMonth = new Date(y, mo + 1, 1); viewSchedule(); };
   $('#calt').onclick = () => { S.calOpen = !S.calOpen; viewSchedule(); };
@@ -1131,8 +1198,9 @@ async function viewChecklist() {
       ${waiting.length ? `<div class="card obx"><span class="ic">${ic('clock', 24)}</span><div style="flex:1"><div class="t">${waiting.length} check list${waiting.length > 1 ? 's' : ''} saved on this phone</div>
         <div class="s">${waiting.some(x => x.err) ? 'Upload problem: ' + esc(waiting.find(x => x.err).err) : 'Will upload by itself when the network is back'}</div></div><button class="btn" id="obxgo">Upload now</button></div>` : ''}
       <button class="card actcard" id="actc" data-go="actions"><span class="ic">${ic('alert', 26)}</span><span class="tx"><span class="a">Daily action required</span><span class="b" id="actn">Checking abnormal readings…</span></span><span class="chev">${ic('chev', 20)}</span></button>
-      <div class="card report" style="margin-top:18px"><div class="row"><span class="ic">${ic('xls', 26)}</span><div style="flex:1"><div class="t">${esc(clAreaName(S.clArea))} – final report (Excel)</div><div class="s">Save / Share works only when <b>every sub-tree</b> of this area is filled for the date.</div></div></div>
+      <div class="card report" style="margin-top:18px"><div class="row"><span class="ic">${ic('xls', 26)}</span><div style="flex:1"><div class="t">${esc(clAreaName(S.clArea))} – final report (Excel)</div><div class="s">Save / Share works only when <b>every sub-tree</b> is filled and the <b>area incharge / admin has approved</b>.</div></div></div>
         <div class="row"><input type="date" id="rdate" value="${S.reportDate}" max="${today}" aria-label="Report date"></div>
+        <div id="rstate" class="apw"></div>
         <div class="two"><button class="btn" id="rsave">${ic('download')} Save</button><button class="btn pri" id="rshare">${ic('share')} Share / Mail</button></div></div></div>`;
     const draw = () => { const q = S.clQ.trim(), list = subsOf(S.clArea);
       $('#clt').innerHTML = areas.map(([a, l]) => { const n = subsOf(a), d = n.filter(x => x.h >= x.n).length, hits = q ? n.filter(x => secHit(x.t, x.si, q)).length : 0;
@@ -1152,11 +1220,47 @@ async function viewChecklist() {
     $('#clst').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; const x = subsOf(S.clArea)[+b.dataset.i], q = S.clQ.trim();
       S.clSec = { code: x.t.code, v: String(x.si) }; S.clJump = q && secHit(x.t, x.si, q) ? { code: x.t.code, q } : null; go('cl/' + x.t.code); };
     $('#clq').oninput = e => { S.clQ = e.target.value; draw(); };
-    $('#rdate').onchange = e => { S.reportDate = e.target.value || today; };
+    const repState = async () => { const el = $('#rstate'); if (!el) return; el.innerHTML = '<div class="aps none">' + ic('clock', 22) + '<span>Checking approval…</span></div>'; $('#rsave').disabled = $('#rshare').disabled = true;
+      let st; try { st = await clApState(S.clArea, S.reportDate, tpl); } catch (e) { st = { st: 'pending' }; }
+      if (!$('#rstate')) return; apStrip($('#rstate'), st, S.clArea, S.reportDate, repState); $('#rsave').disabled = $('#rshare').disabled = st.st !== 'ok'; };
+    $('#rdate').onchange = e => { S.reportDate = e.target.value || today; repState(); };
+    repState();
     $('#rsave').onclick = () => areaReport(S.clArea, S.reportDate, false);
     $('#rshare').onclick = () => areaReport(S.clArea, S.reportDate, true);
     if ($('#obxgo')) $('#obxgo').onclick = async () => { toast('Uploading…'); const n = await flushOutbox(); if (!n && outbox().length) toast('Still no network – will try again automatically'); };
   } catch (e) { $('#cl').innerHTML = '<div class="empty"><b>Could not load check lists</b>Check network and try again.</div>'; netErr(e); }
+}
+/* ---- approval: the Excel of a check list can be saved / shared only after the area incharge (or an admin) has approved that area for that date ---- */
+const INC_OF = { ABB: ['abb mv drive', 'abb lv drive', 'drive'], DC: ['dc'], FMCB: ['fm', 'cb'], INST: ['instrument'], MOTOR: ['motor'], POWER: ['power'], RHF: ['rhf'], RM: ['rm'] };
+const canApproveCl = a => !!ME && (ME.is_admin || (isModAdmin('checklist') && canArea('checklist', a)) || (ME.areas && Array.isArray(ME.areas.incharge) && ME.areas.incharge.some(x => (INC_OF[a] || [String(a).toLowerCase()]).includes(String(x).trim().toLowerCase()))));
+async function clApState(area, day, tpl) {
+  const list = tpl.filter(t => t.area === area); let rows = [], aps = [];
+  try { rows = await api(`checklist_entries?select=template_code,created_at,client_id&check_date=eq.${day}`, { fresh: true }); } catch (e) { if (!isNet(e)) throw e; }
+  try { aps = await api(`checklist_approvals?select=area,day,approved_by,approved_at&day=eq.${day}`, { fresh: true }); } catch (e) { if (!isNet(e)) throw e; }
+  const have = new Set(rows.map(r => r.client_id).filter(Boolean));
+  rows = rows.filter(r => list.some(t => t.code === r.template_code));
+  const loc = obxEntries(day).filter(r => list.some(t => t.code === r.template_code) && !have.has(r.client_id));
+  const ap = aps.find(a => a.area === area);
+  if (!rows.length && !loc.length) return { st: 'none' };
+  const last = Math.max(0, ...rows.map(r => +new Date(r.created_at)));
+  if (loc.length) return { st: 'pending', ap, local: true };
+  if (ap && +new Date(ap.approved_at) >= last) return { st: 'ok', ap };
+  return { st: ap ? 'stale' : 'pending', ap };
+}
+async function clGate(area, day, tpl) {
+  let st; try { st = await clApState(area, day, tpl); } catch (e) { netErr(e); return false; }
+  if (st.st === 'ok') return true;
+  toast(st.st === 'none' ? 'Nothing submitted for this area on this date' : 'Waiting for approval by the area incharge / admin – the Excel can be saved or shared only after that', 5500);
+  return false;
+}
+// approval strip (used on the Check List page and on a record): who approved, or the Approve button for the incharge / admin
+function apStrip(el, st, area, day, onChange) {
+  const can = canApproveCl(area), ok = st.st === 'ok';
+  el.innerHTML = st.st === 'none' ? `<div class="aps none">${ic('clock', 22)}<span>Nothing submitted for this date yet.</span></div>`
+    : ok ? `<div class="aps ok">${ic('ok', 22)}<span><b>Approved</b> by ${esc(st.ap.approved_by)}<small>${fmtStamp(st.ap.approved_at)}</small></span></div>`
+    : `<div class="aps wait">${ic('hourglass', 22)}<span><b>${st.st === 'stale' ? 'Changed after approval' : 'Waiting for approval'}</b><small>${st.local ? 'Some entries are still on this phone – ' : ''}The area incharge or an admin must approve before the Excel can be saved or shared.</small></span>${can ? `<button class="btn sm pri" data-ap="1">${ic('ok', 18)} Approve</button>` : ''}</div>`;
+  const b = $('[data-ap]', el);
+  if (b) b.onclick = async () => { b.disabled = true; try { await rpc('hsm_cl_approve', { p_area: area, p_day: day }); toast('Approved – Excel can now be saved and shared'); onChange(); } catch (e) { b.disabled = false; netErr(e); } };
 }
 // Final Excel of ONE area – only when every sub-tree (check list) of the area is completely filled for that date
 async function areaReport(area, day, share) {
@@ -1175,13 +1279,14 @@ async function areaReport(area, day, share) {
         <button class="btn pri block" id="pdok" style="margin-top:14px">OK</button></div>`;
       m.classList.remove('hidden'); const close = () => m.classList.add('hidden'); $('#pdok').onclick = close; m.onclick = e => { if (e.target === m) close(); }; return; }
     if (!list.length) { toast('No check lists in this area'); return; }
+    if (!(await clGate(area, day, tpl))) return;
     if (off || OFFLINE) toast('No network: report made from data on this phone', 4000);
     const buf = await xl().dailyWorkbook(list, merged, day);
     deliver(buf, `HSM E&A ${clAreaName(area)} Checklist ${fmtShort(fromYmd(day))}.xlsx`, share);
   } catch (e) { netErr(e); }
 }
 async function recordReport(tpl, entry, share) {
-  try { toast('Preparing Excel…', 6000); const buf = await xl().recordWorkbook(tpl, entry);
+  try { if (!(await clGate(tpl.area, entry.check_date, await templates()))) return; toast('Preparing Excel…', 6000); const buf = await xl().recordWorkbook(tpl, entry);
     deliver(buf, `${tpl.name.replace(/[\\/:*?"<>|]/g, '-')} ${fmtShort(fromYmd(entry.check_date))} Shift ${entry.shift || ''}.xlsx`, share);
   } catch (e) { netErr(e); }
 }
@@ -1305,9 +1410,12 @@ async function viewChecklistFill(code) {
         <h2>${pending ? 'Saved on this phone' : 'Submitted'}</h2><p>${esc(t.name)}${sel ? ' · ' + esc(sel.title) : ''} · ${n} new reading${n > 1 ? 's' : ''} · ${Object.keys(all).length} of ${total} done today${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--red)">${hot} out of limit</b>` : ''}</p>
         ${left.length ? `<p style="margin-top:8px;text-align:left"><b>Still empty:</b> ${left.map(x => `${esc(x.s.title)} (${x.e})`).join(', ')}</p>` : `<p style="margin-top:8px"><b>All readings of this check list are filled.</b> Use “Daily report (Excel)” on the Check List page to get the full Excel.</p>`}
         ${pending ? '<p style="margin-top:8px">No network here. It will upload by itself when the network is back – no need to fill it again.</p>' : ''}</div>
-        <button class="btn pri block" id="mdone" style="margin-top:14px">Done</button></div>`;
+        <button class="btn block" id="mview" style="margin-top:14px">${ic('xls', 20)} View in Excel format</button>
+        <button class="btn pri block" id="mdone" style="margin-top:8px">Done</button>
+        <p class="hint" style="margin:10px 0 0;text-align:center">Excel can be saved / shared after the area incharge or admin approves.</p></div>`;
       m.classList.remove('hidden');
       const close = () => { m.classList.add('hidden'); go('checklist'); };
+      $('#mview').onclick = () => { m.classList.add('hidden'); go('cle/client:' + body.client_id); };
       $('#mdone').onclick = close; m.onclick = e => { if (e.target === m) close(); };
       logAct('checklist', 'Check list submitted', `${t.name}${sel ? ' · ' + sel.title : ''} · Shift ${dr.shift} · ${n} new readings${nok ? ` · ${nok} NOT OK` : ''}${hot ? ` · ${hot} out of limit` : ''}`);
     } catch (e) { netErr(e); btn.disabled = false; upd(); }
@@ -1412,22 +1520,46 @@ async function viewChecklistEntry(id) {
   $('#app').innerHTML = `${bar('Check list record', 'checklist')}<main class="scroll" id="ce"><div class="spin">Loading…</div></main>`;
   try {
     const tpl = await templates();
-    const rows = id.startsWith('local:') ? obxEntries().filter(r => r.id === id) : await api(`checklist_entries?id=eq.${encodeURIComponent(id)}&select=*`);
+    let rows;
+    if (id.startsWith('local:')) rows = obxEntries().filter(r => r.id === id);
+    else if (id.startsWith('client:')) { const cid = id.slice(7); rows = obxEntries().filter(r => r.client_id === cid); if (!rows.length) rows = await api(`checklist_entries?client_id=eq.${encodeURIComponent(cid)}&select=*`, { fresh: true }); }
+    else rows = await api(`checklist_entries?id=eq.${encodeURIComponent(id)}&select=*`);
     let r = rows[0]; const t = r && tpl.find(x => x.code === r.template_code);
     if (r && t) { const sib = (await dayEntries(r.template_code, r.check_date)).filter(x => (x.shift || '') === (r.shift || '')); r = mergeEntries(sib.length ? sib : [r])[0]; }
     if (!r || !t) { $('#ce').innerHTML = '<div class="empty"><b>Record not found</b></div>'; return; }
     const V = r.vals || {};
     const cell = (v, ty, si) => !v ? '<span style="color:var(--muted)">—</span>' : v === 'NOT OK' || v === 'OUT' ? `<b style="color:var(--red)">${esc(v)}</b>` : v === 'OK' || v === 'IN' ? `<span style="color:var(--green);font-weight:700">${esc(v)}</span>`
       : isHot(ty, v, limOf(t.code, si)) ? `<b style="color:var(--red)">${esc(v)}</b>` : esc(v);
-    $('#ce').innerHTML = `<div class="dayhead"><div class="k">${esc(t.name)}</div><div class="v">${fmtDay(fromYmd(r.check_date))} · Shift ${esc(r.shift || '-')}</div><div style="font-size:15px;margin-top:2px">${esc(r.inspected_name || '')} · ${fmtStamp(r.filled_at || r.created_at)}${r.local ? ' · waiting to upload' : ''}</div>
-        ${r.nparts > 1 ? `<div style="font-size:13.5px;margin-top:6px;opacity:.85">${r.nparts} submissions combined: ${r.parts.map(x => `${esc(firstName(x.name))} ${new Date(x.at).toTimeString().slice(0, 5)} (${x.n})`).join(' · ')}</div>` : ''}</div>
-      <div style="padding:12px 16px 0" class="two"><button class="btn" id="esave">${ic('download')} Save Excel</button><button class="btn pri" id="eshare">${ic('share')} Share</button></div>
-      <div style="padding:4px 12px 24px">${t.sections.map((s, si) => {
+    const listHtml = t.sections.map((s, si) => {
         const one = s.fields.length === 1;
         const rowsH = s.items.map((it, ii) => { const any = it.cells.some((c, fi) => c && V[`${si}.${ii}.${fi}`]);
           return `<tr${any ? '' : ' class="dim"'}><td>${esc(it.name)}</td>${s.fields.map((f, fi) => `<td class="v">${it.cells[fi] ? cell(V[`${si}.${ii}.${fi}`], ftype(s, it, fi), si) : '<span style="color:var(--muted)">·</span>'}</td>`).join('')}</tr>`; }).join('');
-        return `<h2 class="clsec">${esc(s.title)}</h2><div class="card" style="overflow-x:auto"><table class="rt"><thead><tr><th>Equipment</th>${s.fields.map(f => `<th>${esc(f.l || (one ? 'Value' : ''))}</th>`).join('')}</tr></thead><tbody>${rowsH}</tbody></table></div>`; }).join('')}
-      ${r.remarks ? `<h2 class="clsec">Remarks</h2><div class="card" style="padding:14px;font-size:17px;line-height:1.4">${esc(r.remarks)}</div>` : ''}</div>`;
+        return `<h2 class="clsec">${esc(s.title)}</h2><div class="card" style="overflow-x:auto"><table class="rt"><thead><tr><th>Equipment</th>${s.fields.map(f => `<th>${esc(f.l || (one ? 'Value' : ''))}</th>`).join('')}</tr></thead><tbody>${rowsH}</tbody></table></div>`; }).join('')
+      + (r.remarks ? `<h2 class="clsec">Remarks</h2><div class="card" style="padding:14px;font-size:17px;line-height:1.4">${esc(r.remarks)}</div>` : '');
+    S.recView = S.recView || 'xl'; S.xlZoom = S.xlZoom || 'fit';
+    $('#ce').innerHTML = `<div class="dayhead"><div class="k">${esc(t.name)}</div><div class="v">${fmtDay(fromYmd(r.check_date))} · Shift ${esc(r.shift || '-')}</div><div style="font-size:15px;margin-top:2px">${esc(r.inspected_name || '')} · ${fmtStamp(r.filled_at || r.created_at)}${r.local ? ' · waiting to upload' : ''}</div>
+        ${r.nparts > 1 ? `<div style="font-size:13.5px;margin-top:6px;opacity:.85">${r.nparts} submissions combined: ${r.parts.map(x => `${esc(firstName(x.name))} ${new Date(x.at).toTimeString().slice(0, 5)} (${x.n})`).join(' · ')}</div>` : ''}</div>
+      <div class="apw" id="estate" style="padding:12px 16px 0"></div>
+      <div style="padding:10px 16px 0" class="two"><button class="btn" id="esave" disabled>${ic('download')} Save Excel</button><button class="btn pri" id="eshare" disabled>${ic('share')} Share</button></div>
+      <div class="seg recseg" id="rseg"><button data-v="xl" class="${S.recView === 'xl' ? 'on' : ''}">Excel format</button><button data-v="list" class="${S.recView === 'list' ? 'on' : ''}">Simple list</button></div>
+      <div id="rbody" style="padding:0 12px 24px"></div>`;
+    const paint = async () => {
+      $$('#rseg button').forEach(b => b.classList.toggle('on', b.dataset.v === S.recView));
+      const body = $('#rbody');
+      if (S.recView === 'list') { body.innerHTML = listHtml; return; }
+      body.innerHTML = '<div class="spin">Preparing Excel format…</div>';
+      try { const p = await xl().recordPreview(t, r); if (S.recView !== 'xl' || !$('#rbody')) return;
+        body.innerHTML = `<div class="xlbar"><span>Same layout as the Excel file</span><button class="btn sm" id="xlz">Zoom: ${S.xlZoom === 'fit' ? 'Fit' : Math.round(S.xlZoom * 100) + '%'}</button></div><div class="xlw" id="xlw"><div id="xli" style="position:relative">${p.html}</div></div>`;
+        const fit = () => { const w = $('#xlw'), tb = w && $('table.xlp', w); if (!tb) return; const k = S.xlZoom === 'fit' ? Math.min(1, w.clientWidth / p.width) : +S.xlZoom;
+          tb.style.transformOrigin = '0 0'; tb.style.transform = `scale(${k})`; $('#xli').style.width = Math.round(p.width * k) + 'px'; $('#xli').style.height = Math.round(tb.offsetHeight * k) + 'px'; };
+        fit(); $('#xlz').onclick = () => { S.xlZoom = S.xlZoom === 'fit' ? 0.75 : S.xlZoom === 0.75 ? 1.2 : 'fit'; $('#xlz').textContent = 'Zoom: ' + (S.xlZoom === 'fit' ? 'Fit' : Math.round(S.xlZoom * 100) + '%'); fit(); };
+      } catch (e) { body.innerHTML = listHtml; }
+    };
+    $('#rseg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; S.recView = b.dataset.v; paint(); };
+    paint();
+    const state = async () => { let st; try { st = await clApState(t.area, r.check_date, tpl); } catch (e) { st = { st: 'pending' }; }
+      if (!$('#estate')) return; apStrip($('#estate'), st, t.area, r.check_date, state); $('#esave').disabled = $('#eshare').disabled = st.st !== 'ok'; };
+    state();
     $('#esave').onclick = () => recordReport(t, r, false);
     $('#eshare').onclick = () => recordReport(t, r, true);
   } catch (e) { netErr(e); }
@@ -1459,6 +1591,37 @@ function wireCombo(id, options, free) {
 }
 // areas whose spares Excel this person may download: app/spares admin = all; area incharge = own areas only; others none
 const spareXlsAreas = () => (ME.is_admin || isModAdmin('spares')) ? SPARE_AREAS : (ME.areas && Array.isArray(ME.areas.incharge) ? SPARE_AREAS.filter(a => ME.areas.incharge.includes(a)) : []);
+// Spares Excel: complete / area-wise / cupboard-wise / rack-wise (your own areas only unless you are an admin)
+async function spareExport() {
+  const ar = spareXlsAreas(); if (!ar.length) return;
+  const md = $('#modal'); md.innerHTML = '<div class="sheet"><h3>Download spares Excel</h3><div class="spin">Loading spares…</div></div>'; md.classList.remove('hidden'); md.onclick = e => { if (e.target === md) md.classList.add('hidden'); };
+  let rows; try { rows = await api(`spares?select=*&order=area,id&area=in.(${ar.map(a => '"' + a.replace(/"/g, '') + '"').join(',')})`, { fresh: true }); } catch (e) { md.classList.add('hidden'); return netErr(e); }
+  const cupL = r => r.cupboard ? `Cupboard ${r.cupboard}${r.location ? ' · ' + r.location : ''}` : '', rackL = r => r.rack ? `Rack ${r.rack}${r.location ? ' · ' + r.location : ''}` : '';
+  const uniq = f => [...new Set(rows.map(f).filter(Boolean))].sort((x, y) => x.localeCompare(y, undefined, { numeric: true }));
+  const MODES = [['all', 'Complete', 'All areas, one sheet each'], ['area', 'Area-wise', 'One area or every area'], ['cup', 'Cupboard-wise', 'One cupboard or every cupboard'], ['rack', 'Rack-wise', 'One rack or every rack']];
+  let mode = 'all';
+  const opts = () => mode === 'area' ? [['*', 'All areas (one sheet each)'], ...ar.map(a => [a, a])] : mode === 'cup' ? [['*', 'All cupboards (one sheet each)'], ...uniq(cupL).map(x => [x, x])] : mode === 'rack' ? [['*', 'All racks (one sheet each)'], ...uniq(rackL).map(x => [x, x])] : [];
+  const draw = () => { const o = opts(), n = mode === 'cup' ? rows.filter(r => !r.cupboard).length : mode === 'rack' ? rows.filter(r => !r.rack).length : 0;
+    md.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><h3>Download spares Excel</h3><p class="hint" style="margin:2px 0 10px">${rows.length} items in ${ar.length === SPARE_AREAS.length ? 'all areas' : esc(ar.join(', '))}</p>
+      <div class="xmodes" id="xm">${MODES.map(([k, l, d]) => `<button data-m="${k}" class="${k === mode ? 'on' : ''}"><b>${l}</b><span>${d}</span></button>`).join('')}</div>
+      ${o.length ? `<div class="fld" style="margin-top:12px"><label for="xv">${mode === 'area' ? 'Area' : mode === 'cup' ? 'Cupboard' : 'Rack'}</label><select id="xv">${o.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select></div>` : ''}
+      ${n ? `<p class="hint" style="margin:8px 0 0">${n} item${n > 1 ? 's' : ''} without a ${mode === 'cup' ? 'cupboard' : 'rack'} number ${n > 1 ? 'are' : 'is'} not in this file.</p>` : ''}
+      <div class="two" style="margin-top:14px"><button class="btn ghost" id="xc">Cancel</button><button class="btn pri" id="xg">${ic('download', 20)} Download</button></div></div>`;
+    $('#xm').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; mode = b.dataset.m; draw(); };
+    $('#xc').onclick = () => md.classList.add('hidden');
+    $('#xg').onclick = async () => { const v = $('#xv') ? $('#xv').value : '*'; let out, names, what, file;
+      if (mode === 'all') { out = rows; names = ar; what = 'Complete'; file = `HSM Spares ${fmtShort(new Date())}.xlsx`; }
+      else if (mode === 'area') { names = v === '*' ? ar : [v]; out = rows.filter(r => names.includes(r.area)); what = v === '*' ? 'Area-wise, all areas' : 'Area ' + v; file = `HSM Spares ${v === '*' ? 'Area-wise' : v} ${fmtShort(new Date())}.xlsx`; }
+      else { const lab = mode === 'cup' ? cupL : rackL, tag = mode === 'cup' ? 'Cupboard-wise' : 'Rack-wise'; const used = new Set();
+        const sheet = x => { let n = x.replace(/[\\/*?:[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 31), k = 2, b = n; while (used.has(n)) n = b.slice(0, 28) + ' ' + k++; used.add(n); return n; };
+        const groups = (v === '*' ? uniq(lab) : [v]); const map = {}; groups.forEach(g => { map[g] = sheet(g); });
+        out = rows.filter(r => lab(r) && map[lab(r)]).map(r => ({ ...r, area: map[lab(r)] })); names = groups.map(g => map[g]);
+        what = v === '*' ? tag + ', all' : v; file = `HSM Spares ${v === '*' ? tag : v.replace(/[\\/*?:"<>|]/g, '-')} ${fmtShort(new Date())}.xlsx`; }
+      if (!out.length) return toast('Nothing to export for this choice');
+      try { toast('Preparing Excel…', 8000); md.classList.add('hidden'); deliver(await xl().sparesWorkbook(out, names), file, true); logAct('spares', 'Spares Excel downloaded', what); } catch (e) { netErr(e); } };
+  };
+  draw();
+}
 function viewSpares() {
   $('#app').innerHTML = `${bar('Spares', 'home', `${logBtn('spares')}${ME.is_admin ? `<button class="ib" id="sset" aria-label="Spares settings">${ic('gear', 26)}</button>` : ''}${spareXlsAreas().length ? `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button>` : ''}<button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="sq" type="search" placeholder="Search item, model, make, location, cupboard" value="${esc(S.spareQuery)}" aria-label="Search spares"></div></div>
@@ -1469,10 +1632,7 @@ function viewSpares() {
   centerOn('#tabs .on');
   $('#tabs').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === '__low') S.spareLow = !S.spareLow; else { S.spareLow = false; S.spareArea = b.dataset.a; } viewSpares(); };
   $('#rbtn').onclick = loadSpares;
-  if ($('#sxls')) $('#sxls').onclick = async () => { const ar = spareXlsAreas(); if (!ar.length) return;
-    if (!(await ask('Download spares Excel?', ar.length === SPARE_AREAS.length ? 'All categories, one sheet each, in your HSM Spares format.' : `Your area${ar.length > 1 ? 's' : ''}: ${ar.join(', ')}`, 'Download'))) return;
-    try { toast('Preparing Excel…', 8000); const rows = await api(`spares?select=*&order=area,id&area=in.(${ar.map(a => '"' + a.replace(/"/g, '') + '"').join(',')})`, { fresh: true });
-      deliver(await xl().sparesWorkbook(rows, ar), `HSM Spares ${fmtShort(new Date())}.xlsx`, true); logAct('spares', 'Spares Excel downloaded', ar.length === SPARE_AREAS.length ? 'All areas' : ar.join(', ')); } catch (e) { netErr(e); } };
+  if ($('#sxls')) $('#sxls').onclick = () => spareExport();
   if ($('#sset')) $('#sset').onclick = () => { const md = $('#modal');
     md.innerHTML = `<div class="sheet"><h3>Spares settings</h3><div class="fld"><label for="lown">Low stock: quantity below</label><input id="lown" type="number" inputmode="numeric" min="1" max="1000" value="${LOWN}"></div>
       <p class="hint" style="margin:6px 0 12px">Items with quantity 0 are “Out of stock”. Items below this number are “Low stock” (orange). Changes apply to everyone.</p>
@@ -2607,4 +2767,11 @@ function uidOfToken() { try { return JSON.parse(atob(SESSION.access_token.split(
 /* ================= START ================= */
 applySettings(store.get('hsm_set', {}));
 render();
-document.addEventListener('visibilitychange', () => { if (!document.hidden && SESSION) loadSettings().then(ch => { if (ch) softRerender(); }); });
+let hiddenAt = Date.now(); S.lastDay = ymd(new Date());
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (!SESSION) return;
+  const d = ymd(new Date()), away = Date.now() - hiddenAt, newDay = d !== S.lastDay; S.lastDay = d;
+  if (newDay || away > 30000) { FRESH_UNTIL = Date.now() + 8000; if (newDay) { try { bustCache(); } catch (e) {} } softRerender(); }
+  loadSettings().then(ch => { if (ch) softRerender(); });
+});

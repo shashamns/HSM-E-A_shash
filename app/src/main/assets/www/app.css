@@ -714,3 +714,56 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 @keyframes clflash{50%{background:#9EC3FF}}
 /* v3.11 plant-wide total */
 .qty .ptot{display:block;margin-top:3px;font-size:11px;font-weight:700;line-height:1.1;opacity:.85;white-space:nowrap}
+
+/* ===== v3.13 ===== */
+/* approval strip */
+.apw{padding:0 14px 6px}
+.aps{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;font-size:14px;line-height:1.35}
+.aps>span{flex:1;min-width:0}.aps b{display:block;font-size:15px}.aps small{display:block;opacity:.85;font-size:12.5px;margin-top:1px}
+.aps .i{flex:none}
+.aps.ok{background:var(--green-50);color:var(--green)}
+.aps.wait{background:var(--amber-50);color:var(--amber);border:1px solid #F1D3A6}
+.aps.none{background:var(--bg);color:var(--ink-2)}
+.aps .btn{flex:none;height:40px;padding:0 14px}
+.card.report .apw{padding:0 14px 10px}
+/* Excel-format preview of a record */
+.recseg{margin:14px 12px 10px}
+.xlbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 4px 8px;font-size:13px;color:var(--ink-2)}
+.xlbar .btn{height:34px;padding:0 12px;font-size:13px}
+.xlw{overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line-2);border-radius:12px;-webkit-overflow-scrolling:touch}
+.xlp{position:absolute;left:0;top:0;background:#fff;color:#000;font-family:Calibri,Arial,sans-serif;font-size:13px;line-height:1.15}
+.xlp td{padding:0 3px;overflow:hidden;text-overflow:clip}
+/* spares export */
+.xmodes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.xmodes button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:11px 12px;border-radius:14px;border:1.5px solid var(--line-2);background:#fff;text-align:left;color:var(--ink)}
+.xmodes button b{font-size:15px}.xmodes button span{font-size:12px;color:var(--ink-2);line-height:1.25}
+.xmodes button.on{border-color:var(--red);background:var(--red-50)}.xmodes button.on b{color:var(--red-700)}
+/* schedule: day / my month */
+.schseg{margin:0 0 12px}
+.schseg button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.mymonth{padding:8px 12px 14px;margin-bottom:14px}
+.mymonth .cal-h{display:flex;align-items:center;justify-content:space-between}
+.mymonth .mt{text-align:center}.mymonth .mt h2{margin:0;font-size:19px}.mymonth .mt span{font-size:13px;color:var(--ink-2)}
+.msum{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:8px 0 12px}
+.msum span{display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 2px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:.2px}
+.msum span b{font-size:20px;line-height:1.1}
+.mymonth .wk{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.mc{position:relative;aspect-ratio:1/1.12;border:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 0 6px;background:var(--bg);color:var(--ink-2)}
+.mc i{position:absolute;top:5px;left:7px;font-style:normal;font-size:11px;font-weight:700;opacity:.75}
+.mc b{font-size:17px;font-weight:800}
+.mc.none b{opacity:.35}.mc.past{opacity:.82}
+.mc.today{outline:2.5px solid var(--red);outline-offset:1px;opacity:1}
+.s-a{background:#E3EEFB!important;color:#14529C!important}
+.s-b{background:#FFEEDB!important;color:#9A4A00!important}
+.s-c{background:#EEE6F8!important;color:#5B2E91!important}
+.s-g{background:#E4EAF0!important;color:#2F3E4E!important}
+.s-l{background:#FBE0E0!important;color:#A32D2D!important}
+.s-wo{background:#E8F5EC!important;color:#17803A!important}
+.mc.s-a,.mc.s-b,.mc.s-c,.mc.s-g,.mc.s-l,.mc.s-wo{box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
+/* roster export */
+.rexp{padding:14px;margin:14px 0}
+.rexp .row{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.rexp .ic{width:46px;height:46px;border-radius:14px;background:var(--red-50);color:var(--red-700);display:flex;align-items:center;justify-content:center;flex:none}
+.rexp .t{font-weight:800;font-size:16px}.rexp .s{font-size:13px;color:var(--ink-2);margin-top:2px;line-height:1.35}
+.rexp input[type=month]{width:100%;height:46px;border:1.5px solid var(--line-2);border-radius:12px;padding:0 12px;font-size:16px;background:#fff}
