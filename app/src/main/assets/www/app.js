@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.13';
+const APP_VERSION = '3.14';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -102,6 +102,7 @@ const I = {
   star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/>',
   list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   alert:'<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   trash:'<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
   wa:'<path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9c0 3 3 6 6 6l1-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/>'
 };
@@ -495,12 +496,20 @@ const S = { spareArea: SPARE_AREAS[0], spareQuery: '', spareLow: false, sopTab: 
             calMonth: null, calSel: null, schedEdit: false, clArea: null, tbtArea: null, contactQuery: '', tbtQuery: '', teamQuery: '', reqTab: 'pending', reportDate: null, millArea: 'CB' };
 const go = h => { location.hash = h; };
 window.addEventListener('hashchange', render);
-/* Back returns to the same place: the scroll position of every page is remembered, and coming back to a page puts you where you were
- * (the same tab / search / area are already kept in S). Opening a page fresh from a menu starts at the top. */
-const POS = {}; let NAVH = [], lastH = null;
-document.addEventListener('scroll', e => { const t = e.target; if (lastH != null && t && t.classList && t.classList.contains('scroll')) POS[lastH] = t.scrollTop; }, true);
-function restorePos(y) { let n = 0; const tick = () => { const m = document.querySelector('main.scroll'); if (!m) return;
-  if (m.scrollHeight - m.clientHeight >= y - 2 || n > 30) { m.scrollTop = y; if (n > 30 || m.scrollTop >= y - 2) return; } n++; setTimeout(tick, 80); }; tick(); }
+/* Back returns to the same place. Every history entry gets its own key (kept in history.state), and the scroll position of the page is remembered
+ * under that key. Going BACK (or forward) to an entry we have already shown puts you where you were; opening a page fresh – from a tile, the bottom
+ * bar or a link – is a new entry and starts at the top. (The tab / search / area are kept in S.) */
+const POS = {}; let KEYN = 0, curKey = null, userTouched = 0;
+document.addEventListener('scroll', e => { const t = e.target; if (curKey != null && t && t.classList && t.classList.contains('scroll')) POS[curKey] = t.scrollTop; }, true);
+['touchstart', 'wheel', 'mousedown'].forEach(ev => document.addEventListener(ev, () => { userTouched = Date.now(); }, { capture: true, passive: true }));
+function restorePos(y, key) { let n = 0; const t0 = Date.now(); const tick = () => {
+  if (curKey !== key || userTouched > t0) return;           // the page changed or the person started scrolling – leave it alone
+  const m = document.querySelector('main.scroll'); if (!m) return;
+  if (m.scrollHeight - m.clientHeight >= y - 2) { m.scrollTop = y; return; }   // wait until the page is tall enough; never jump to the bottom of a short page
+  if (++n < 60) setTimeout(tick, 80); }; tick(); }
+function histKey() {
+  let st = history.state; if (!st || typeof st !== 'object' || st.hk == null) { const k = Date.now().toString(36) + '.' + (++KEYN); try { history.replaceState(Object.assign({}, st && typeof st === 'object' ? st : {}, { hk: k }), ''); } catch (e) {} return { k, seen: false }; }
+  return { k: st.hk, seen: st.hk in POS }; }
 document.addEventListener('click', e => {
   const lg = e.target.closest('[data-log]'); if (lg) { S.actOnly = lg.dataset.log; S.actMod = lg.dataset.log; S.actBack = (location.hash.replace(/^#\/?/, '') || 'home'); go('activity'); return; }
   const g = e.target.closest('[data-go]'); if (g) { if (g.dataset.go === 'activity') { S.actOnly = null; S.actMod = 'all'; } go(g.dataset.go); return; }
@@ -532,9 +541,8 @@ async function refreshMe() {
 }
 function render() {
   window.scrollTo(0, 0);
-  const hh0 = location.hash.replace(/^#\/?/, '') || 'home'; let backNav = false;
-  if (hh0 !== lastH) { if (NAVH.length > 1 && NAVH[NAVH.length - 2] === hh0) { NAVH.pop(); backNav = true; } else NAVH.push(hh0);
-    if (NAVH.length > 80) NAVH.shift(); lastH = hh0; if (!backNav) delete POS[hh0]; }
+  const ek = histKey(), backNav = ek.seen && ek.k !== curKey, restoreY = backNav ? POS[ek.k] : 0;
+  if (ek.k !== curKey) { curKey = ek.k; if (!ek.seen) POS[ek.k] = 0; }
   const md = $('#modal'); if (md && !md.classList.contains('hidden')) { md.classList.add('hidden'); md.onclick = null; }
   if (!SESSION || !ME) return viewLogin();
   refreshMe(); initNotify(); initSettings();
@@ -544,12 +552,54 @@ function render() {
   const routes = { home: viewHome, schedule: viewSchedule, checklist: viewChecklist, cl: () => viewChecklistFill(arg), clh: () => viewChecklistHistory(arg),
     cle: () => viewChecklistEntry(arg), actions: viewActions, activity: viewActivity, clearlogs: viewClearLogs, spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
     clset: viewClSettings, approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, drive: () => viewDrive(arg), admin: viewAdmin,
-    contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub };
+    contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub, notifs: viewNotifs };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
   (routes[page] || viewHome)();
-  if (backNav && POS[hh0]) restorePos(POS[hh0]);
+  if (backNav && restoreY) restorePos(restoreY, curKey);
 }
 const logBtn = m => (ME && (ME.is_admin || isModAdmin(m))) ? `<button class="ib" data-log="${m}" aria-label="Activity log of this module">${ic('list', 24)}</button>` : '';
+/* ================= NOTIFICATION CENTRE (in the app) =================
+ * Everything the phone was told – approvals waiting, leave decisions, schedule changes, the 8 PM duty notice – is also listed here, so a message
+ * missed on the phone can still be read. A tap opens the matching screen and removes the item. The bell on Home shows how many are waiting. */
+let NKEY = null;
+const ncHist = () => store.get('hsm_nhist', {}), ncDis = () => store.get('hsm_ndis', {});
+const ncItems = () => { const h = ncHist(), d = ncDis(); return Object.values(h).filter(x => !d[x.k]).sort((a, b) => String(b.at).localeCompare(String(a.at))); };
+const NC_LIVE = /^(u\d|s\d|l\d|sc\d|ca[A-Z])/;      // "waiting" items disappear by themselves once handled; the others stay until read (max 7 days)
+async function ncFetch() {
+  if (!SESSION || !ME || ME.need_pin) return ncItems();
+  try {
+    if (!NKEY) NKEY = await rpc('hsm_notify_key'); if (!NKEY) return ncItems();
+    const list = await rpc('hsm_notify_center', { p_key: NKEY }); if (!Array.isArray(list)) return ncItems();
+    const h = ncHist(), now = new Date().toISOString(), seen = new Set(list.map(x => x.k));
+    list.forEach(x => { const o = h[x.k]; if (!o) h[x.k] = { k: x.k, t: x.t, b: x.b, at: x.at || now }; else { o.t = x.t; o.b = x.b; if (x.at) o.at = x.at; } });
+    const cut = Date.now() - 7 * 864e5;
+    Object.keys(h).forEach(k => { if (+new Date(h[k].at) < cut || (NC_LIVE.test(k) && !seen.has(k))) delete h[k]; });
+    store.set('hsm_nhist', h);
+    const d = ncDis(), dk = Object.keys(d); if (dk.length > 300) { dk.sort((a, b) => d[a] - d[b]).slice(0, dk.length - 300).forEach(k => delete d[k]); store.set('hsm_ndis', d); }
+  } catch (e) { /* offline: show what we have */ }
+  return ncItems();
+}
+function ncBadge() { const el = $('#ncb'); if (!el) return; const n = ncItems().length; el.textContent = n > 99 ? '99+' : n; el.classList.toggle('hidden', !n); const b = el.closest('button'); if (b) b.setAttribute('aria-label', n ? `Notifications, ${n} new` : 'Notifications'); }
+function ncDismiss(ks) { const d = ncDis(), t = Date.now(); [].concat(ks).forEach(k => { d[k] = t; }); store.set('hsm_ndis', d); ncBadge(); }
+function ncOpen(k) {
+  const to = /^duty/.test(k) ? 'schedule' : /^rs/.test(k) ? 'schedule' : /^ca/.test(k) ? 'checklist' : /^pc/.test(k) ? 'spares' : /^(scd|scc|sc|ld|lc|l)\d/.test(k) ? 'leave' : /^s\d/.test(k) ? 'suggest' : /^u\d/.test(k) ? 'approval' : 'home';
+  if (/^duty/.test(k)) S.schedView = 'month';
+  go(to);
+}
+const ncIcon = k => /^duty/.test(k) ? 'cal' : /^rs/.test(k) ? 'cal' : /^ca/.test(k) ? 'ok' : /^pc/.test(k) ? 'box' : /^(scd|scc|sc|ld|lc|l)\d/.test(k) ? 'plane' : /^s\d/.test(k) ? 'bulb' : /^u\d/.test(k) ? 'key' : 'bell';
+const ncWhen = iso => { const d = new Date(iso), m = Math.round((Date.now() - +d) / 60000); return m < 1 ? 'Just now' : m < 60 ? `${m} min ago` : m < 1440 && d.getDate() === new Date().getDate() ? `Today ${pad2(d.getHours())}:${pad2(d.getMinutes())}` : fmtStamp(iso); };
+async function viewNotifs() {
+  $('#app').innerHTML = `${bar('Notifications', 'home', '<button class="ib" id="ncall" aria-label="Clear all" style="width:auto;padding:0 12px;font-weight:700;font-size:14px">Clear all</button>')}<main class="scroll" id="nc"><div class="pad"><div id="nclist"></div></div></main>${nav('home')}`;
+  const draw = () => {
+    const items = ncItems(); if (!$('#nclist')) return;
+    $('#nclist').innerHTML = items.length ? `<div class="label">${items.length} notification${items.length === 1 ? '' : 's'} · tap one to open it and clear it</div><div class="list nclist">${items.map(x => `<button class="lrow ncrow" data-k="${esc(x.k)}"><span class="ic">${ic(ncIcon(x.k), 22)}</span><span class="tx"><span class="a">${esc(x.t)}</span><span class="b2">${esc(x.b)}</span><span class="b">${esc(ncWhen(x.at))}</span></span><span class="chev">${ic('chev', 22)}</span></button>`).join('')}</div>`
+      : `<div class="empty"><b>You are all caught up</b>Approvals, leave decisions, schedule changes and the 8 PM duty notice appear here when they arrive.</div>`;
+    const b = $('#ncall'); if (b) b.style.visibility = items.length ? 'visible' : 'hidden';
+  };
+  draw(); ncFetch().then(draw);
+  $('#nc').onclick = e => { const r = e.target.closest('[data-k]'); if (!r) return; ncDismiss(r.dataset.k); ncOpen(r.dataset.k); };
+  $('#ncall').onclick = () => { ncDismiss(ncItems().map(x => x.k)); draw(); toast('All cleared'); };
+}
 const bar = (title, backTo, extra = '') => `<header class="bar">${backTo ? `<button class="ib back" aria-label="Back" data-back="${backTo}">${ic('back', 26)}</button>` : ''}<h1>${esc(title)}</h1>${extra}</header>`;
 const nav = on => `<nav class="nav" aria-label="Main">${[['home','home','Home'],['schedule','cal','Schedule'],['checklist','check','Check List'],['suggest','bulb','Suggestions']].filter(([k]) => k === 'home' || k === 'suggest' || can(k))
   .map(([k, i, l]) => `<button class="${on === k ? 'on' : ''}" data-go="${k}" ${on === k ? 'aria-current="page"' : ''}><span class="pill">${ic(i, 24)}</span>${l}</button>`).join('')}</nav>`;
@@ -669,7 +719,8 @@ async function viewHome() {
     <div class="hero"><div class="row"><div><div class="brand">HSM · Electrical &amp; Automation</div>
       <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div>
       <div class="sub">${DAYNAME[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}</div></div>
-      <button class="avatar-btn" data-go="profile" aria-label="My profile" style="overflow:hidden;padding:0">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc(initials(ME.name))}</button></div></div>
+      <div class="hbtns"><button class="bell-btn" data-go="notifs" aria-label="Notifications">${ic('bell', 24)}<b class="bdg hidden" id="ncb"></b></button>
+      <button class="avatar-btn" data-go="profile" aria-label="My profile" style="overflow:hidden;padding:0">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc(initials(ME.name))}</button></div></div></div>
     ${cS ? `<div class="lift card shiftcard" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div><div class="t1">Shift on duty now</div><div class="t2">Shift ${sh} · ${SHIFT_TIME[sh]}</div></div></div>
       <div class="chips" id="hcrew"><span class="hint">Loading crew…</span></div></div>` : '<div style="height:16px"></div>'}
     <div id="hadmin"></div><div id="hleave"></div>
@@ -685,6 +736,7 @@ async function viewHome() {
     <div style="height:24px"></div>
   </main>${nav('home')}`;
   if ($('#hlow')) $('#hlow').onclick = () => { S.spareLow = true; go('spares'); };
+  ncBadge(); ncFetch().then(ncBadge);
   setTimeout(homeAlerts, 50);
   const today = ymd(now);
   try {
@@ -1023,6 +1075,7 @@ async function viewMyMonth() {
   for (let d = 1; d <= nD; d++) { const dt = new Date(y, mo, d), k = ymd(dt), sh = mine[k], isT = +dt === +today;
     cells += `<button type="button" class="mc ${sh ? 's-' + sh.toLowerCase() : 'none'}${isT ? ' today' : ''}${+dt < +today ? ' past' : ''}" data-day="${k}" aria-label="${d} ${MONTHS[mo]}, ${sh ? SHIFT_NAME[sh] : 'no duty'}"><i>${d}</i><b>${sh || '–'}</b></button>`; }
   const have = Object.keys(mine).length;
+  if (!$('#sc')) return;
   $('#sc').innerHTML = `<div class="pad">${schedSeg()}
     <section class="card mymonth"><div class="cal-h"><button class="ib" id="mpm" aria-label="Previous month">${ic('back')}</button><div class="mt"><h2>${MONTHS[mo]} ${y}</h2><span>${esc(ME.name)}</span></div><button class="ib" id="mnm" aria-label="Next month">${ic('chev')}</button></div>
       ${have ? `<div class="msum">${[['A', 'A'], ['B', 'B'], ['C', 'C'], ['G', 'General'], ['L', 'Leave'], ['WO', 'Off']].map(([k, l]) => `<span class="s-${k.toLowerCase()}"><b>${cnt[k]}</b>${l}</span>`).join('')}</div>` : ''}
@@ -1074,6 +1127,7 @@ async function viewSchedule() {
   const general = by('G'), areaMap = {};
   general.forEach(r => (areaMap[r.area || 'Other'] = areaMap[r.area || 'Other'] || []).push(r));
   const isToday = +S.calSel === +today;
+  if (!$('#sc')) return;
   $('#sc').innerHTML = `<div class="pad">
     ${schedSeg()}
     <button class="calpick ${S.calOpen ? 'open' : ''}" id="calt" aria-expanded="${!!S.calOpen}">${ic('cal', 22)}<span>${fmtDay(S.calSel)}</span><span class="cv">${ic('chev', 20)}</span></button>
@@ -2113,33 +2167,50 @@ async function openDriveDoc(path, bucket = DRIVE_BUCKET) {
 async function viewMillProcessSops() {
   const admin = isModAdmin('mill');
   const areas = MILL_AREAS.filter(([f]) => canArea('mill', f));
-  $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home', logBtn('mill'))}<main class="scroll" id="ml" style="${admin ? 'padding-bottom:90px' : ''}"><div class="spin">Loading…</div></main>
+  $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home', logBtn('mill'))}<main class="scroll" id="ml" style="${admin ? 'padding-bottom:90px' : ''}"><div class="searchwrap mqw"><div class="search">${ic('search', 22)}<input id="mq" type="search" placeholder="Search SOP in every area" value="${esc(S.millQ || '')}" aria-label="Search mill process SOPs" autocomplete="off"></div></div><div id="mb"><div class="spin">Loading…</div></div></main>
     ${admin ? `<label class="fab" style="cursor:pointer;bottom:88px">${ic('upload', 22)} Add SOP<input type="file" id="mup" hidden accept=".docx,.pdf"></label>` : ''}${nav('mill')}`;
   const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
   if (!areas.length) { $('#ml').innerHTML = `<div class="empty"><b>No areas for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access to your area's SOPs.</div>`; return; }
   if (!areas.some(a => a[0] === S.millArea)) S.millArea = areas[0][0];
   const label = f => (MILL_AREAS.find(a => a[0] === f) || [f, f])[1];
+    const typ = n => (n.split('.').pop() || '').toUpperCase().slice(0, 4);
+    const row = (o, ar = S.millArea, tag = '') => `<button class="lrow" data-f="${esc(ar + '/' + o.name)}" style="${admin ? 'flex:1;min-width:0' : ''}">
+        <span class="ic" style="font-size:12px;font-weight:800">${esc(typ(o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${tag ? `<b style="color:var(--red)">${esc(tag)}</b> · ` : ''}${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
   const draw = async () => {
     const btns = `<div class="tabs milltabs" id="mt" role="tablist">${areas.map(([f, t]) => `<button role="tab" data-area="${f}" class="${S.millArea === f ? 'on' : ''}" aria-selected="${S.millArea === f}">${esc(t)}</button>`).join('')}</div>`;
-    $('#ml').innerHTML = `${btns}<div class="pad"><div class="spin">Loading…</div></div>`;
+    $('#mb').innerHTML = `${btns}<div class="pad"><div class="spin">Loading…</div></div>`;
     { const on = $('#mt .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); }
     let items = [];
     try { items = (await storageList(`${S.millArea}/`, MILL_PROCESS_BUCKET)).filter(o => o.id && o.name && /\.(docx?|pdf)$/i.test(o.name)); }
-    catch (e) { $('#ml').innerHTML = `${btns}<div class="pad"><div class="empty"><b>Could not load procedures</b>Check the network and try again.</div></div>`; netErr(e); return; }
-    const typ = n => (n.split('.').pop() || '').toUpperCase().slice(0, 4);
-    const row = o => `<button class="lrow" data-f="${esc(S.millArea + '/' + o.name)}" style="${admin ? 'flex:1;min-width:0' : ''}">
-        <span class="ic" style="font-size:12px;font-weight:800">${esc(typ(o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
-    $('#ml').innerHTML = `${btns}<div class="pad">
+    catch (e) { $('#mb').innerHTML = `${btns}<div class="pad"><div class="empty"><b>Could not load procedures</b>Check the network and try again.</div></div>`; netErr(e); return; }
+    $('#mb').innerHTML = `${btns}<div class="pad">
       <div class="label">${items.length} procedure${items.length === 1 ? '' : 's'} · ${esc(label(S.millArea))}</div>
       <div class="list">${items.length ? items.map(o => admin ? `<div style="display:flex;align-items:center">${row(o)}<button class="ib" data-del="${esc(S.millArea + '/' + o.name)}" aria-label="Delete ${esc(o.name)}" style="color:var(--ink-2);margin-right:6px">${ic('x', 22)}</button></div>` : row(o)).join('')
         : `<div class="empty"><b>No SOPs in ${esc(label(S.millArea))} yet</b>${admin ? 'Tap “Add SOP” to upload a Word or PDF file.' : ''}</div>`}</div></div>`;
   };
+  const valid = o => o.id && o.name && /\.(docx?|pdf)$/i.test(o.name);
+  const allCache = {};
+  const normQ = t => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const drawSearch = async q => {
+    $('#mb').innerHTML = '<div class="pad"><div class="spin">Searching…</div></div>';
+    try { await Promise.all(areas.map(async ([f]) => { if (!allCache[f]) allCache[f] = (await storageList(`${f}/`, MILL_PROCESS_BUCKET)).filter(valid); })); }
+    catch (e) { if ($('#mb')) $('#mb').innerHTML = '<div class="pad"><div class="empty"><b>Could not search</b>Check the network and try again.</div></div>'; netErr(e); return; }
+    if (!$('#mq') || $('#mq').value.trim() !== q) return;
+    const words = normQ(q).split(' ').filter(Boolean), hits = [];
+    areas.forEach(([f, t]) => (allCache[f] || []).forEach(o => { const n = normQ(o.name.replace(/\.[^.]+$/, '') + ' ' + t); if (words.every(w => n.includes(w))) hits.push([f, t, o]); }));
+    $('#mb').innerHTML = `<div class="pad"><div class="label">${hits.length} result${hits.length === 1 ? '' : 's'} for “${esc(q)}” · all areas</div><div class="list">${hits.length ? hits.map(([f, t, o]) => admin
+      ? `<div style="display:flex;align-items:center">${row(o, f, t)}<button class="ib" data-del="${esc(f + '/' + o.name)}" aria-label="Delete ${esc(o.name)}" style="color:var(--ink-2);margin-right:6px">${ic('x', 22)}</button></div>` : row(o, f, t)).join('')
+      : `<div class="empty"><b>No SOP found</b>Try fewer or different words – the name of the job, machine or area.</div>`}</div></div>`;
+  };
+  const refresh = () => { const q = ($('#mq').value || '').trim(); S.millQ = q; if (q) drawSearch(q); else draw(); };
+  let mqT = null; $('#mq').oninput = () => { clearTimeout(mqT); mqT = setTimeout(refresh, 250); };
+  $('#mq').onsearch = refresh;
   $('#ml').onclick = async e => {
     const area = e.target.closest('[data-area]'); if (area) { S.millArea = area.dataset.area; draw(); return; }
     const d = e.target.closest('[data-del]');
     if (d) { const name = d.dataset.del.split('/').pop();
       if (!(await ask('Delete this SOP?', `${name}\nIt is removed for everyone.`, 'Delete', 'Cancel', true))) return;
-      try { await storageDelete(d.dataset.del, MILL_PROCESS_BUCKET); logAct('mill', 'SOP deleted', `${label(S.millArea)} · ${name}`); toast('SOP deleted'); draw(); } catch (err) { netErr(err); } return; }
+      try { await storageDelete(d.dataset.del, MILL_PROCESS_BUCKET); logAct('mill', 'SOP deleted', `${label(d.dataset.del.split('/')[0])} · ${name}`); toast('SOP deleted'); delete allCache[d.dataset.del.split('/')[0]]; refresh(); } catch (err) { netErr(err); } return; }
     const r = e.target.closest('[data-f]'); if (!r) return;
     try { await openDoc(r.dataset.f, MILL_PROCESS_BUCKET); } catch (err) { netErr(err); } };
   if ($('#mup')) $('#mup').onchange = async e => {
@@ -2150,14 +2221,14 @@ async function viewMillProcessSops() {
     S.millArea = area;
     const path = `${area}/${file.name.replace(/[\\/#?%]/g, '_')}`;
     toast('Uploading…', 60000);
-    try { await storageUpload(path, file, MILL_PROCESS_BUCKET); logAct('mill', 'SOP added', `${label(S.millArea)} · ${file.name}`); toast('SOP added'); draw(); }
+    try { await storageUpload(path, file, MILL_PROCESS_BUCKET); logAct('mill', 'SOP added', `${label(S.millArea)} · ${file.name}`); toast('SOP added'); delete allCache[area]; refresh(); }
     catch (err) {
       if (err.exists && await ask('Replace the existing SOP?', `${file.name} is already in ${label(S.millArea)}.`, 'Replace')) {
-        try { toast('Uploading…', 60000); await storageUpload(path, file, MILL_PROCESS_BUCKET, true); logAct('mill', 'SOP replaced', `${label(S.millArea)} · ${file.name}`); toast('SOP replaced'); draw(); } catch (e2) { netErr(e2); }
+        try { toast('Uploading…', 60000); await storageUpload(path, file, MILL_PROCESS_BUCKET, true); logAct('mill', 'SOP replaced', `${label(S.millArea)} · ${file.name}`); toast('SOP replaced'); delete allCache[area]; refresh(); } catch (e2) { netErr(e2); }
       } else if (!err.exists) netErr(err); else toast('Not uploaded');
     }
   };
-  draw();
+  if (S.millQ) drawSearch(S.millQ); else draw();
 }
 
 /* ================= ADMIN UPLOADS (Excel → cloud) ================= */

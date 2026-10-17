@@ -36,7 +36,8 @@ import java.util.Set;
 public class NotifyWorker extends Worker {
 
     static final String PREFS = "hsm_notify";
-    static final String CHANNEL = "hsm_updates";
+    static final String CHANNEL = "hsm_alerts";            // new id (v3.14): channels keep the first settings Android saw, so the old silent one is replaced
+    static final String OLD_CHANNEL = "hsm_updates";
     private static final String BASE = "https://jqxabsioebndhslyagxc.supabase.co";
     private static final String API_KEY = "sb_publishable_iemA7-rKgs1VdZSH9hd2Kw__8458frU";
 
@@ -106,8 +107,18 @@ public class NotifyWorker extends Worker {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(CHANNEL, "Approvals & updates", NotificationManager.IMPORTANCE_HIGH);
+            try { nm.deleteNotificationChannel(OLD_CHANNEL); } catch (Exception ignored) { }
+            NotificationChannel ch = new NotificationChannel(CHANNEL, "Duty alerts & approvals", NotificationManager.IMPORTANCE_HIGH);
             ch.setDescription("Tomorrow's duty, approvals, leave requests and suggestions");
+            ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+            ch.enableVibration(true);
+            ch.setVibrationPattern(new long[]{0, 250, 150, 250});
+            ch.enableLights(true);
+            ch.setLightColor(0xFFC8102E);
+            ch.setShowBadge(true);
+            ch.setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
+                    new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
             nm.createNotificationChannel(ch);
         }
         Intent open = new Intent(ctx, MainActivity.class);
@@ -117,7 +128,7 @@ public class NotifyWorker extends Worker {
         int single = Math.min(total, 3);
         for (int i = 0; i < single; i++) {
             JSONObject o = fresh.getJSONObject(i);
-            nm.notify(1000 + i, build(ctx, pi, o.optString("t"), o.optString("b")));
+            nm.notify(2000 + (o.optString("k").hashCode() & 0xFFFFF), build(ctx, pi, o.optString("t"), o.optString("b")));
         }
         if (total > single) {
             nm.notify(1100, build(ctx, pi, "HSM E&A", (total - single) + " more update" + (total - single > 1 ? "s" : "") + " waiting – open the app"));
@@ -133,6 +144,9 @@ public class NotifyWorker extends Worker {
                 .setColor(0xFFC8102E)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setContentIntent(pi)
                 .build();
     }
