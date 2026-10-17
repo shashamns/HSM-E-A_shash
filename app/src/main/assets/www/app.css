@@ -779,3 +779,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .nclist .ncrow .a{white-space:normal}
 .mqw{position:sticky;top:0;z-index:3;border-top:1px solid var(--line)}
 .mqw ~ #mb .milltabs{top:71px}
+
+/* v3.14b mill SOP: fixed search, only the list scrolls */
+.mlx{display:flex;flex-direction:column;overflow:hidden!important;padding:0!important}
+.mlx .mqw{position:static;flex-shrink:0}
+.mlx #mb{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:96px}
+.mlx #mb .milltabs{top:0;border-top:0}

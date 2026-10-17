@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.14';
+const APP_VERSION = '3.15';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -2167,7 +2167,7 @@ async function openDriveDoc(path, bucket = DRIVE_BUCKET) {
 async function viewMillProcessSops() {
   const admin = isModAdmin('mill');
   const areas = MILL_AREAS.filter(([f]) => canArea('mill', f));
-  $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home', logBtn('mill'))}<main class="scroll" id="ml" style="${admin ? 'padding-bottom:90px' : ''}"><div class="searchwrap mqw"><div class="search">${ic('search', 22)}<input id="mq" type="search" placeholder="Search SOP in every area" value="${esc(S.millQ || '')}" aria-label="Search mill process SOPs" autocomplete="off"></div></div><div id="mb"><div class="spin">Loading…</div></div></main>
+  $('#app').innerHTML = `${bar('SOP\'s of Mill Process', 'home', logBtn('mill'))}<main class="scroll mlx" id="ml"><div class="searchwrap mqw"><div class="search">${ic('search', 22)}<input id="mq" type="search" placeholder="Search SOP in every area" value="${esc(S.millQ || '')}" aria-label="Search mill process SOPs" autocomplete="off"></div></div><div id="mb"><div class="spin">Loading…</div></div></main>
     ${admin ? `<label class="fab" style="cursor:pointer;bottom:88px">${ic('upload', 22)} Add SOP<input type="file" id="mup" hidden accept=".docx,.pdf"></label>` : ''}${nav('mill')}`;
   const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
   if (!areas.length) { $('#ml').innerHTML = `<div class="empty"><b>No areas for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access to your area's SOPs.</div>`; return; }
