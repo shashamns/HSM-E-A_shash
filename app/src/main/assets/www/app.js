@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.15';
+const APP_VERSION = '3.16';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -494,6 +494,8 @@ const clAreaName = a => (CL_AREAS.find(x => x[0] === a) || [a, a])[1];
 /* ================= ROUTER ================= */
 const S = { spareArea: SPARE_AREAS[0], spareQuery: '', spareLow: false, sopTab: 'numbers', sopGroup: 'All', sopQuery: '', docArea: 'CB',
             calMonth: null, calSel: null, schedEdit: false, clArea: null, tbtArea: null, contactQuery: '', tbtQuery: '', teamQuery: '', reqTab: 'pending', reportDate: null, millArea: 'CB' };
+const S_DEF = Object.assign({}, S);   // Home resets every module's search / filter / tab, so each module opens fresh
+const resetModuleState = () => { Object.keys(S).forEach(k => { if (!(k in S_DEF) && !/^(lastDay|planAreas|xlZoom|lowCache)$/.test(k)) delete S[k]; }); Object.assign(S, S_DEF, { millQ: '' }); };
 const go = h => { location.hash = h; };
 window.addEventListener('hashchange', render);
 /* Back returns to the same place. Every history entry gets its own key (kept in history.state), and the scroll position of the page is remembered
@@ -554,6 +556,7 @@ function render() {
     clset: viewClSettings, approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, drive: () => viewDrive(arg), admin: viewAdmin,
     contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub, notifs: viewNotifs };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
+  if (page === 'home' || !routes[page]) resetModuleState();
   (routes[page] || viewHome)();
   if (backNav && restoreY) restorePos(restoreY, curKey);
 }
@@ -1695,7 +1698,7 @@ function viewSpares() {
     $('#lx').onclick = () => md.classList.add('hidden');
     $('#ls').onclick = async () => { const n = Math.round(+$('#lown').value); if (!(n >= 1 && n <= 1000)) return toast('Enter a number from 1 to 1000');
       $('#ls').disabled = true; try { await saveSetting('low_stock', { n }); logAct('spares', 'Low stock limit changed', `below ${n}`); md.classList.add('hidden'); S.lowCache = null; toast(`Low stock is now below ${n}`); viewSpares(); } catch (e) { $('#ls').disabled = false; netErr(e); } }; };
-  let tm; $('#sq').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { S.spareQuery = e.target.value.trim(); loadSpares(); }, 300); };
+  let tm; $('#sq').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { if (!e.target.isConnected) return; S.spareQuery = e.target.value.trim(); loadSpares(); }, 300); };
   loadSpares();
 }
 async function loadSpares(fromCache) {
@@ -1917,7 +1920,7 @@ async function sopNumbers() {
           : `<span><span class="k">HIRAC NO.</span><span class="v" style="color:var(--muted)">Not applicable</span></span>`}</div></div>`; }).join('')}</div>` : '<div class="empty"><b>No match found</b>Try another number or word.</div>') + '</div>';
   };
   draw();
-  let tm; $('#q').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { S.sopQuery = e.target.value.trim(); draw(); }, 200); };
+  let tm; $('#q').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { if (!e.target.isConnected) return; S.sopQuery = e.target.value.trim(); draw(); }, 200); };
   $('#gt').onclick = e => { const g = e.target.closest('[data-g]'); if (!g) return; S.sopGroup = g.dataset.g; $$('#gt button').forEach(x => x.classList.toggle('on', x === g)); draw(); };
 }
 async function hiracList() {
@@ -1933,7 +1936,7 @@ async function hiracList() {
       return `<button class="lrow" data-go="hirac/${h.no}"><span class="av" style="border-radius:12px">${h.no}</span><span class="tx"><span class="a">${esc(h.title)}</span><span class="b">${(h.hz || []).length} hazards · Rev ${esc(h.rev ?? '-')}${h.owner ? ' · ' + esc(h.owner) : ''}</span></span><span class="rpn ${max >= 10 ? 'h' : max >= 5 ? 'm' : ''}">RPN ${max}</span></button>`; }).join('')}</div>` : '<div class="empty"><b>No match found</b></div>') + '</div>';
   };
   draw();
-  let tm; $('#q').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { S.sopQuery = e.target.value.trim(); draw(); }, 200); };
+  let tm; $('#q').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { if (!e.target.isConnected) return; S.sopQuery = e.target.value.trim(); draw(); }, 200); };
 }
 async function viewHirac(no) {
   $('#app').innerHTML = `${bar(`HIRAC ${no}`, 'sop')}<main class="scroll" id="hd"><div class="spin">Loading…</div></main>`;
@@ -2202,7 +2205,7 @@ async function viewMillProcessSops() {
       ? `<div style="display:flex;align-items:center">${row(o, f, t)}<button class="ib" data-del="${esc(f + '/' + o.name)}" aria-label="Delete ${esc(o.name)}" style="color:var(--ink-2);margin-right:6px">${ic('x', 22)}</button></div>` : row(o, f, t)).join('')
       : `<div class="empty"><b>No SOP found</b>Try fewer or different words – the name of the job, machine or area.</div>`}</div></div>`;
   };
-  const refresh = () => { const q = ($('#mq').value || '').trim(); S.millQ = q; if (q) drawSearch(q); else draw(); };
+  const refresh = () => { if (!$('#mq')) return; const q = ($('#mq').value || '').trim(); S.millQ = q; if (q) drawSearch(q); else draw(); };
   let mqT = null; $('#mq').oninput = () => { clearTimeout(mqT); mqT = setTimeout(refresh, 250); };
   $('#mq').onsearch = refresh;
   $('#ml').onclick = async e => {
