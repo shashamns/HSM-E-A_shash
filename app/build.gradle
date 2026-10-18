@@ -10,8 +10,8 @@ android {
         applicationId 'com.hsm.ea'
         minSdk 26
         targetSdk 34
-        versionCode 30
-        versionName '3.17'
+        versionCode 31
+        versionName '3.18'
     }
 
     signingConfigs {
