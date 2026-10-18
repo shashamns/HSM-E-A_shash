@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.16';
+const APP_VERSION = '3.17';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -542,7 +542,7 @@ async function refreshMe() {
   } catch (e) { meFresh = false; }
 }
 function render() {
-  window.scrollTo(0, 0);
+  window.scrollTo(0, 0); { const ap = document.getElementById('app'); if (ap) ap.classList.remove('kb'); }
   const ek = histKey(), backNav = ek.seen && ek.k !== curKey, restoreY = backNav ? POS[ek.k] : 0;
   if (ek.k !== curKey) { curKey = ek.k; if (!ek.seen) POS[ek.k] = 0; }
   const md = $('#modal'); if (md && !md.classList.contains('hidden')) { md.classList.add('hidden'); md.onclick = null; }
@@ -1437,6 +1437,11 @@ async function viewChecklistFill(code) {
   if ($('#clsc')) $('#clsc').onclick = e => { const b = e.target.closest('[data-sc]'); if (!b) return; selSec = b.dataset.sc; S.clSec = { code, v: selSec };
     $$('#clsc button').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); }); applyFilter(); f.scrollTop = 0; };
   $('#clq').oninput = e => { qtxt = e.target.value; applyFilter(); };
+  // Keypad open = fill mode: header, search, chips and the Submit bar fold away so 5-6 readings stay visible; they return when the keypad closes
+  { const app = $('#app'); let kbT = 0; app.classList.remove('kb');
+    const place = el => { const it = el.closest('.clitem') || el, r = f.getBoundingClientRect(), y = it.getBoundingClientRect().top - r.top; if (Math.abs(y - 6) > 4) f.scrollTop += y - 6; };
+    f.addEventListener('focusin', e => { if (!e.target.matches('input,textarea')) return; clearTimeout(kbT); app.classList.add('kb'); const el = e.target; [120, 380].forEach(ms => setTimeout(() => { if (el.isConnected && document.activeElement === el) place(el); }, ms)); });
+    f.addEventListener('focusout', () => { clearTimeout(kbT); kbT = setTimeout(() => { const a = document.activeElement; if (!a || !a.matches || !a.matches('#clf input,#clf textarea')) app.classList.remove('kb'); }, 250); }); }
   $('#clemp').onclick = e => { onlyEmpty = !onlyEmpty; e.currentTarget.classList.toggle('on', onlyEmpty); e.currentTarget.setAttribute('aria-pressed', onlyEmpty); applyFilter(); };
   f.addEventListener('input', e => { const k = e.target.dataset.k; if (!k) return; V[k] = e.target.value.trim(); e.target.classList.remove('sv');
     e.target.classList.toggle('hot', isHot(e.target.dataset.t, val(k), lim(k))); persist(); });

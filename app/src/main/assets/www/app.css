@@ -785,3 +785,14 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .mlx .mqw{position:static;flex-shrink:0}
 .mlx #mb{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:96px}
 .mlx #mb .milltabs{top:0;border-top:0}
+
+/* v3.17 check list: keypad open = compact fill mode */
+.kb .clhead,.kb .prog,.kb .clq,.kb .cltabs,.kb .actions,.kb .resume,.kb .hint{display:none!important}
+.kb #clf{padding-bottom:55vh}
+.kb .clsec{margin:8px 4px 6px;font-size:18px}
+.kb .clitem{padding:8px 10px;margin-bottom:6px}
+.kb .cln{font-size:15.5px;margin-bottom:4px}
+.kb .clf{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.kb .clf.one{grid-template-columns:1fr}
+.kb .clf label>span{min-height:0;font-size:12px}
+.kb .clf input{height:44px;font-size:19px}
