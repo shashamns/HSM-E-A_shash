@@ -124,6 +124,12 @@ public class MainActivity extends Activity {
 
     /** Called from the web app: window.HSMNative.* */
     class NativeBridge {
+        /** Colour theme chosen in the app: paints the status bar to match. */
+        @JavascriptInterface
+        public void statusColor(final String hex) {
+            runOnUiThread(() -> { try { getWindow().setStatusBarColor(android.graphics.Color.parseColor(hex)); } catch (Exception e) { } });
+        }
+
         /** The whole app is protected from screenshots now (FLAG_SECURE set in onCreate), so this never lifts it. */
         @JavascriptInterface
         public void secure(final boolean on) {

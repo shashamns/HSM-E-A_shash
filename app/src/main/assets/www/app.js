@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.22';
+const APP_VERSION = '3.23';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -133,9 +133,16 @@ const initials = n => { const p = String(n || '?').replace(/\./g, '').trim().spl
 const firstName = n => { const p = String(n || '').replace(/^s\.\s*/i, '').split(/\s+/); return p[0] || ''; };
 const curShift = (d = new Date()) => { const h = d.getHours(); return h >= 7 && h < 15 ? 'A' : h >= 15 && h < 23 ? 'B' : 'C'; };
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
+const THEMES = [['red', 'AMNS Red', '#C8102E', '#A50D26'], ['blue', 'Blue', '#1E5BD8', '#1747AB'], ['green', 'Green', '#13834A', '#0F6A3C'], ['purple', 'Purple', '#6D3FC0', '#5732A0'],
+  ['orange', 'Orange', '#D9620B', '#B04F08'], ['teal', 'Teal', '#0F7C86', '#0C646C'], ['steel', 'Steel Grey', '#37474F', '#2B383F']];
+function applyTheme(k) { const t = THEMES.find(x => x[0] === k) || THEMES[0], h = document.documentElement;
+  if (t[0] === 'red') delete h.dataset.theme; else h.dataset.theme = t[0];
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t[3]);
+  try { if (window.HSMNative && HSMNative.statusColor) HSMNative.statusColor(t[3]); } catch (e) {} }
 const store = { get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
                 del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
+applyTheme(store.get('hsm_theme', 'red'));
 const normName = n => String(n || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\b(mr|mrs|ms)\b/g, '').trim().split(/\s+/).filter(w => w.length > 1);
 function sameName(a, b) {
   const x = normName(a), y = normName(b); if (!x.length || !y.length) return false;
@@ -725,18 +732,18 @@ async function viewHome() {
     cC && `<button class="card kpi" data-go="actions" id="habk"><span class="k">Abnormal</span><span class="v" id="hab">–</span><span class="s">readings today</span></button>`,
     cP && `<button class="card kpi" id="hlow"><span class="k">Low stock</span><span class="v" id="hsp">–</span><span class="s" id="hspz">spares</span></button>`].filter(Boolean);
   $('#app').innerHTML = `<main class="scroll hm">
-    <div class="hero hh"><div class="hrow"><div class="brand">HSM · Electrical &amp; Automation</div>
+    <div class="hero hh"><div class="hrow"><div class="brand">HSM E&amp;A</div>
       <div class="hbtns">${ME.is_admin ? `<button class="bell-btn" data-go="ask" aria-label="Ask HSM">${ic('bot', 22)}</button>` : ''}<button class="bell-btn" data-go="notifs" aria-label="Notifications">${ic('bell', 22)}<b class="bdg hidden" id="ncb"></b></button>
       <button class="avatar-btn" data-go="profile" aria-label="My profile" style="overflow:hidden;padding:0">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc(initials(ME.name))}</button></div></div>
       <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div><div class="sub">${dayTxt}</div></div>
     ${cS ? `<div class="lift card shiftcard sc2" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div class="sci"><div class="t1">On duty now</div><div class="t2">Shift ${sh}</div><div class="t3">${SHIFT_TIME[sh]}</div></div><span class="mepill hidden" id="hme"></span></div>
       <div class="chips" id="hcrew"><span class="hint">Loading crew…</span></div></div>` : '<div style="height:16px"></div>'}
+    <div class="card thought"><span class="k">Thought of the day</span><p>“${esc(QUOTES[Math.floor((Date.now() + 19800000) / 864e5) % QUOTES.length])}”</p></div>
     ${kpis.length ? `<div class="kpis">${kpis.join('')}</div>` : ''}
     <div id="hadmin"></div><div id="hleave"></div>
     <div class="sec-h">Apps</div>
     ${mods.length || canAp ? `<div class="agrid">${canAp ? `<button class="atile ap" data-go="approval"><span class="ic">${ic('key', 24)}<b class="bdg hidden" id="apb"></b></span><span class="tt">Approval</span></button>` : ''}${mods.map(([k, t, i]) => `<button class="atile" data-go="${k}"><span class="ic">${ic(i, 24)}</span><span class="tt">${SHORT[k] || t.replace(/'/g, '&#39;')}</span></button>`).join('')}</div>`
       : `<div class="empty"><b>No modules yet</b>Ask ${esc(ADMIN_NAME)} to give you access.</div>`}
-    <div class="card thought"><span class="k">Thought of the day</span><p>“${esc(QUOTES[Math.floor((Date.now() + 19800000) / 864e5) % QUOTES.length])}”</p></div>
     <button class="aboutlink" data-go="about">${ic('info', 18)} About this app</button>
     <div style="height:24px"></div>
   </main>${nav('home')}`;
@@ -829,6 +836,9 @@ function viewProfile() {
       ${ME.is_admin ? '<span class="tag soft" style="margin-top:6px">App admin</span>' : (ME.admin_modules || []).length ? `<span class="tag soft" style="margin-top:6px">Admin: ${esc(MODULES.filter(m => ME.admin_modules.includes(m[0])).map(m => m[1].replace(/&#39;|'/g, '’')).join(', '))}</span>` : ''}
       <div class="phact"><label class="linkbtn">${ic('camera', 18)} ${ME.avatar ? 'Change photo' : 'Add photo'}<input type="file" id="pph" accept="image/*" hidden></label>
         ${ME.avatar ? `<button class="linkbtn" id="prm">${ic('x', 18)} Remove</button>` : ''}</div></div></div>
+    <div class="card" style="padding:16px;margin-top:18px"><div class="label" style="margin:0 0 10px">App colour</div>
+      <div class="thm" id="pthm">${THEMES.map(([k, l, c1, c2]) => `<button type="button" data-th="${k}" class="${(store.get('hsm_theme', 'red')) === k ? 'on' : ''}"><i style="background:linear-gradient(135deg,${c1},${c2})"></i>${l}</button>`).join('')}</div>
+      <p class="hint" style="margin:10px 0 0">Only on this phone. Alerts stay red and OK stays green in every colour.</p></div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-top:18px">
       <button class="btn block" data-go="pin">${ic('key')} Change PIN</button>
       ${ME.is_admin ? `<button class="btn block" data-go="approvals">${ic('users')} App approvals &amp; sign-ins</button>` : ''}
@@ -840,6 +850,7 @@ function viewProfile() {
       <button class="btn block" data-go="about">${ic('info')} About this app</button>
       <button class="btn ghost block" id="pout">${ic('logout')} Sign out</button></div>
     <p class="hint" style="margin-top:22px;text-align:center">HSM E&amp;A App · version ${APP_VERSION} (build ${esc(window.HSM_APP_VERSION || 0)})</p></div></main>`;
+  $('#pthm').onclick = e => { const b = e.target.closest('[data-th]'); if (!b) return; store.set('hsm_theme', b.dataset.th); applyTheme(b.dataset.th); $$('#pthm button').forEach(x => x.classList.toggle('on', x === b)); };
   $('#pview').onclick = () => ME.avatar ? showPhoto(ME.avatar, ME.name) : $('#pph').click();
   $('#pph').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     if (f.size > 25 * 1024 * 1024) return toast('Photo is too large');
@@ -982,7 +993,7 @@ async function viewUser(id) {
     ${r.status === 'approved' && !self ? `<div style="padding:14px 16px 0;display:flex;flex-direction:column;gap:10px">
       ${r.has_pin ? `<button class="btn block" data-x="reset_pin">${ic('key')} Reset PIN (forgot PIN)</button>` : ''}
       ${r.device_name ? `<button class="btn block" data-x="unbind">${ic('refresh')} Free the phone</button>` : ''}
-      <button class="btn ghost block" data-x="remove" style="color:var(--red);border-color:var(--red-100)">${ic('x')} Remove access</button></div>`
+      <button class="btn ghost block" data-x="remove" style="color:var(--danger);border-color:var(--red-100)">${ic('x')} Remove access</button></div>`
       : r.status !== 'approved' && r.status !== 'pending' ? `<div style="padding:14px 16px 0"><button class="btn green block" data-x="approve">${ic('ok')} Approve now</button></div>` : ''}
     <div style="padding:10px 16px 0"><button class="btn block" data-x="edit">${ic('edit')} Edit name, username, SAP ID</button></div>
     ${r.is_admin ? '' : `<div class="pad" style="padding-bottom:0"><div class="card" style="padding:14px 14px 16px"><div class="label" style="margin:0 0 4px">Access</div>
@@ -1199,7 +1210,7 @@ async function viewSchedule() {
     const md = $('#modal');
     md.innerHTML = `<div class="sheet"><h3>${esc(p.name)}</h3><p>${fmtDay(S.calSel)}${p.shift ? ` · now <b>${esc(SHIFT_NAME[p.shift])}</b>` : ''}</p>
       <div class="shpick">${['A','B','C','G','L','WO'].map(k => `<button class="sp-${k.toLowerCase()} ${p.shift === k ? 'on' : ''}" data-sh="${k}"><b>${k}</b><span>${SHIFT_NAME[k]}</span></button>`).join('')}</div>
-      ${isNew || !isModAdmin('schedule') ? '' : `<button class="btn ghost block" data-sh="__x" style="color:var(--red)">${ic('x')} Remove from this date</button>`}
+      ${isNew || !isModAdmin('schedule') ? '' : `<button class="btn ghost block" data-sh="__x" style="color:var(--danger)">${ic('x')} Remove from this date</button>`}
       <button class="btn ghost block" data-sh="__c">Cancel</button></div>`;
     md.classList.remove('hidden');
     md.onclick = e => { const b = e.target.closest('[data-sh]'); if (!b && e.target !== md) return; md.classList.add('hidden'); md.onclick = null;
@@ -1279,12 +1290,12 @@ async function viewChecklist() {
       const pend = list.filter(x => x.h < x.n);
       let msg = '';
       if (q) { const here = list.filter(x => secHit(x.t, x.si, q)), other = [...tl.filter(t => t.code !== ct).map(t => [t.name, subsOf(S.clArea, t.code).filter(x => secHit(x.t, x.si, q)).length]), ...areas.filter(([a]) => a !== S.clArea).map(([a, l]) => [l, subsOf(a).filter(x => secHit(x.t, x.si, q)).length])].filter(([, n]) => n);
-        msg = (!here.length && !other.length) ? `<span style="color:var(--red)"><b>No reading matches “${esc(q)}”.</b></span>` : `<b>${here.length ? `${here.length} sub-tree${here.length > 1 ? 's' : ''} here ${here.length > 1 ? 'have' : 'has'} it – tap the highlighted one.` : 'No match in this area.'}</b>${other.length ? ` Also in: ${other.map(([l, n]) => `${esc(l)} (${n})`).join(', ')}` : ''}`; }
+        msg = (!here.length && !other.length) ? `<span style="color:var(--danger)"><b>No reading matches “${esc(q)}”.</b></span>` : `<b>${here.length ? `${here.length} sub-tree${here.length > 1 ? 's' : ''} here ${here.length > 1 ? 'have' : 'has'} it – tap the highlighted one.` : 'No match in this area.'}</b>${other.length ? ` Also in: ${other.map(([l, n]) => `${esc(l)} (${n})`).join(', ')}` : ''}`; }
       $('#clmsg').innerHTML = msg; $('#clmsg').hidden = !msg;
       const on = $('#clt .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); };
     draw();
     abnormalFor(today).then(d => { const el = $('#actn'); if (!el) return; const n = d.items.length;
-      el.innerHTML = n ? `<b style="color:var(--red)">${n} abnormal reading${n > 1 ? 's' : ''}</b> · tap to see area-wise` : 'All readings normal today'; if (n) $('#actc').classList.add('bad'); }).catch(() => { const el = $('#actn'); if (el) el.textContent = 'Tap to open'; });
+      el.innerHTML = n ? `<b style="color:var(--danger)">${n} abnormal reading${n > 1 ? 's' : ''}</b> · tap to see area-wise` : 'All readings normal today'; if (n) $('#actc').classList.add('bad'); }).catch(() => { const el = $('#actn'); if (el) el.textContent = 'Tap to open'; });
     $('#clt').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; S.clArea = b.dataset.a; viewChecklist(); };
     $('#clt2').onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; S.clTplBy[S.clArea] = b.dataset.t; draw(); };
     $('#clst').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; const x = subsOf(S.clArea, curTpl())[+b.dataset.i], q = S.clQ.trim();
@@ -1482,7 +1493,7 @@ async function viewChecklistFill(code) {
       const left = t.sections.map((s, si) => ({ s, e: secTot[si] - s.items.reduce((c, it, ii) => c + it.cells.filter((x, fi) => x && all[`${si}.${ii}.${fi}`]).length, 0) })).filter(x => x.e > 0);
       const m = $('#modal');
       m.innerHTML = `<div class="sheet"><div class="status" style="padding:0"><div class="ring" style="background:${pending ? 'var(--amber-50,#FFF4E5);color:var(--amber)' : 'var(--green-50);color:var(--green)'}">${ic(pending ? 'clock' : 'ok', 40)}</div>
-        <h2>${pending ? 'Saved on this phone' : 'Submitted'}</h2><p>${esc(t.name)}${sel ? ' · ' + esc(sel.title) : ''} · ${n} new reading${n > 1 ? 's' : ''} · ${Object.keys(all).length} of ${total} done today${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--red)">${hot} out of limit</b>` : ''}</p>
+        <h2>${pending ? 'Saved on this phone' : 'Submitted'}</h2><p>${esc(t.name)}${sel ? ' · ' + esc(sel.title) : ''} · ${n} new reading${n > 1 ? 's' : ''} · ${Object.keys(all).length} of ${total} done today${nok ? ` · <b style="color:var(--danger)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--danger)">${hot} out of limit</b>` : ''}</p>
         ${left.length ? `<p style="margin-top:8px;text-align:left"><b>Still empty:</b> ${left.map(x => `${esc(x.s.title)} (${x.e})`).join(', ')}</p>` : `<p style="margin-top:8px"><b>All readings of this check list are filled.</b> Use “Daily report (Excel)” on the Check List page to get the full Excel.</p>`}
         ${pending ? '<p style="margin-top:8px">No network here. It will upload by itself when the network is back – no need to fill it again.</p>' : ''}</div>
         <button class="btn block" id="mview" style="margin-top:14px">${ic('xls', 20)} View in Excel format</button>
@@ -1508,7 +1519,7 @@ async function viewClSettings() {
   const draw = () => {
     const list = tpl.filter(t => t.area === S.csArea);
     $('#cst').innerHTML = areas.map(([a, l]) => `<button role="tab" data-a="${a}" class="${a === S.csArea ? 'on' : ''}" aria-selected="${a === S.csArea}">${esc(l)}</button>`).join('');
-    $('#cs').innerHTML = `<div class="pad csp"><p class="hint" style="margin:0 0 10px">A temperature reading turns <b style="color:var(--red)">red</b> when it is above “Red above” (or below “Red below”, if filled). Default: above 100. Changes apply to everyone from now on.</p>
+    $('#cs').innerHTML = `<div class="pad csp"><p class="hint" style="margin:0 0 10px">A temperature reading turns <b style="color:var(--danger)">red</b> when it is above “Red above” (or below “Red below”, if filled). Default: above 100. Changes apply to everyone from now on.</p>
       ${list.map(t => `<div class="label" style="margin-top:14px">${esc(t.name)}</div>` + t.sections.map((s, si) => { if (!hasTemp(t, si)) return ''; const l = limOf(t.code, si);
         return `<div class="card cslim" data-k="${esc(t.code)}|${si}" style="padding:12px;margin-bottom:8px"><div style="font-weight:700;margin-bottom:8px">${esc(s.title)}</div>
           <div class="two"><div class="fld"><label>Red above (°C)</label><input type="number" inputmode="decimal" class="hi" value="${l.hi}"></div>
@@ -1587,7 +1598,7 @@ async function viewChecklistHistory(code) {
     const t = tpl.find(x => x.code === code);
     $('#hh').innerHTML = `<div class="pad"><div class="label">${esc(t ? t.name : code)} · last ${rows.length}</div>` + (rows.length ? `<div class="list">${rows.map(r => {
       const vals = Object.values(r.vals || {}); const { nok, hot } = t ? countFlags(t, r.vals || {}) : { nok: 0, hot: 0 };
-      return `<button class="lrow" data-go="cle/${r.id}"><span class="tx"><span class="a">${fmtDay(fromYmd(r.check_date))} · Shift ${esc(r.shift || '-')}</span><span class="b">${r.local ? '<b style="color:var(--amber)">Waiting to upload</b> · ' : ''}${esc(r.inspected_name || '')} · ${vals.length} readings${r.nparts > 1 ? ` · ${r.nparts} submissions combined` : ''}${nok ? ` · <b style="color:var(--red)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--red)">${hot} &gt;100 °C</b>` : ''}</span></span><span class="chev">${ic('chev', 22)}</span></button>`; }).join('')}</div>`
+      return `<button class="lrow" data-go="cle/${r.id}"><span class="tx"><span class="a">${fmtDay(fromYmd(r.check_date))} · Shift ${esc(r.shift || '-')}</span><span class="b">${r.local ? '<b style="color:var(--amber)">Waiting to upload</b> · ' : ''}${esc(r.inspected_name || '')} · ${vals.length} readings${r.nparts > 1 ? ` · ${r.nparts} submissions combined` : ''}${nok ? ` · <b style="color:var(--danger)">${nok} NOT OK</b>` : ''}${hot ? ` · <b style="color:var(--danger)">${hot} &gt;100 °C</b>` : ''}</span></span><span class="chev">${ic('chev', 22)}</span></button>`; }).join('')}</div>`
       : '<div class="empty"><b>No records yet</b>Submitted check lists appear here.</div>') + '</div>';
   } catch (e) { netErr(e); }
 }
@@ -1603,8 +1614,8 @@ async function viewChecklistEntry(id) {
     if (r && t) { const sib = (await dayEntries(r.template_code, r.check_date)).filter(x => (x.shift || '') === (r.shift || '')); r = mergeEntries(sib.length ? sib : [r])[0]; }
     if (!r || !t) { $('#ce').innerHTML = '<div class="empty"><b>Record not found</b></div>'; return; }
     const V = r.vals || {};
-    const cell = (v, ty, si) => !v ? '<span style="color:var(--muted)">—</span>' : v === 'NOT OK' || v === 'OUT' ? `<b style="color:var(--red)">${esc(v)}</b>` : v === 'OK' || v === 'IN' ? `<span style="color:var(--green);font-weight:700">${esc(v)}</span>`
-      : isHot(ty, v, limOf(t.code, si)) ? `<b style="color:var(--red)">${esc(v)}</b>` : esc(v);
+    const cell = (v, ty, si) => !v ? '<span style="color:var(--muted)">—</span>' : v === 'NOT OK' || v === 'OUT' ? `<b style="color:var(--danger)">${esc(v)}</b>` : v === 'OK' || v === 'IN' ? `<span style="color:var(--green);font-weight:700">${esc(v)}</span>`
+      : isHot(ty, v, limOf(t.code, si)) ? `<b style="color:var(--danger)">${esc(v)}</b>` : esc(v);
     const listHtml = t.sections.map((s, si) => {
         const one = s.fields.length === 1;
         const rowsH = s.items.map((it, ii) => { const any = it.cells.some((c, fi) => c && V[`${si}.${ii}.${fi}`]);
@@ -1700,7 +1711,7 @@ async function spareExport() {
 function viewSpares() {
   $('#app').innerHTML = `${bar('Spares', 'home', `${logBtn('spares')}${ME.is_admin ? `<button class="ib" id="sset" aria-label="Spares settings">${ic('gear', 26)}</button>` : ''}${spareXlsAreas().length ? `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button>` : ''}<button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="sq" type="search" placeholder="Search item, model, make, location, cupboard" value="${esc(S.spareQuery)}" aria-label="Search spares"></div></div>
-  <div class="tabs" role="tablist" id="tabs"><button data-a="__low" class="${S.spareLow ? 'on' : ''}" style="${S.spareLow ? 'background:var(--red);border-color:var(--red)' : ''}">Out / low stock</button>${SPARE_AREAS.map(a => `<button role="tab" data-a="${esc(a)}" class="${!S.spareLow && a === S.spareArea ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>
+  <div class="tabs" role="tablist" id="tabs"><button data-a="__low" class="${S.spareLow ? 'on' : ''}" style="${S.spareLow ? 'background:var(--red);border-color:var(--danger)' : ''}">Out / low stock</button>${SPARE_AREAS.map(a => `<button role="tab" data-a="${esc(a)}" class="${!S.spareLow && a === S.spareArea ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>
   <main class="scroll" id="list" style="padding-bottom:90px"><div class="spin">Loading…</div></main>
   <button class="fab" data-go="spare/new" style="bottom:24px">${ic('plus', 24)} Add spare</button>`;
   if (!SPARE_AREAS.includes(S.spareArea)) S.spareArea = SPARE_AREAS[0];
@@ -1759,7 +1770,7 @@ async function loadSpares(fromCache) {
       const chip = (k, lbl, list) => `<button data-la="${esc(k)}" class="lachip ${sel === k ? 'on' : ''}">${esc(lbl)}<b class="${list.some(r => tot(r) <= 0) ? '' : 'or'}">${list.length}</b></button>`;
       list.innerHTML = `<div class="lachips" id="lach">${chip('all', 'All areas', rows)}${order.map(a => chip(a, a, by[a])).join('')}</div>
         <div class="areahead"><b>${sel === 'all' ? 'All areas' : esc(sel)}</b><span>${shown.length} item${shown.length > 1 ? 's' : ''}</span></div>
-        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => tot(r) <= 0).length} out of stock <span style="color:var(--red)">●</span> · ${shown.filter(r => tot(r) > 0).length} low (below ${LOWN}) <span style="color:#E8710A">●</span></div>${tog}`
+        <div class="hint" style="padding:8px 16px 4px;font-weight:600">${S.spareHid ? 'Removed from list: ' : ''}${shown.filter(r => tot(r) <= 0).length} out of stock <span style="color:var(--danger)">●</span> · ${shown.filter(r => tot(r) > 0).length} low (below ${LOWN}) <span style="color:#E8710A">●</span></div>${tog}`
         + (sel === 'all' ? order.map(a => `<div class="oosh"><span>${esc(a)}</span><span class="tag red">${by[a].length}</span></div>` + by[a].map(r => planItem(r)).join('')).join('') : shown.map(r => planItem(r)).join(''));
       rows.forEach(r => { lowRows[r.id] = r; });
       if (!cached || !S.planAreas) rpc('hsm_plan_areas').then(v => { S.planAreas = v; }).catch(() => { S.planAreas = S.planAreas || { all: false, areas: [] }; });
@@ -2008,7 +2019,7 @@ async function sopDocs() {
     const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
     const row = x => `<button class="lrow" data-p="${esc(x.path)}" style="${admin ? 'flex:1;min-width:0' : ''}"><span class="ic" style="font-size:12px;font-weight:800">${esc(typ(x.o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(x.o.name.replace(/\.[^.]+$/, ''))}</span><span class="b"><span class="dk ${x.kind}">${x.kind === 'DOC' ? 'DOCUMENT' : x.kind}</span>${x.o.metadata ? size(x.o.metadata.size) : ''}${x.o.updated_at ? ' · ' + fmtShort(new Date(x.o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
     $('#dl').innerHTML = items.length ? `<div class="pad"><div class="label">${items.length} document${items.length > 1 ? 's' : ''} · ${esc(S.docArea)}${S.docType !== 'All' ? ' · ' + (S.docType === 'DOC' ? 'Documents' : S.docType) : ''}</div><div class="list">${items.map(x => admin
-        ? `<div style="display:flex;align-items:center">${row(x)}<button class="ib" data-del="${esc(x.path)}" aria-label="Delete ${esc(x.o.name)}" style="color:var(--red);margin-right:6px">${ic('trash', 22)}</button></div>` : row(x)).join('')}</div></div>`
+        ? `<div style="display:flex;align-items:center">${row(x)}<button class="ib" data-del="${esc(x.path)}" aria-label="Delete ${esc(x.o.name)}" style="color:var(--danger);margin-right:6px">${ic('trash', 22)}</button></div>` : row(x)).join('')}</div></div>`
       : `<div class="empty"><b>No ${S.docType === 'All' ? '' : (S.docType === 'DOC' ? '' : S.docType + ' ')}documents in ${esc(S.docArea)} yet</b>Tap “Add document” and choose where to add it.</div>`;
     $('#dl').onclick = async e => {
       const d = e.target.closest('[data-del]');
@@ -2078,9 +2089,9 @@ async function viewDrive(tab) {
   items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   const row = o => `<button class="lrow" data-f="${esc(tab + '/' + o.name)}" style="${admin ? 'flex:1;min-width:0' : ''}"><span class="ic" style="font-size:12px;font-weight:800">PDF</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${o.metadata ? fmtSize(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
   $('#dr').innerHTML = `<div class="pad"><div class="label">${items.length} document${items.length === 1 ? '' : 's'}</div>
-    <div class="list">${items.length ? items.map(o => admin ? `<div style="display:flex;align-items:center">${row(o)}<button class="ib" data-del="${esc(tab + '/' + o.name)}" aria-label="Remove ${esc(o.name)}" style="color:var(--red);margin-right:6px">${ic('trash', 22)}</button></div>` : row(o)).join('')
+    <div class="list">${items.length ? items.map(o => admin ? `<div style="display:flex;align-items:center">${row(o)}<button class="ib" data-del="${esc(tab + '/' + o.name)}" aria-label="Remove ${esc(o.name)}" style="color:var(--danger);margin-right:6px">${ic('trash', 22)}</button></div>` : row(o)).join('')
       : `<div class="empty"><b>No documents in ${esc(driveLabel(tab))} yet</b>${admin ? 'Tap “Add document” to upload PDF files.' : ''}</div>`}</div></div>`;
-  if (admin && !items.length && !DRIVE_BASE.some(t => t[0] === tab)) $('#dr').insertAdjacentHTML('beforeend', `<div class="pad"><button class="btn block" id="dfd" style="color:var(--red)">${ic('trash', 20)} Delete this empty folder</button></div>`);
+  if (admin && !items.length && !DRIVE_BASE.some(t => t[0] === tab)) $('#dr').insertAdjacentHTML('beforeend', `<div class="pad"><button class="btn block" id="dfd" style="color:var(--danger)">${ic('trash', 20)} Delete this empty folder</button></div>`);
   if ($('#dfd')) $('#dfd').onclick = async () => { const nm = driveLabel(tab); if (!(await ask('Delete this folder?', nm, 'Delete', 'Cancel', true))) return;
     try { await saveSetting('drive_folders', (SET.drive_folders || []).filter(f => f.k !== tab)); logAct('drive', 'Folder deleted', nm); toast('Folder deleted'); location.hash = '#drive'; } catch (e) { netErr(e); } };
   $('#dr').onclick = async e => {
@@ -2196,7 +2207,7 @@ async function viewMillProcessSops() {
   const label = f => (MILL_AREAS.find(a => a[0] === f) || [f, f])[1];
     const typ = n => (n.split('.').pop() || '').toUpperCase().slice(0, 4);
     const row = (o, ar = S.millArea, tag = '') => `<button class="lrow" data-f="${esc(ar + '/' + o.name)}" style="${admin ? 'flex:1;min-width:0' : ''}">
-        <span class="ic" style="font-size:12px;font-weight:800">${esc(typ(o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${tag ? `<b style="color:var(--red)">${esc(tag)}</b> · ` : ''}${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
+        <span class="ic" style="font-size:12px;font-weight:800">${esc(typ(o.name))}</span><span class="tx"><span class="a" style="font-size:16px">${esc(o.name.replace(/\.[^.]+$/, ''))}</span><span class="b">${tag ? `<b style="color:var(--danger)">${esc(tag)}</b> · ` : ''}${o.metadata ? size(o.metadata.size) : ''}${o.updated_at ? ' · ' + fmtShort(new Date(o.updated_at)) : ''}</span></span>${admin ? '' : `<span class="chev">${ic('chev', 22)}</span>`}</button>`;
   const draw = async () => {
     const btns = `<div class="tabs milltabs" id="mt" role="tablist">${areas.map(([f, t]) => `<button role="tab" data-area="${f}" class="${S.millArea === f ? 'on' : ''}" aria-selected="${S.millArea === f}">${esc(t)}</button>`).join('')}</div>`;
     $('#mb').innerHTML = `${btns}<div class="pad"><div class="spin">Loading…</div></div>`;
@@ -2287,7 +2298,7 @@ async function askAbnormal(t, words) {
   const day = ymd(askDay(t)), d = await abnormalFor(day);
   let it = d.items; if (words.length) it = it.filter(x => words.every(w => (x.tname + ' ' + x.equip + ' ' + x.param + ' ' + clAreaName(x.area)).toLowerCase().includes(w)));
   if (!it.length) return askCard('Abnormal readings · ' + fmtDay(fromYmd(day)), '<b style="color:var(--green)">None found – all readings normal.</b>');
-  return askCard(`${it.length} abnormal reading${it.length > 1 ? 's' : ''} · ${fmtDay(fromYmd(day))}`, it.slice(0, 15).map(x => askRow(`${esc(x.equip)} <small>${esc(clAreaName(x.area))} · ${esc(x.param)}</small>`, `<span style="color:var(--red)">${esc(x.value)}</span>`)).join('') + (it.length > 15 ? `<div class="hint">+${it.length - 15} more – open “Daily action required”.</div>` : '') + '<button class="akb" data-go="actions">Open action list</button>');
+  return askCard(`${it.length} abnormal reading${it.length > 1 ? 's' : ''} · ${fmtDay(fromYmd(day))}`, it.slice(0, 15).map(x => askRow(`${esc(x.equip)} <small>${esc(clAreaName(x.area))} · ${esc(x.param)}</small>`, `<span style="color:var(--danger)">${esc(x.value)}</span>`)).join('') + (it.length > 15 ? `<div class="hint">+${it.length - 15} more – open “Daily action required”.</div>` : '') + '<button class="akb" data-go="actions">Open action list</button>');
 }
 async function askSpares(t, words) {
   const low = /\b(low|nil|out of|khatam|zero|kam|short)\b/.test(t);
@@ -2297,7 +2308,7 @@ async function askSpares(t, words) {
   else return '';
   const rows = await api(path); if (!rows.length) return '';
   return askCard(low && !words.length ? `Out of stock / low (below ${LOWN})` : `Spares · ${rows.length}${rows.length === 8 ? '+' : ''} found`, rows.map(r => { const n = r.item_total != null ? r.item_total : r.qty;
-    return `<button class="akb row" data-go="spare/${r.id}"><span>${esc(r.material)}<small>${esc([r.model, r.make].filter(Boolean).join(' · '))} · ${esc(r.location || 'location not set')}${r.rack ? ' · Rack ' + esc(r.rack) : ''}${r.cupboard ? ' · Cup. ' + esc(r.cupboard) : ''}</small></span><b style="color:${n <= 0 ? 'var(--red)' : n < LOWN ? 'var(--amber,#E69100)' : 'inherit'}">${n}</b></button>`; }).join(''));
+    return `<button class="akb row" data-go="spare/${r.id}"><span>${esc(r.material)}<small>${esc([r.model, r.make].filter(Boolean).join(' · '))} · ${esc(r.location || 'location not set')}${r.rack ? ' · Rack ' + esc(r.rack) : ''}${r.cupboard ? ' · Cup. ' + esc(r.cupboard) : ''}</small></span><b style="color:${n <= 0 ? 'var(--danger)' : n < LOWN ? 'var(--amber,#E69100)' : 'inherit'}">${n}</b></button>`; }).join(''));
 }
 const ASK_SOPS = {};
 async function askSops(words) {
@@ -2328,7 +2339,7 @@ async function askSummary() {
   const [ab, pend, low, ros] = await Promise.allSettled([abnormalFor(day), (async () => { await ncFetch(); return ncItems().filter(x => NC_LIVE.test(x.k)); })(), api(`spares_v?select=id&item_total=lt.${LOWN}&low_hidden=eq.false&limit=500`), api(`shift_roster?select=name,shift&day=eq.${day}&limit=300`)]);
   const sh = curShift(today), crew = ros.status === 'fulfilled' ? ros.value.filter(r => r.shift === sh).map(r => firstName(r.name)) : [];
   const rows = [askRow('Shift on duty', `${sh} · ${SHIFT_TIME[sh]}`, crew.length ? `<small>${esc(crew.join(', '))}</small>` : '')];
-  if (ab.status === 'fulfilled') rows.push(askRow('Abnormal readings today', `<span style="color:${ab.value.items.length ? 'var(--red)' : 'var(--green)'}">${ab.value.items.length}</span>`));
+  if (ab.status === 'fulfilled') rows.push(askRow('Abnormal readings today', `<span style="color:${ab.value.items.length ? 'var(--danger)' : 'var(--green)'}">${ab.value.items.length}</span>`));
   if (pend.status === 'fulfilled') rows.push(askRow('Waiting for approval', pend.value.length));
   if (low.status === 'fulfilled') rows.push(askRow(`Spares low / nil (below ${LOWN})`, low.value.length));
   return askCard('Summary · ' + fmtDay(today), rows.join('') + '<button class="akb" data-go="actions">Abnormal readings in detail</button>');
@@ -2372,15 +2383,15 @@ async function askReadings(words, status = '') {
   if (!out.length) return '';
   out.sort((a, b) => b.sc - a.sc || (b.hot - a.hot));
   const lab = { normal: 'Normal readings', abnormal: 'Abnormal readings', empty: 'Not filled yet', '': 'Readings' };
-  const sum = !words.length || out.length > 14 ? `<div class="akn" style="margin-bottom:6px">${Object.entries(cnt).map(([k, c]) => `<b>${esc(k)}</b>: ${c.normal} normal · ${c.abnormal ? `<span style="color:var(--red)">${c.abnormal} abnormal</span>` : '0 abnormal'} · ${c.empty} empty`).join('<br>')}</div>` : '';
-  return askCard(`${lab[status]} today · ${out.length} found`, sum + out.slice(0, 14).map(x => askRow(`${esc(x.name)} <small>${esc(x.area)} › ${esc(x.t)} · ${esc(x.lbl)}</small>`, `<span style="${x.hot ? 'color:var(--red)' : ''}">${esc(x.v)}</span>`)).join('') + akMore(out.length, 14));
+  const sum = !words.length || out.length > 14 ? `<div class="akn" style="margin-bottom:6px">${Object.entries(cnt).map(([k, c]) => `<b>${esc(k)}</b>: ${c.normal} normal · ${c.abnormal ? `<span style="color:var(--danger)">${c.abnormal} abnormal</span>` : '0 abnormal'} · ${c.empty} empty`).join('<br>')}</div>` : '';
+  return askCard(`${lab[status]} today · ${out.length} found`, sum + out.slice(0, 14).map(x => askRow(`${esc(x.name)} <small>${esc(x.area)} › ${esc(x.t)} · ${esc(x.lbl)}</small>`, `<span style="${x.hot ? 'color:var(--danger)' : ''}">${esc(x.v)}</span>`)).join('') + akMore(out.length, 14));
 }
 async function askProgress() {
   const day = ymd(new Date()), tpl = await templates(); let rows = []; try { rows = await api(`checklist_entries?select=template_code,shift,vals,client_id&check_date=eq.${day}`); } catch (e) { if (!isNet(e)) throw e; }
   const m = {}; dayMerge(rows).forEach(r => { m[r.template_code] = r; });
   const mine = ME && ME.areas && Array.isArray(ME.areas.checklist) ? ME.areas.checklist : [], all = isModAdmin('checklist'), by = {};
   tpl.forEach(t => { if (!(all || mine.includes(t.area))) return; const n = itemCount(t), h = Object.keys((m[t.code] && m[t.code].vals) || {}).length, k = clAreaName(t.area); (by[k] = by[k] || []).push([t.name, h, n]); });
-  return askCard('Check list progress · ' + fmtDay(new Date()), Object.entries(by).map(([k, l]) => `<div class="aks">${esc(k)}</div>` + l.map(([n, h, t]) => askRow(esc(n), `<span style="color:${h >= t ? 'var(--green)' : h ? 'var(--amber,#E69100)' : 'var(--red)'}">${h}/${t}</span>`)).join('')).join('') + '<button class="akb" data-go="checklist">Open Check List</button>');
+  return askCard('Check list progress · ' + fmtDay(new Date()), Object.entries(by).map(([k, l]) => `<div class="aks">${esc(k)}</div>` + l.map(([n, h, t]) => askRow(esc(n), `<span style="color:${h >= t ? 'var(--green)' : h ? 'var(--amber,#E69100)' : 'var(--danger)'}">${h}/${t}</span>`)).join('')).join('') + '<button class="akb" data-go="checklist">Open Check List</button>');
 }
 const askGoRow = (go, a, b, r) => `<button class="akb row" data-go="${esc(go)}"><span>${a}${b ? `<small>${b}</small>` : ''}</span><b>${r || '›'}</b></button>`;
 async function askUniversal(text, t, words, hint) {
@@ -2401,7 +2412,7 @@ async function askUniversal(text, t, words, hint) {
     x = top(tbt, r => Math.max(akScore(r.topic, words, pass), akScore((r.points || []).join(' '), words, pass) * .9), 4);
     add('tbt', hint.tbt, x.length && askCard(`TBT · ${x.length}`, x.map(([, r]) => { const p = (r.points || []).filter(q => akScore(q, words, false)).slice(0, 2); return `<div class="akr"><span><b>${esc(r.topic)}</b> <small>${esc(r.area)} · TBT ${esc(r.sr)}</small>${p.map(q => `<small>• ${esc(q.replace(/^\d+\.\s*/, ''))}</small>`).join('')}</span></div>`; }).join('') + '<button class="akb" data-go="tbt">Open TBT</button>'), x[0] && x[0][0]);
     x = top(con, r => akScore([r.detail, r.ext1, r.ext2, r.mob1, r.mob2].join(' '), words, pass), 6);
-    add('contact', hint.contact, x.length && askCard(`Contacts · ${x.length}`, x.map(([, r]) => `<div class="akr"><span>${esc(r.detail)}</span><b>${[r.mob1, r.mob2].filter(Boolean).map(m => `<a href="tel:${String(m).replace(/[^0-9+]/g, '')}" style="color:var(--red)">${esc(m)}</a>`).join(' · ') || '—'}</b>${r.ext1 || r.ext2 ? `<small>Ext ${esc([r.ext1, r.ext2].filter(Boolean).join(' / '))}</small>` : ''}</div>`).join('')), x[0] && x[0][0]);
+    add('contact', hint.contact, x.length && askCard(`Contacts · ${x.length}`, x.map(([, r]) => `<div class="akr"><span>${esc(r.detail)}</span><b>${[r.mob1, r.mob2].filter(Boolean).map(m => `<a href="tel:${String(m).replace(/[^0-9+]/g, '')}" style="color:var(--danger)">${esc(m)}</a>`).join(' · ') || '—'}</b>${r.ext1 || r.ext2 ? `<small>Ext ${esc([r.ext1, r.ext2].filter(Boolean).join(' / '))}</small>` : ''}</div>`).join('')), x[0] && x[0][0]);
     x = top(docs, d => akScore(d.n.replace(/\.[^.]+$/, '') + ' ' + d.where, words, pass), 8);
     add('doc', hint.doc || hint.sop, x.length && askCard(`Documents & SOP files · ${x.length}${x.length === 8 ? '+' : ''}`, x.map(([, d]) => `<button class="akb row" data-f="${esc(d.p)}" data-b="${esc(d.b)}"><span>${esc(d.n.replace(/\.[^.]+$/, ''))}<small>${esc(d.where)}</small></span><b>Open</b></button>`).join('')), x[0] && x[0][0]);
     add('spare', hint.spare, sp, 2); add('read', hint.read, rd, 2);
@@ -2754,7 +2765,7 @@ function viewAbout() {
     <div class="card about"><img src="img/coil.png" alt="" class="alogo"><h2>HSM E&amp;A App</h2><div class="motto">One action, multiple solutions.</div><div class="hint">Version ${APP_VERSION} · build ${esc(window.HSM_APP_VERSION || 0)}</div>
       <p>One app for the Electrical &amp; Automation team of the Hot Strip Mill: shift schedule, check lists, spares, SOPs, TBT and contacts – on Android and iPhone.</p>
       <div class="by"><span class="k">Designed &amp; developed by</span><b>Shashank Agrawal</b><span>HSM – Electrical &amp; Automation</span></div></div>
-    <p class="hint" style="text-align:center;margin-top:18px">For ideas or problems use <a href="#suggest" style="color:var(--red);font-weight:700">Suggestions</a>.</p></div></main>`;
+    <p class="hint" style="text-align:center;margin-top:18px">For ideas or problems use <a href="#suggest" style="color:var(--danger);font-weight:700">Suggestions</a>.</p></div></main>`;
 }
 
 
