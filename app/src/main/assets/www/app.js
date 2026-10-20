@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.20';
+const APP_VERSION = '3.21';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -2286,20 +2286,6 @@ async function askAbnormal(t, words) {
   if (!it.length) return askCard('Abnormal readings · ' + fmtDay(fromYmd(day)), '<b style="color:var(--green)">None found – all readings normal.</b>');
   return askCard(`${it.length} abnormal reading${it.length > 1 ? 's' : ''} · ${fmtDay(fromYmd(day))}`, it.slice(0, 15).map(x => askRow(`${esc(x.equip)} <small>${esc(clAreaName(x.area))} · ${esc(x.param)}</small>`, `<span style="color:var(--red)">${esc(x.value)}</span>`)).join('') + (it.length > 15 ? `<div class="hint">+${it.length - 15} more – open “Daily action required”.</div>` : '') + '<button class="akb" data-go="actions">Open action list</button>');
 }
-async function askReadings(words) {
-  if (!words.length) return '';
-  const day = ymd(new Date()), tpl = await templates();
-  let rows = []; try { rows = await api(`checklist_entries?select=*&check_date=eq.${day}&order=created_at`); } catch (e) { if (!isNet(e)) throw e; }
-  const mine = ME && ME.areas && Array.isArray(ME.areas.checklist) ? ME.areas.checklist : [], all = isModAdmin('checklist');
-  const out = [];
-  dayMerge(rows).forEach(r => { const t = tpl.find(x => x.code === r.template_code); if (!t || !(all || mine.includes(t.area))) return;
-    t.sections.forEach((s, si) => s.items.forEach((it, ii) => it.cells.forEach((c, fi) => { if (!c) return;
-      const lbl = (s.fields[fi] || {}).l || '', hay = (t.name + ' ' + s.title + ' ' + it.name + ' ' + lbl + ' ' + clAreaName(t.area)).toLowerCase();
-      if (!words.every(w => hay.includes(w))) return; const v = (r.vals || {})[`${si}.${ii}.${fi}`]; if (!v) return;
-      out.push({ name: it.name, lbl: lbl || s.title, v, hot: v === 'NOT OK' || isHot(ftype(s, it, fi), v, limOf(t.code, si)), t: t.name }); }))); });
-  if (!out.length) return '';
-  return askCard(`Today's readings · ${out.length} found`, out.slice(0, 14).map(x => askRow(`${esc(x.name)} <small>${esc(x.lbl)}</small>`, `<span style="${x.hot ? 'color:var(--red)' : ''}">${esc(x.v)}</span>`)).join('') + (out.length > 14 ? '<div class="hint">Add more words to narrow down.</div>' : ''));
-}
 async function askSpares(t, words) {
   const low = /\b(low|nil|out of|khatam|zero|kam|short)\b/.test(t);
   let path = 'spares_v?select=id,area,material,model,make,qty,location,rack,cupboard,item_total&order=item_total,material&limit=8';
@@ -2345,19 +2331,100 @@ async function askSummary() {
   return askCard('Summary · ' + fmtDay(today), rows.join('') + '<button class="akb" data-go="actions">Abnormal readings in detail</button>');
 }
 const ASK_HELP = askCard('Ask me like this', ['“aaj ki summary”', '“kal duty par kaun”', '“shift B me kaun”', '“abnormal readings”', '“FM1 motor temp”', '“bearing spare kahan hai”', '“low stock”', '“pending approvals”', '“RM motor trip hua – kya kare”'].map(x => `<div class="akn">${x}</div>`).join(''));
-async function askAnswer(text) {
-  const t = text.toLowerCase(), words = askWords(text);
-  if (/\b(summary|saransh|report|status|haal)\b/.test(t)) return askSummary();
-  if (/\b(pending|approval|approve|waiting|intezaar|intezar)\b/.test(t)) return askPending();
-  if (/\b(fault|trip|tripped|alarm|breakdown|problem|issue|error|band|kharab|nahi chal|not working|vibration)\b/.test(t) && words.length) return askFault(t, words);
-  if (/\b(abnormal|not ok|alert|danger|khatra|action|high|hot|garam)\b/.test(t) && !/\b(spare|stock)\b/.test(t)) return askAbnormal(t, words.filter(w => !/^(high|hot|garam|alert|danger|abnormal|action|not|ok)$/.test(w)));
-  if (/\b(duty|shift|roster|kaun|koun|who|off|weekly)\b/.test(t)) return askRoster(t, words);
-  if (/\b(spare|spares|stock|kahan|where|location|cupboard|rack|nil|khatam)\b/.test(t)) { const r = await askSpares(t, words); if (r) return r; }
-  if (/\bsop\b|procedure|process/.test(t)) { const r = await askSops(words); if (r) return r; }
-  // no clear intent – look everywhere
-  const parts = [await askReadings(words), await askSops(words), await askSpares(t, words)].filter(Boolean);
-  return parts.join('') || ASK_HELP;
+const akNorm = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const akLev1 = (a, b) => { if (a === b) return true; if (Math.abs(a.length - b.length) > 1) return false; let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2)); return a.length > b.length ? a.slice(i + 1) === b.slice(i) : b.slice(i + 1) === a.slice(i); };
+const akHit = (h, toks, w) => { if (h.includes(w)) return 1; if (w.length > 3 && w.endsWith('s') && h.includes(w.slice(0, -1))) return 1; if (w.length >= 5) for (const t of toks) if (akLev1(t, w)) return .8; return 0; };
+// score of one record for the query words: all words found = full match; only most of them = partial (used only when nothing matches fully)
+const akScore = (hay, words, partial) => { const h = akNorm(hay), toks = h.split(' '); let s = 0, m = 0; words.forEach(w => { const x = akHit(h, toks, w); s += x; if (x) m++; });
+  if (m === words.length) return s + 1; if (partial && words.length > 1 && m >= Math.ceil(words.length * .6)) return s * .6; return 0; };
+const AK_NOISE = new Set('number no num nmbr bataiye batayiye batado bataye batayein dijiye kijiye poochho pucho si sa se jo jaisa waha yaha unka uska iska inka liye lie chahiye chaiye hona dikhana nikalo nikal normal abnormal any about related'.split(' '));
+const akQuery = text => askWords(text).map(w => akNorm(w)).filter(w => w && !AK_NOISE.has(w));
+const akHints = t => ({ sop: /\b(sop|hirac|procedure|process|jsa)\b/.test(t), spare: /\b(spare|spares|stock|material)\b/.test(t), contact: /\b(contact|phone|mobile|mob|ext|extension|call)\b/.test(t), tbt: /\b(tbt|toolbox|tool box|safety|talk)\b/.test(t),
+  read: /\b(reading|readings|checklist|check list|value|values|temp|temperature|pressure|current|amp|vibration)\b/.test(t), doc: /\b(document|documents|drive|pdf|file|manual|drawing|drawings|doc)\b/.test(t) });
+const AK = { c: {}, t: 0 };
+const akLoad = async (k, fn) => { if (!AK.c[k] || Date.now() - AK.c[k].t > 300000) { try { AK.c[k] = { t: Date.now(), v: await fn() }; } catch (e) { if (isNet(e)) throw e; AK.c[k] = { t: Date.now(), v: [] }; } } return AK.c[k].v; };
+const akDocs = () => akLoad('docs', async () => { const out = [], ok = o => o.id && o.name && o.name !== '.emptyFolderPlaceholder', tryL = async (p, b) => { try { return (await storageList(p, b)).filter(ok); } catch (e) { return []; } };
+  await Promise.all([
+    ...DOC_AREAS.flatMap(a => [['', 'SOP'], ['SOP/', 'SOP'], ['HIRAC/', 'HIRAC'], ['DOC/', 'Document']].map(async ([sub, kind]) => (await tryL(`${a}/${sub}`, SOP_BUCKET)).forEach(o => out.push({ n: o.name, where: `${a} · ${kind}`, p: `${a}/${sub}${o.name}`, b: SOP_BUCKET })))),
+    ...DRIVE_TABS.filter(([k]) => canArea('drive', k)).map(async ([k, l]) => (await tryL(`${k}/`, DRIVE_BUCKET)).filter(o => /\.pdf$/i.test(o.name)).forEach(o => out.push({ n: o.name, where: 'Drive · ' + l, p: `${k}/${o.name}`, b: DRIVE_BUCKET }))),
+    ...MILL_AREAS.filter(([f]) => canArea('mill', f)).map(async ([f, l]) => (await tryL(`${f}/`, MILL_PROCESS_BUCKET)).filter(o => /\.(docx?|pdf)$/i.test(o.name)).forEach(o => out.push({ n: o.name, where: 'Mill process · ' + l, p: `${f}/${o.name}`, b: MILL_PROCESS_BUCKET })))]);
+  return out; });
+const akMore = (n, shown) => n > shown ? `<div class="hint">+${n - shown} more – add one more word to narrow down.</div>` : '';
+
+/* readings of today: status = '' (all filled), 'normal', 'abnormal', 'empty' */
+async function askReadings(words, status = '') {
+  const day = ymd(new Date()), tpl = await templates();
+  let rows = []; try { rows = await api(`checklist_entries?select=*&check_date=eq.${day}&order=created_at`); } catch (e) { if (!isNet(e)) throw e; }
+  const mine = ME && ME.areas && Array.isArray(ME.areas.checklist) ? ME.areas.checklist : [], all = isModAdmin('checklist');
+  const byT = {}; dayMerge(rows).forEach(r => { byT[r.template_code] = r; });
+  const out = [], cnt = {};
+  tpl.forEach(t => { if (!(all || mine.includes(t.area))) return; const r = byT[t.code], vals = (r && r.vals) || {};
+    t.sections.forEach((s, si) => s.items.forEach((it, ii) => it.cells.forEach((c, fi) => { if (!c) return;
+      const lbl = (s.fields[fi] || {}).l || '', hay = t.name + ' ' + s.title + ' ' + it.name + ' ' + lbl + ' ' + clAreaName(t.area);
+      const sc = words.length ? akScore(hay, words, false) : 1; if (!sc) return;
+      const v = vals[`${si}.${ii}.${fi}`], hot = !!v && (v === 'NOT OK' || isHot(ftype(s, it, fi), v, limOf(t.code, si))), st = !v ? 'empty' : hot ? 'abnormal' : 'normal';
+      const k = clAreaName(t.area); (cnt[k] = cnt[k] || { normal: 0, abnormal: 0, empty: 0 })[st]++;
+      if (status ? st === status : st !== 'empty') out.push({ sc, name: it.name, lbl: lbl || s.title, v: v || '–', hot, t: t.name, area: k }); }))); });
+  if (!out.length) return '';
+  out.sort((a, b) => b.sc - a.sc || (b.hot - a.hot));
+  const lab = { normal: 'Normal readings', abnormal: 'Abnormal readings', empty: 'Not filled yet', '': 'Readings' };
+  const sum = !words.length || out.length > 14 ? `<div class="akn" style="margin-bottom:6px">${Object.entries(cnt).map(([k, c]) => `<b>${esc(k)}</b>: ${c.normal} normal · ${c.abnormal ? `<span style="color:var(--red)">${c.abnormal} abnormal</span>` : '0 abnormal'} · ${c.empty} empty`).join('<br>')}</div>` : '';
+  return askCard(`${lab[status]} today · ${out.length} found`, sum + out.slice(0, 14).map(x => askRow(`${esc(x.name)} <small>${esc(x.area)} › ${esc(x.t)} · ${esc(x.lbl)}</small>`, `<span style="${x.hot ? 'color:var(--red)' : ''}">${esc(x.v)}</span>`)).join('') + akMore(out.length, 14));
 }
+async function askProgress() {
+  const day = ymd(new Date()), tpl = await templates(); let rows = []; try { rows = await api(`checklist_entries?select=template_code,shift,vals,client_id&check_date=eq.${day}`); } catch (e) { if (!isNet(e)) throw e; }
+  const m = {}; dayMerge(rows).forEach(r => { m[r.template_code] = r; });
+  const mine = ME && ME.areas && Array.isArray(ME.areas.checklist) ? ME.areas.checklist : [], all = isModAdmin('checklist'), by = {};
+  tpl.forEach(t => { if (!(all || mine.includes(t.area))) return; const n = itemCount(t), h = Object.keys((m[t.code] && m[t.code].vals) || {}).length, k = clAreaName(t.area); (by[k] = by[k] || []).push([t.name, h, n]); });
+  return askCard('Check list progress · ' + fmtDay(new Date()), Object.entries(by).map(([k, l]) => `<div class="aks">${esc(k)}</div>` + l.map(([n, h, t]) => askRow(esc(n), `<span style="color:${h >= t ? 'var(--green)' : h ? 'var(--amber,#E69100)' : 'var(--red)'}">${h}/${t}</span>`)).join('')).join('') + '<button class="akb" data-go="checklist">Open Check List</button>');
+}
+const askGoRow = (go, a, b, r) => `<button class="akb row" data-go="${esc(go)}"><span>${a}${b ? `<small>${b}</small>` : ''}</span><b>${r || '›'}</b></button>`;
+async function askUniversal(text, t, words, hint) {
+  if (!words.length) return '';
+  const any = Object.values(hint).some(Boolean), res = [], hk = { sop: hint.sop, hirac: hint.sop, tbt: hint.tbt, contact: hint.contact, doc: hint.doc || hint.sop, spare: hint.spare, read: hint.read };
+  const partial = n => n;   // placeholder to keep the shape readable
+  for (const pass of [false, true]) {
+    res.length = 0;
+    const [sop, hir, tbt, con, docs, sp, rd] = await Promise.all([
+      akLoad('sop', () => api('sop_hirac?select=area,sr_no,activity,sop_no,hirac_no&order=sr_no')), akLoad('hirac', () => hiracData()), akLoad('tbt', () => api('tbt?select=area,sr,topic,points&order=area_sort,sr')),
+      akLoad('con', () => api('contacts?select=sr,detail,ext1,ext2,mob1,mob2&order=sr')), akDocs(), askSpares(t, words), askReadings(words, /\bnormal\b/.test(t) && !/abnormal/.test(t) ? 'normal' : '')]);
+    const top = (arr, fn, n) => arr.map(x => [fn(x), x]).filter(([s]) => s > 0).sort((a, b) => b[0] - a[0]).slice(0, n);
+    const add = (k, rank, html, best) => { if (html) res.push({ k, best, html: html }); };
+    let x = top(sop, r => akScore([r.sr_no, r.sop_no, r.hirac_no, r.activity, r.area].join(' '), words, pass), 6);
+    add('sop', hint.sop, x.length && askCard(`SOP / HIRAC numbers · ${x.length}${x.length === 6 ? '+' : ''}`, x.map(([, r]) => `<div class="akr"><span>${esc(r.activity)} <small>${esc(r.area)} · Sr ${esc(r.sr_no)}</small></span><b>SOP ${esc(r.sop_no || '—')}</b>${hiracNos(r.hirac_no).length ? `<button class="akb" data-go="hirac/${hiracNos(r.hirac_no)[0]}" style="margin-top:4px">HIRAC ${esc(r.hirac_no)} ›</button>` : ''}</div>`).join('')), x[0] && x[0][0]);
+    x = top(hir, h => Math.max(akScore([h.title, h.ref, ...(h.acts || [])].join(' '), words, pass), akScore((h.hz || []).map(z => z.h).join(' '), words, pass) * .8), 5);
+    add('hirac', hint.sop, x.length && askCard(`HIRAC · ${x.length}`, x.map(([, h]) => { const hz = (h.hz || []).find(z => akScore(z.h || '', words, pass)); return askGoRow('hirac/' + h.no, `HIRAC ${h.no} · ${esc(h.title)}`, hz ? `Hazard: ${esc(hz.h)}${hz.c ? ' — ' + esc(String(hz.c).slice(0, 110)) : ''}` : esc(h.ref || ''), 'Open'); }).join('')), x[0] && x[0][0]);
+    x = top(tbt, r => Math.max(akScore(r.topic, words, pass), akScore((r.points || []).join(' '), words, pass) * .9), 4);
+    add('tbt', hint.tbt, x.length && askCard(`TBT · ${x.length}`, x.map(([, r]) => { const p = (r.points || []).filter(q => akScore(q, words, false)).slice(0, 2); return `<div class="akr"><span><b>${esc(r.topic)}</b> <small>${esc(r.area)} · TBT ${esc(r.sr)}</small>${p.map(q => `<small>• ${esc(q.replace(/^\d+\.\s*/, ''))}</small>`).join('')}</span></div>`; }).join('') + '<button class="akb" data-go="tbt">Open TBT</button>'), x[0] && x[0][0]);
+    x = top(con, r => akScore([r.detail, r.ext1, r.ext2, r.mob1, r.mob2].join(' '), words, pass), 6);
+    add('contact', hint.contact, x.length && askCard(`Contacts · ${x.length}`, x.map(([, r]) => `<div class="akr"><span>${esc(r.detail)}</span><b>${[r.mob1, r.mob2].filter(Boolean).map(m => `<a href="tel:${String(m).replace(/[^0-9+]/g, '')}" style="color:var(--red)">${esc(m)}</a>`).join(' · ') || '—'}</b>${r.ext1 || r.ext2 ? `<small>Ext ${esc([r.ext1, r.ext2].filter(Boolean).join(' / '))}</small>` : ''}</div>`).join('')), x[0] && x[0][0]);
+    x = top(docs, d => akScore(d.n.replace(/\.[^.]+$/, '') + ' ' + d.where, words, pass), 8);
+    add('doc', hint.doc || hint.sop, x.length && askCard(`Documents & SOP files · ${x.length}${x.length === 8 ? '+' : ''}`, x.map(([, d]) => `<button class="akb row" data-f="${esc(d.p)}" data-b="${esc(d.b)}"><span>${esc(d.n.replace(/\.[^.]+$/, ''))}<small>${esc(d.where)}</small></span><b>Open</b></button>`).join('')), x[0] && x[0][0]);
+    add('spare', hint.spare, sp, 2); add('read', hint.read, rd, 2);
+    if (any ? res.some(r => hk[r.k]) : res.length) break;
+  }
+  if (!res.length) return '';
+  const rank = r => (any && r.rank ? 100 : 0) + (r.best || 0);
+  res.forEach(r => { r.rank = 0; });
+  const hinted = any ? res.filter(r => hk[r.k]) : [];
+  return (hinted.length ? hinted : res).map(r => r.html).join('');
+}
+async function askAnswer(text) {
+  const t = ' ' + text.toLowerCase() + ' ', words = akQuery(text), hint = akHints(t);
+  if (/\b(summary|saransh|status report|haal)\b/.test(t)) return askSummary();
+  if (/\b(pending|approval|approve|waiting|intezaar|intezar)\b/.test(t) && !hint.read) return askPending();
+  if (/\b(baki|bacha|bachi|remaining|not filled|unfilled|khali|kitna bhara|kitni bhari|progress|complete)\b/.test(t) && (hint.read || /\bcheck/.test(t) || !words.length)) return askProgress();
+  if (/\b(abnormal|not ok|alert|danger|khatra|garam|exceed|out of limit|limit se)\b/.test(t) && !hint.spare) { const w = words.filter(x => !/^(high|hot|alert|danger|action|ok)$/.test(x)); return askAbnormal(t, w); }
+  if (/\bnormal\b/.test(t) && !words.length) return askReadings([], 'normal') || ASK_HELP;
+  if (/\b(low stock|nil stock|out of stock|stock khatam|khatam)\b/.test(t) && !words.length) return askSpares(t, []) || ASK_HELP;
+  if (/\b(duty|roster|kaun|koun|who|weekly off|leave par)\b/.test(t) && !hint.sop && !hint.read && !hint.spare && !hint.contact) return askRoster(t, words.filter(w => !/^(shift|off|weekly)$/.test(w)));
+  if (/\bshift\b/.test(t) && askShift(t)) return askRoster(t, []);
+  if (/\b(fault|trip|tripped|breakdown|problem|issue|error|nahi chal|not working)\b/.test(t) && words.length) return askFault(t, words);
+  const u = await askUniversal(text, t, words, hint);
+  return u || (words.length ? askCard('Kuch nahi mila', `<span class="hint">“${esc(words.join(' '))}” ke liye kisi module mein match nahi mila. Spelling badal kar ya sirf equipment / job ka naam likh kar dekhiye.</span>`) : ASK_HELP);
+}
+
 function viewAsk() {
   if (!ME || !ME.is_admin) { toast('Ask HSM is for the admin only'); return go('home'); }
   const quick = ['Aaj ki summary', 'Abnormal readings', 'Aaj duty par kaun', 'Low stock', 'Pending approvals'];
@@ -2376,7 +2443,7 @@ function viewAsk() {
   $('#akf').onsubmit = e => { e.preventDefault(); send($('#aki').value); };
   $('#akq').onclick = e => { const b = e.target.closest('button'); if (b) send(b.textContent); };
   $('#akclr').onclick = () => { ASK.msgs = []; draw(); };
-  box.onclick = async e => { const f = e.target.closest('[data-f]'); if (!f) return; try { await openDoc(f.dataset.f, MILL_PROCESS_BUCKET); } catch (err) { netErr(err); } };
+  box.onclick = async e => { const f = e.target.closest('[data-f]'); if (!f) return; try { await openDoc(f.dataset.f, f.dataset.b || MILL_PROCESS_BUCKET); } catch (err) { netErr(err); } };
 }
 
 /* ================= ADMIN UPLOADS (Excel → cloud) ================= */
