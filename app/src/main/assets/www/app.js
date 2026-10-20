@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.18';
+const APP_VERSION = '3.19';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -1245,10 +1245,14 @@ async function viewChecklist() {
     if (!areas.length) { $('#cl').innerHTML = `<div class="empty"><b>No check lists for you yet</b>Ask ${esc(ADMIN_NAME)} to give you access to your area.</div>`; return; }
     if (!areas.some(([a]) => a === S.clArea)) S.clArea = areas[0][0];
     // sub-tree = one section of a check list (e.g. “FM DC Motors – OP side”); an area's sub-trees are all its sections in order
-    const subsOf = a => tpl.filter(t => t.area === a).flatMap(t => t.sections.map((sc, si) => { const m = recs[t.code], dr = store.get(draftKey(t.code)), x = secStat(t, si, m && m.vals);
+    const subsOf = (a, code) => tpl.filter(t => t.area === a && (!code || t.code === code)).flatMap(t => t.sections.map((sc, si) => { const m = recs[t.code], dr = store.get(draftKey(t.code)), x = secStat(t, si, m && m.vals);
       return { t, si, title: sc.title, n: x.n, h: x.h, draft: !!(dr && dr.v && Object.keys(dr.v).some(k => k.startsWith(si + '.') && dr.v[k])) }; }));
-    const multi = a => tpl.filter(t => t.area === a).length > 1, lab = (a, x) => multi(a) ? `${x.t.name} › ${x.title}` : x.title;
-    $('#cl').innerHTML = `<div class="tabs cltabs" id="clt" role="tablist"></div>
+    const areaTpls = a => tpl.filter(t => t.area === a);
+    // area → (check list 1 / 2 / 3, only when the area has more than one) → sub-trees of that check list
+    S.clTplBy = S.clTplBy || {};
+    const curTpl = () => { const l = areaTpls(S.clArea); return (l.find(t => t.code === S.clTplBy[S.clArea]) || l[0] || {}).code; };
+    const lab = (a, x) => x.title;
+    $('#cl').innerHTML = `<div class="tabs cltabs" id="clt" role="tablist"></div><div class="tabs cltabs cl2" id="clt2" role="tablist" hidden></div>
       <div class="clq" style="border-top:1px solid var(--line)"><div class="search">${ic('search', 22)}<input id="clq" type="search" placeholder="Search reading – motor, pump, panel…" aria-label="Search all check lists" value="${esc(S.clQ)}"></div></div>
       <div class="clstw"><div class="clstl">Sub-trees of ${esc(clAreaName(S.clArea))} · ${fmtDay(new Date())}</div><div class="clstv" id="clst" role="list"></div><div class="clmsg" id="clmsg"></div></div>
       <div class="pad">
@@ -1259,14 +1263,18 @@ async function viewChecklist() {
         <div class="row"><input type="date" id="rdate" value="${S.reportDate}" max="${today}" aria-label="Report date"></div>
         <div id="rstate" class="apw"></div>
         <div class="two"><button class="btn" id="rsave">${ic('download')} Save</button><button class="btn pri" id="rshare">${ic('share')} Share / Mail</button></div></div></div>`;
-    const draw = () => { const q = S.clQ.trim(), list = subsOf(S.clArea);
+    const draw = () => { const q = S.clQ.trim(), ct = curTpl(), list = subsOf(S.clArea, ct), tl = areaTpls(S.clArea);
       $('#clt').innerHTML = areas.map(([a, l]) => { const n = subsOf(a), d = n.filter(x => x.h >= x.n).length, hits = q ? n.filter(x => secHit(x.t, x.si, q)).length : 0;
         return `<button role="tab" data-a="${a}" class="${a === S.clArea ? 'on' : ''}" aria-selected="${a === S.clArea}">${esc(l)}<span class="cnt ${d === n.length ? 'all' : ''}">${d}/${n.length}</span>${hits && a !== S.clArea ? `<i class="mk">${hits}</i>` : ''}</button>`; }).join('');
+      { const b2 = $('#clt2'); b2.hidden = tl.length < 2;
+        b2.innerHTML = tl.length < 2 ? '' : tl.map((t, i) => { const n = subsOf(S.clArea, t.code), d = n.filter(x => x.h >= x.n).length, hits = q ? n.filter(x => secHit(x.t, x.si, q)).length : 0;
+          return `<button role="tab" data-t="${esc(t.code)}" class="${t.code === ct ? 'on' : ''}" aria-selected="${t.code === ct}">${esc(t.name)}<span class="cnt ${d === n.length ? 'all' : ''}">${d}/${n.length}</span>${hits && t.code !== ct ? `<i class="mk">${hits}</i>` : ''}</button>`; }).join('');
+        const on2 = $('#clt2 .on'); if (on2) on2.scrollIntoView({ inline: 'center', block: 'nearest' }); }
       $('#clst').innerHTML = list.map((x, i) => { const full = x.h >= x.n, hit = q && secHit(x.t, x.si, q);
         return `<button type="button" role="listitem" data-i="${i}" class="${full ? 'ok' : x.h || x.draft ? 'part' : ''}${hit ? ' hit' : q ? ' dim' : ''}"><span class="nm2">${esc(lab(S.clArea, x))}${x.draft && !full ? '<i class="dr" title="Draft saved"></i>' : ''}${hit ? `<em class="mt">${ic('search', 14)} ${hit} found</em>` : ''}</span><span class="cnt ${full ? 'all' : ''}">${x.h}/${x.n}</span></button>`; }).join('');
       const pend = list.filter(x => x.h < x.n);
       let msg = '';
-      if (q) { const here = list.filter(x => secHit(x.t, x.si, q)), other = areas.filter(([a]) => a !== S.clArea).map(([a, l]) => [l, subsOf(a).filter(x => secHit(x.t, x.si, q)).length]).filter(([, n]) => n);
+      if (q) { const here = list.filter(x => secHit(x.t, x.si, q)), other = [...tl.filter(t => t.code !== ct).map(t => [t.name, subsOf(S.clArea, t.code).filter(x => secHit(x.t, x.si, q)).length]), ...areas.filter(([a]) => a !== S.clArea).map(([a, l]) => [l, subsOf(a).filter(x => secHit(x.t, x.si, q)).length])].filter(([, n]) => n);
         msg = (!here.length && !other.length) ? `<span style="color:var(--red)"><b>No reading matches “${esc(q)}”.</b></span>` : `<b>${here.length ? `${here.length} sub-tree${here.length > 1 ? 's' : ''} here ${here.length > 1 ? 'have' : 'has'} it – tap the highlighted one.` : 'No match in this area.'}</b>${other.length ? ` Also in: ${other.map(([l, n]) => `${esc(l)} (${n})`).join(', ')}` : ''}`; }
       $('#clmsg').innerHTML = msg; $('#clmsg').hidden = !msg;
       const on = $('#clt .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); };
@@ -1274,7 +1282,8 @@ async function viewChecklist() {
     abnormalFor(today).then(d => { const el = $('#actn'); if (!el) return; const n = d.items.length;
       el.innerHTML = n ? `<b style="color:var(--red)">${n} abnormal reading${n > 1 ? 's' : ''}</b> · tap to see area-wise` : 'All readings normal today'; if (n) $('#actc').classList.add('bad'); }).catch(() => { const el = $('#actn'); if (el) el.textContent = 'Tap to open'; });
     $('#clt').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; S.clArea = b.dataset.a; viewChecklist(); };
-    $('#clst').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; const x = subsOf(S.clArea)[+b.dataset.i], q = S.clQ.trim();
+    $('#clt2').onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; S.clTplBy[S.clArea] = b.dataset.t; draw(); };
+    $('#clst').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; const x = subsOf(S.clArea, curTpl())[+b.dataset.i], q = S.clQ.trim();
       S.clSec = { code: x.t.code, v: String(x.si) }; S.clJump = q && secHit(x.t, x.si, q) ? { code: x.t.code, q } : null; go('cl/' + x.t.code); };
     $('#clq').oninput = e => { S.clQ = e.target.value; draw(); };
     const repState = async () => { const el = $('#rstate'); if (!el) return; el.innerHTML = '<div class="aps none">' + ic('clock', 22) + '<span>Checking approval…</span></div>'; $('#rsave').disabled = $('#rshare').disabled = true;
