@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.23';
+const APP_VERSION = '3.24';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -119,6 +119,7 @@ const fromYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Da
 const fmtDay = d => `${pad2(d.getDate())}-${MON3[d.getMonth()]}-${String(d.getFullYear()).slice(2)}, ${DAY3[d.getDay()]}`;
 const fmtShort = d => `${pad2(d.getDate())}-${MON3[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`;
 const fmtStamp = iso => { const d = new Date(iso); return `${fmtShort(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const canAsk = () => !!ME && (!!ME.is_admin || (Array.isArray(ME.modules) && ME.modules.includes('ask')));
 const can = m => !ME || ME.is_admin || !Array.isArray(ME.modules) || ME.modules.includes(m) || (ME.admin_modules || []).includes(m);
 // module admin: can upload / edit inside that module and sees all its areas
 const isModAdmin = m => !!ME && (ME.is_admin || (ME.admin_modules || []).includes(m));
@@ -133,12 +134,37 @@ const initials = n => { const p = String(n || '?').replace(/\./g, '').trim().spl
 const firstName = n => { const p = String(n || '').replace(/^s\.\s*/i, '').split(/\s+/); return p[0] || ''; };
 const curShift = (d = new Date()) => { const h = d.getHours(); return h >= 7 && h < 15 ? 'A' : h >= 15 && h < 23 ? 'B' : 'C'; };
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
-const THEMES = [['red', 'AMNS Red', '#C8102E', '#A50D26'], ['blue', 'Blue', '#1E5BD8', '#1747AB'], ['green', 'Green', '#13834A', '#0F6A3C'], ['purple', 'Purple', '#6D3FC0', '#5732A0'],
-  ['orange', 'Orange', '#D9620B', '#B04F08'], ['teal', 'Teal', '#0F7C86', '#0C646C'], ['steel', 'Steel Grey', '#37474F', '#2B383F']];
+// [key, name, colour 1, colour 2 (swatch), status bar, 1 = single colour / 2 = dual shade]
+const THEMES = [
+  ['red', 'AMNS Red', '#C8102E', '#A50D26', '#A50D26', 1],
+  ['blue', 'Blue', '#1E5BD8', '#1747AB', '#1747AB', 1],
+  ['green', 'Green', '#13834A', '#0F6A3C', '#0F6A3C', 1],
+  ['purple', 'Purple', '#6D3FC0', '#5732A0', '#5732A0', 1],
+  ['orange', 'Orange', '#D9620B', '#B04F08', '#B04F08', 1],
+  ['teal', 'Teal', '#0F7C86', '#0C646C', '#0C646C', 1],
+  ['steel', 'Steel Grey', '#37474F', '#2B383F', '#2B383F', 1],
+  ['navy', 'Navy', '#1F3A68', '#193055', '#193055', 1],
+  ['maroon', 'Maroon', '#8B1E3F', '#721934', '#721934', 1],
+  ['indigo', 'Indigo', '#3F51B5', '#344294', '#344294', 1],
+  ['pink', 'Pink', '#D6336C', '#AF2A59', '#AF2A59', 1],
+  ['brown', 'Brown', '#7B4A2A', '#653D22', '#653D22', 1],
+  ['olive', 'Olive', '#5E7A1F', '#4D6419', '#4D6419', 1],
+  ['sunset', 'Sunset', '#D7263D', '#F77F00', '#B01F32', 2],
+  ['ocean', 'Ocean', '#1D4ED8', '#0F9BA8', '#1840B1', 2],
+  ['royal', 'Royal', '#1E2A5A', '#C99A2E', '#19224A', 2],
+  ['aurora', 'Aurora', '#7B2FF7', '#E0457B', '#6527CB', 2],
+  ['forest', 'Forest', '#14532D', '#65A30D', '#104425', 2],
+  ['steelfire', 'Steel & Fire', '#37474F', '#E8590C', '#2D3A41', 2],
+  ['midnight', 'Midnight', '#0B1F4D', '#0EA5E9', '#09193F', 2],
+  ['berry', 'Berry', '#7A1037', '#E75480', '#640D2D', 2],
+  ['mint', 'Mint Fresh', '#0F766E', '#34D399', '#0C615A', 2],
+  ['copper', 'Copper', '#5D3A1A', '#C46A2B', '#4C3015', 2],
+  ['indigosky', 'Indigo Sky', '#312E81', '#3B82F6', '#28266A', 2],
+  ['lava', 'Lava', '#9B1B1B', '#F59E0B', '#7F1616', 2]];
 function applyTheme(k) { const t = THEMES.find(x => x[0] === k) || THEMES[0], h = document.documentElement;
   if (t[0] === 'red') delete h.dataset.theme; else h.dataset.theme = t[0];
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t[3]);
-  try { if (window.HSMNative && HSMNative.statusColor) HSMNative.statusColor(t[3]); } catch (e) {} }
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t[4]);
+  try { if (window.HSMNative && HSMNative.statusColor) HSMNative.statusColor(t[4]); } catch (e) {} }
 const store = { get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
                 del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
@@ -733,7 +759,7 @@ async function viewHome() {
     cP && `<button class="card kpi" id="hlow"><span class="k">Low stock</span><span class="v" id="hsp">–</span><span class="s" id="hspz">spares</span></button>`].filter(Boolean);
   $('#app').innerHTML = `<main class="scroll hm">
     <div class="hero hh"><div class="hrow"><div class="brand">HSM E&amp;A</div>
-      <div class="hbtns">${ME.is_admin ? `<button class="bell-btn" data-go="ask" aria-label="Ask HSM">${ic('bot', 22)}</button>` : ''}<button class="bell-btn" data-go="notifs" aria-label="Notifications">${ic('bell', 22)}<b class="bdg hidden" id="ncb"></b></button>
+      <div class="hbtns">${canAsk() ? `<button class="bell-btn" data-go="ask" aria-label="Ask HSM">${ic('bot', 22)}</button>` : ''}<button class="bell-btn" data-go="notifs" aria-label="Notifications">${ic('bell', 22)}<b class="bdg hidden" id="ncb"></b></button>
       <button class="avatar-btn" data-go="profile" aria-label="My profile" style="overflow:hidden;padding:0">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc(initials(ME.name))}</button></div></div>
       <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div><div class="sub">${dayTxt}</div></div>
     ${cS ? `<div class="lift card shiftcard sc2" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div class="sci"><div class="t1">On duty now</div><div class="t2">Shift ${sh}</div><div class="t3">${SHIFT_TIME[sh]}</div></div><span class="mepill hidden" id="hme"></span></div>
@@ -836,9 +862,11 @@ function viewProfile() {
       ${ME.is_admin ? '<span class="tag soft" style="margin-top:6px">App admin</span>' : (ME.admin_modules || []).length ? `<span class="tag soft" style="margin-top:6px">Admin: ${esc(MODULES.filter(m => ME.admin_modules.includes(m[0])).map(m => m[1].replace(/&#39;|'/g, '’')).join(', '))}</span>` : ''}
       <div class="phact"><label class="linkbtn">${ic('camera', 18)} ${ME.avatar ? 'Change photo' : 'Add photo'}<input type="file" id="pph" accept="image/*" hidden></label>
         ${ME.avatar ? `<button class="linkbtn" id="prm">${ic('x', 18)} Remove</button>` : ''}</div></div></div>
-    <div class="card" style="padding:16px;margin-top:18px"><div class="label" style="margin:0 0 10px">App colour</div>
-      <div class="thm" id="pthm">${THEMES.map(([k, l, c1, c2]) => `<button type="button" data-th="${k}" class="${(store.get('hsm_theme', 'red')) === k ? 'on' : ''}"><i style="background:linear-gradient(135deg,${c1},${c2})"></i>${l}</button>`).join('')}</div>
-      <p class="hint" style="margin:10px 0 0">Only on this phone. Alerts stay red and OK stays green in every colour.</p></div>
+    ${(() => { const cur = THEMES.find(x => x[0] === store.get('hsm_theme', 'red')) || THEMES[0], sw = t => `<i style="background:linear-gradient(135deg,${t[2]},${t[3]})"></i>`;
+      const grid = kind => `<div class="thm">${THEMES.filter(t => t[5] === kind).map(t => `<button type="button" data-th="${t[0]}" class="${cur[0] === t[0] ? 'on' : ''}">${sw(t)}${t[1]}</button>`).join('')}</div>`;
+      return `<div class="card" style="padding:14px 16px;margin-top:18px"><button type="button" class="thmrow" id="pthr" aria-expanded="false">${sw(cur)}<span class="nm"><b>App colour</b><span id="pthn">${esc(cur[1])}${cur[5] === 2 ? ' · dual shade' : ''}</span></span>${ic('chev', 20)}</button>
+      <div class="thmbox" id="pthm" hidden><div class="label">Single colour</div>${grid(1)}<div class="label">Dual shade</div>${grid(2)}
+      <p class="hint" style="margin:10px 0 0">Only on this phone. Alerts stay red and OK stays green in every colour.</p></div></div>`; })()}
     <div style="display:flex;flex-direction:column;gap:12px;margin-top:18px">
       <button class="btn block" data-go="pin">${ic('key')} Change PIN</button>
       ${ME.is_admin ? `<button class="btn block" data-go="approvals">${ic('users')} App approvals &amp; sign-ins</button>` : ''}
@@ -850,7 +878,10 @@ function viewProfile() {
       <button class="btn block" data-go="about">${ic('info')} About this app</button>
       <button class="btn ghost block" id="pout">${ic('logout')} Sign out</button></div>
     <p class="hint" style="margin-top:22px;text-align:center">HSM E&amp;A App · version ${APP_VERSION} (build ${esc(window.HSM_APP_VERSION || 0)})</p></div></main>`;
-  $('#pthm').onclick = e => { const b = e.target.closest('[data-th]'); if (!b) return; store.set('hsm_theme', b.dataset.th); applyTheme(b.dataset.th); $$('#pthm button').forEach(x => x.classList.toggle('on', x === b)); };
+  $('#pthr').onclick = () => { const bx = $('#pthm'), op = bx.hidden; bx.hidden = !op; $('#pthr').classList.toggle('open', op); $('#pthr').setAttribute('aria-expanded', op); };
+  $('#pthm').onclick = e => { const b = e.target.closest('[data-th]'); if (!b) return; const t = THEMES.find(x => x[0] === b.dataset.th); store.set('hsm_theme', t[0]); applyTheme(t[0]);
+    $$('#pthm button').forEach(x => x.classList.toggle('on', x === b)); $('#pthr i').style.background = `linear-gradient(135deg,${t[2]},${t[3]})`; $('#pthn').textContent = t[1] + (t[5] === 2 ? ' · dual shade' : '');
+    setTimeout(() => { $('#pthm').hidden = true; $('#pthr').classList.remove('open'); $('#pthr').setAttribute('aria-expanded', 'false'); }, 350); };
   $('#pview').onclick = () => ME.avatar ? showPhoto(ME.avatar, ME.name) : $('#pph').click();
   $('#pph').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     if (f.size > 25 * 1024 * 1024) return toast('Photo is too large');
@@ -877,12 +908,12 @@ let REQ = [];
 const RESULT = { ok: ['Signed in', 'green'], first_login: ['First sign-in', 'green'], new_device: ['New phone tried', 'amber'], wrong_password: ['Wrong SAP ID / PIN', 'red'],
   locked: ['Locked (too many tries)', 'red'], not_approved: ['Not approved yet', 'amber'], unknown_user: ['Unknown username', 'red'] };
 // Access editor: module ticks, area ticks inside Check List / Mill SOPs, and "Admin" per module
-const ACC_MODS = [...MODULES, ['planning', 'Planning – Out of stock status', 'box'], ['clset', 'Checklist settings (alert limits)', 'gear']];
+const ACC_MODS = [...MODULES, ['ask', 'Ask HSM (free assistant)', 'bot'], ['planning', 'Planning – Out of stock status', 'box'], ['clset', 'Checklist settings (alert limits)', 'gear']];
 const accessEditor = (r, key, withAdmin = true) => `<div class="acc" data-ak="${key}">${ACC_MODS.map(([k, t, i]) => {
-  const on = (r.modules || ALL_MODS).includes(k), adm = (r.admin_modules || []).includes(k);
+  const on = k === 'ask' ? (r.modules || []).includes(k) : (r.modules || ALL_MODS).includes(k), adm = (r.admin_modules || []).includes(k);
   const areas = k === 'planning' ? SPARE_AREAS.map(a => [a, a]) : AREA_MODS[k], sel = r.areas && Array.isArray(r.areas[k]) ? r.areas[k] : null;
   return `<div class="accm ${on ? 'on' : ''}" data-m="${k}"><div class="accr"><label class="modchk"><input type="checkbox" class="am" value="${k}" ${on ? 'checked' : ''}><span class="mi">${ic(i, 18)}</span><span>${t}</span></label>
-    ${withAdmin ? `<label class="admchk"><input type="checkbox" class="ad" ${adm ? 'checked' : ''}><span>${k === 'planning' ? 'All areas' : 'Admin'}</span></label>` : ''}</div>${k === 'planning' ? '<div class="hint" style="padding:0 4px 6px">Can write Planning status in Spares → Out / low stock. Tick “All areas” or pick areas below.</div>' : ''}
+    ${withAdmin && k !== 'ask' ? `<label class="admchk"><input type="checkbox" class="ad" ${adm ? 'checked' : ''}><span>${k === 'planning' ? 'All areas' : 'Admin'}</span></label>` : ''}</div>${k === 'planning' ? '<div class="hint" style="padding:0 4px 6px">Can write Planning status in Spares → Out / low stock. Tick “All areas” or pick areas below.</div>' : ''}
     ${areas ? `<div class="areas"><span class="hint">Areas</span>${areas.map(([a, l]) => `<label class="chipchk"><input type="checkbox" class="aa" value="${a}" ${!sel || sel.includes(a) ? 'checked' : ''}><span>${esc(l)}</span></label>`).join('')}</div>` : ''}</div>`; }).join('')}
   ${withAdmin ? `<div class="accinc"><div class="accr"><span class="mi">${ic('users', 18)}</span><b style="flex:1">Area incharge of</b></div><div class="hint" style="padding:0 4px 6px">Gets the Planning updates of these areas as notifications and can write Planning status for them.</div><div class="areas">${SPARE_AREAS.map(a => `<label class="chipchk"><input type="checkbox" class="inch" value="${esc(a)}" ${r.areas && Array.isArray(r.areas.incharge) && r.areas.incharge.includes(a) ? 'checked' : ''}><span>${esc(a)}</span></label>`).join('')}</div></div>` : ''}</div>`;
 function wireAccess(key) {
@@ -2440,7 +2471,7 @@ async function askAnswer(text) {
 }
 
 function viewAsk() {
-  if (!ME || !ME.is_admin) { toast('Ask HSM is for the admin only'); return go('home'); }
+  if (!canAsk()) { toast('Ask HSM is not given to you – ask the admin'); return go('home'); }
   const quick = ['Aaj ki summary', 'Abnormal readings', 'Aaj duty par kaun', 'Low stock', 'Pending approvals'];
   $('#app').innerHTML = `${bar('Ask HSM', 'home', '<button class="ib" id="akclr" aria-label="Clear chat">' + ic('x', 24) + '</button>')}
     <main class="scroll" id="akm"></main>
