@@ -917,3 +917,4 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .thmbox{margin-top:12px}.thmbox[hidden]{display:none}
 .thmbox .label{margin:10px 0 8px}
 .thm button i.d{border-radius:50%}
+.akex{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 0;color:var(--red);font-weight:600;font-size:15.5px}
