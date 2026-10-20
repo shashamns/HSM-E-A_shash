@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.21';
+const APP_VERSION = '3.22';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -719,23 +719,24 @@ async function viewHome() {
   const mods = MODULES.filter(m => can(m[0]));
   const canAp = !!ME.is_admin || isModAdmin('leave') || store.get('hsm_scap', false);
   if (!ME.is_admin && !isModAdmin('leave')) rpc('hsm_sc_is_approver').then(v => { v = v === true; if (v !== !!store.get('hsm_scap', false)) { store.set('hsm_scap', v); if (location.hash.replace('#', '') === '' || location.hash === '#home') viewHome(); } }).catch(() => {});
-  $('#app').innerHTML = `<main class="scroll">
-    <div class="hero"><div class="row"><div><div class="brand">HSM · Electrical &amp; Automation</div>
-      <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div>
-      <div class="sub">${DAYNAME[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}</div></div>
-      <div class="hbtns">${ME.is_admin ? `<button class="bell-btn" data-go="ask" aria-label="Ask HSM">${ic('bot', 24)}</button>` : ''}<button class="bell-btn" data-go="notifs" aria-label="Notifications">${ic('bell', 24)}<b class="bdg hidden" id="ncb"></b></button>
-      <button class="avatar-btn" data-go="profile" aria-label="My profile" style="overflow:hidden;padding:0">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc(initials(ME.name))}</button></div></div></div>
-    ${cS ? `<div class="lift card shiftcard" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div><div class="t1">Shift on duty now</div><div class="t2">Shift ${sh} · ${SHIFT_TIME[sh]}</div></div></div>
+  const dayTxt = `${DAYNAME[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+  const SHORT = { mill: 'Mill Process SOPs', tbt: 'TBT Talks' };
+  const kpis = [cC && `<button class="card kpi" data-go="checklist"><span class="k">Check lists</span><span class="v" id="hcl">–</span><span class="bar2"><i id="hclb" style="width:0"></i></span></button>`,
+    cC && `<button class="card kpi" data-go="actions" id="habk"><span class="k">Abnormal</span><span class="v" id="hab">–</span><span class="s">readings today</span></button>`,
+    cP && `<button class="card kpi" id="hlow"><span class="k">Low stock</span><span class="v" id="hsp">–</span><span class="s" id="hspz">spares</span></button>`].filter(Boolean);
+  $('#app').innerHTML = `<main class="scroll hm">
+    <div class="hero hh"><div class="hrow"><div class="brand">HSM · Electrical &amp; Automation</div>
+      <div class="hbtns">${ME.is_admin ? `<button class="bell-btn" data-go="ask" aria-label="Ask HSM">${ic('bot', 22)}</button>` : ''}<button class="bell-btn" data-go="notifs" aria-label="Notifications">${ic('bell', 22)}<b class="bdg hidden" id="ncb"></b></button>
+      <button class="avatar-btn" data-go="profile" aria-label="My profile" style="overflow:hidden;padding:0">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc(initials(ME.name))}</button></div></div>
+      <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div><div class="sub">${dayTxt}</div></div>
+    ${cS ? `<div class="lift card shiftcard sc2" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div class="sci"><div class="t1">On duty now</div><div class="t2">Shift ${sh}</div><div class="t3">${SHIFT_TIME[sh]}</div></div><span class="mepill hidden" id="hme"></span></div>
       <div class="chips" id="hcrew"><span class="hint">Loading crew…</span></div></div>` : '<div style="height:16px"></div>'}
+    ${kpis.length ? `<div class="kpis">${kpis.join('')}</div>` : ''}
     <div id="hadmin"></div><div id="hleave"></div>
-    <div class="card thought"><span class="k">Thought of the day</span><p>“${esc(QUOTES[Math.floor((Date.now() + 19800000) / 864e5) % QUOTES.length])}”</p></div>
-    ${cC || cP ? `<div class="stats" style="${cC && cP ? '' : 'grid-template-columns:1fr'}">
-      ${cC ? `<button class="card stat" data-go="checklist"><span class="k">Check lists today</span><span class="v" id="hcl">–</span><span class="bar2"><i id="hclb" style="width:0"></i></span></button>` : ''}
-      ${cP ? `<button class="card stat" id="hlow"><span class="k">Spares out / low stock</span><span class="v" id="hsp">–</span><span class="hint" id="hspz">Tap to view</span></button>` : ''}
-    </div>` : ''}
     <div class="sec-h">Apps</div>
-    ${mods.length || canAp ? `<div class="grid">${canAp ? `<button class="card tile ap" data-go="approval"><span class="ic">${ic('key', 26)}<b class="bdg hidden" id="apb"></b></span><span><span class="tt">Approval</span></span><span class="ts" id="aps">Pending requests</span></button>` : ''}${mods.map(([k, t, i, sub]) => tile(k, i, t.replace(/'/g, '&#39;'), sub)).join('')}</div>`
+    ${mods.length || canAp ? `<div class="agrid">${canAp ? `<button class="atile ap" data-go="approval"><span class="ic">${ic('key', 24)}<b class="bdg hidden" id="apb"></b></span><span class="tt">Approval</span></button>` : ''}${mods.map(([k, t, i]) => `<button class="atile" data-go="${k}"><span class="ic">${ic(i, 24)}</span><span class="tt">${SHORT[k] || t.replace(/'/g, '&#39;')}</span></button>`).join('')}</div>`
       : `<div class="empty"><b>No modules yet</b>Ask ${esc(ADMIN_NAME)} to give you access.</div>`}
+    <div class="card thought"><span class="k">Thought of the day</span><p>“${esc(QUOTES[Math.floor((Date.now() + 19800000) / 864e5) % QUOTES.length])}”</p></div>
     <button class="aboutlink" data-go="about">${ic('info', 18)} About this app</button>
     <div style="height:24px"></div>
   </main>${nav('home')}`;
@@ -754,15 +755,15 @@ async function viewHome() {
       roster = roster || [];
       const crew = roster.filter(r => r.shift === sh);
       const mine = roster.find(r => sameName(r.name, ME.name));
-      $('#hcrew').innerHTML = (crew.length ? crew.map(r => `<span class="chip ${sameName(r.name, ME.name) ? 'me' : ''}">${esc(r.name)}</span>`).join('') : '<span class="hint">No roster uploaded for today</span>')
-        + (mine && mine.shift !== sh ? `<span class="chip me">You today: ${esc(mine.shift === 'WO' ? 'Weekly off' : mine.shift === 'L' ? 'Leave' : mine.shift === 'G' ? 'General' : 'Shift ' + mine.shift)}</span>` : '');
+      $('#hcrew').innerHTML = crew.length ? crew.map(r => `<span class="chip ${sameName(r.name, ME.name) ? 'me' : ''}">${esc(r.name)}</span>`).join('') : '<span class="hint">No roster uploaded for today</span>';
+      const me = $('#hme'); if (me && mine) { me.textContent = mine.shift === sh ? 'You are on duty' : 'You: ' + (mine.shift === 'WO' ? 'Weekly off' : mine.shift === 'L' ? 'Leave' : mine.shift === 'G' ? 'General' : 'Shift ' + mine.shift); me.classList.remove('hidden'); }
     }
     if (cC && $('#hcl')) {
       done = [...(done || []), ...obxEntries(today)];
       const n = new Set(done.map(d => d.template_code)).size;
       $('#hcl').innerHTML = `${n}<small>/${tpl.length}</small>`; $('#hclb').style.width = (tpl.length ? 100 * n / tpl.length : 0) + '%';
     }
-    if (cP && $('#hsp')) { $('#hsp').textContent = low ? low.length : '–'; const z = low ? low.filter(x => x.qty <= 0).length : 0; if ($('#hspz')) $('#hspz').textContent = low ? `${z} nil · ${low.length - z} below ${LOWN}` : 'Tap to view'; }
+    if (cP && $('#hsp')) { $('#hsp').textContent = low ? low.length : '–'; const z = low ? low.filter(x => x.qty <= 0).length : 0; if ($('#hspz')) $('#hspz').textContent = low ? `${z} nil · ${low.length - z} low` : 'spares'; if (low && low.length) $('#hlow').classList.add('warn'); }
   } catch (e) { netErr(e); }
   if (canAp) {
     try { const c = await approvalCounts(); const b = $('#apb');
@@ -801,7 +802,9 @@ async function homeAlerts() {
   else if (can('leave')) { try { const mineR = await api(`leave_requests?select=id,status,decided_at&auth_id=eq.${uidOfToken()}&status=in.(approved,rejected)&decided_at=gte.${new Date(Date.now() - 3 * 864e5).toISOString()}`);
     const seen = store.get('hsm_leave_seen', 0), fresh = mineR.filter(r => new Date(r.decided_at).getTime() > seen);
     if (fresh.length) html += `<button class="alert" data-go="leave" style="margin-top:10px;background:#E8F1FB;color:#14529C">${ic('plane')}<span style="flex:1">Your leave request was ${fresh.some(r => r.status === 'rejected') ? 'decided' : 'approved'} – tap to see</span>${ic('chev')}</button>`; } catch (e) {} }
-  if (can('checklist')) { try { const d = await abnormalFor(ymd(new Date())); if (d.items.length) html += `<button class="alert" data-go="actions" style="margin-top:10px">${ic('warn')}<span style="flex:1">${d.items.length} abnormal reading${d.items.length > 1 ? 's' : ''} today – action required</span>${ic('chev')}</button>`; } catch (e) {} }
+  if (can('checklist')) { try { const d = await abnormalFor(ymd(new Date())), n = d.items.length, v = $('#hab'), k = $('#habk');
+      if (v) { v.textContent = n; k.classList.toggle('bad', n > 0); k.classList.toggle('good', !n); k.querySelector('.s').textContent = n ? 'action required' : 'all normal'; }
+      else if (n) html += `<button class="alert" data-go="actions" style="margin-top:10px">${ic('warn')}<span style="flex:1">${n} abnormal reading${n > 1 ? 's' : ''} today – action required</span>${ic('chev')}</button>`; } catch (e) {} }
   box.innerHTML = html;
 }
 // keep the selected tab visible inside a sliding tab bar
