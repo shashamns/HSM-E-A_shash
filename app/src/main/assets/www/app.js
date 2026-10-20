@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.19';
+const APP_VERSION = '3.20';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -102,6 +102,7 @@ const I = {
   star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/>',
   list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   alert:'<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/>',
+  bot:'<rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/><path d="M9.5 16.5h5"/>',
   bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   trash:'<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
   wa:'<path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9c0 3 3 6 6 6l1-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/>'
@@ -554,7 +555,7 @@ function render() {
   const routes = { home: viewHome, schedule: viewSchedule, checklist: viewChecklist, cl: () => viewChecklistFill(arg), clh: () => viewChecklistHistory(arg),
     cle: () => viewChecklistEntry(arg), actions: viewActions, activity: viewActivity, clearlogs: viewClearLogs, spares: viewSpares, spare: () => viewSpare(arg), sop: viewSop, hirac: () => viewHirac(arg), team: viewTeam,
     clset: viewClSettings, approvals: viewApprovals, user: () => viewUser(arg), pin: () => viewSetPin(true), profile: viewProfile, mill: viewMillProcessSops, drive: () => viewDrive(arg), admin: viewAdmin,
-    contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub, notifs: viewNotifs };
+    contacts: viewContacts, tbt: viewTbt, leave: viewLeave, suggest: viewSuggest, about: viewAbout, approval: viewApprovalHub, notifs: viewNotifs, ask: viewAsk };
   if (ROUTE_MOD[page] && !can(ROUTE_MOD[page])) { toast('You do not have access to this module'); history.replaceState(null, '', '#home'); return viewHome(); }
   if (page === 'home' || !routes[page]) resetModuleState();
   (routes[page] || viewHome)();
@@ -722,7 +723,7 @@ async function viewHome() {
     <div class="hero"><div class="row"><div><div class="brand">HSM · Electrical &amp; Automation</div>
       <div class="hi">${greet()}, ${esc(firstName(ME.name))}</div>
       <div class="sub">${DAYNAME[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}</div></div>
-      <div class="hbtns"><button class="bell-btn" data-go="notifs" aria-label="Notifications">${ic('bell', 24)}<b class="bdg hidden" id="ncb"></b></button>
+      <div class="hbtns">${ME.is_admin ? `<button class="bell-btn" data-go="ask" aria-label="Ask HSM">${ic('bot', 24)}</button>` : ''}<button class="bell-btn" data-go="notifs" aria-label="Notifications">${ic('bell', 24)}<b class="bdg hidden" id="ncb"></b></button>
       <button class="avatar-btn" data-go="profile" aria-label="My profile" style="overflow:hidden;padding:0">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover">` : esc(initials(ME.name))}</button></div></div></div>
     ${cS ? `<div class="lift card shiftcard" id="hshift"><div class="top"><div class="bigshift">${sh}</div><div><div class="t1">Shift on duty now</div><div class="t2">Shift ${sh} · ${SHIFT_TIME[sh]}</div></div></div>
       <div class="chips" id="hcrew"><span class="hint">Loading crew…</span></div></div>` : '<div style="height:16px"></div>'}
@@ -2246,6 +2247,136 @@ async function viewMillProcessSops() {
     }
   };
   if (S.millQ) drawSearch(S.millQ); else draw();
+}
+
+/* ================= ASK HSM (admin assistant, no AI service – free) =================
+ * Understands short Hinglish / English questions with keywords and answers from the app's own data: duty roster, readings, abnormal values,
+ * spares, SOPs, approvals, a daily summary and a fault helper. Nothing leaves the phone except the normal app queries. */
+const ASK = { msgs: [] };
+const ASK_STOP = new Set(('aaj aj kal parso today tomorrow yesterday me mein main ka ki ke ko se hai hain h kya kaun koun kon kaha kahan kahaan kitna kitne kitni batao bata do de dena dikhao dikha show tell give list all sab ' +
+  'the is are of in on at for to and or a an please pls mujhe muje mera meri hamara hamari wala wali vala vali abhi ab ke liye lie sop spare spares stock duty shift roster checklist check reading readings value values ' +
+  'wo woh ye yeh isme usme kyu kyun kaise how what who where which when kab nahi nhi ho raha rha rhi hua hui hue hoga par pe kare kre karu karna karen kuch').split(' '));
+const askWords = t => t.toLowerCase().replace(/[^a-z0-9#/.\-\s]/g, ' ').split(/\s+/).filter(w => w && !ASK_STOP.has(w) && !/^(a|b|c|g)$/.test(w));
+const askDay = t => { const d = new Date(); if (/\b(parso|day after)\b/.test(t)) d.setDate(d.getDate() + 2); else if (/\b(yesterday|beeta|pichhle|kal ki raat)\b/.test(t)) d.setDate(d.getDate() - 1); else if (/\b(kal|tomorrow)\b/.test(t)) d.setDate(d.getDate() + 1);
+  const m = /\b(\d{1,2})[-\/ ](?:(\d{1,2})|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)\b/.exec(t);
+  if (m) { const x = new Date(), mo = m[2] ? +m[2] - 1 : MON3.findIndex(n => n.toLowerCase() === m[3]); if (mo >= 0) { x.setMonth(mo, +m[1]); return x; } }
+  return d; };
+const askShift = t => { const m = /\bshift[\s-]*([abcg])\b|\b([abcg])[\s-]*shift\b/.exec(t); return m ? (m[1] || m[2]).toUpperCase() : /\bgeneral\b/.test(t) ? 'G' : ''; };
+const askRow = (a, b, extra = '') => `<div class="akr"><span>${a}</span><b>${b}</b>${extra}</div>`;
+const askCard = (title, body) => `<div class="akc"><div class="akt">${title}</div>${body}</div>`;
+const SH_LBL = { A: 'A · 7 AM–3 PM', B: 'B · 3–11 PM', C: 'C · 11 PM–7 AM', G: 'General', L: 'Leave', WO: 'Weekly off' };
+
+async function askRoster(t, words) {
+  const d = askDay(t), day = ymd(d), sh = askShift(t);
+  if (words.length && !sh) {   // a person's name
+    const q = words.map(w => `name=ilike.*${encodeURIComponent(w)}*`).join('&'), to = new Date(d); to.setDate(to.getDate() + 6);
+    const rows = await api(`shift_roster?select=day,name,shift&${q}&day=gte.${day}&day=lte.${ymd(to)}&order=day,name&limit=60`);
+    if (rows.length) { const by = {}; rows.forEach(r => (by[r.name] = by[r.name] || []).push(r));
+      return Object.entries(by).slice(0, 4).map(([n, l]) => askCard(esc(n) + ' · next 7 days', l.map(r => askRow(fmtDay(fromYmd(r.day)), esc(SH_LBL[r.shift] || r.shift))).join(''))).join(''); }
+  }
+  const rows = await api(`shift_roster?select=name,shift,area,ranking&day=eq.${day}&order=ranking,name&limit=300`);
+  if (!rows.length) return askCard(fmtDay(d), '<span class="hint">No roster is uploaded for this date.</span>');
+  const by = {}; rows.forEach(r => (by[r.shift] = by[r.shift] || []).push(r));
+  const keys = (sh ? [sh] : ['A', 'B', 'C', 'G', 'L', 'WO']).filter(k => by[k]);
+  return askCard('Duty · ' + fmtDay(d), keys.map(k => `<div class="aks">${esc(SH_LBL[k] || k)} <i>${by[k].length}</i></div><div class="akn">${by[k].map(r => esc(r.name)).join(', ')}</div>`).join('') || '<span class="hint">Nobody found.</span>');
+}
+async function askAbnormal(t, words) {
+  const day = ymd(askDay(t)), d = await abnormalFor(day);
+  let it = d.items; if (words.length) it = it.filter(x => words.every(w => (x.tname + ' ' + x.equip + ' ' + x.param + ' ' + clAreaName(x.area)).toLowerCase().includes(w)));
+  if (!it.length) return askCard('Abnormal readings · ' + fmtDay(fromYmd(day)), '<b style="color:var(--green)">None found – all readings normal.</b>');
+  return askCard(`${it.length} abnormal reading${it.length > 1 ? 's' : ''} · ${fmtDay(fromYmd(day))}`, it.slice(0, 15).map(x => askRow(`${esc(x.equip)} <small>${esc(clAreaName(x.area))} · ${esc(x.param)}</small>`, `<span style="color:var(--red)">${esc(x.value)}</span>`)).join('') + (it.length > 15 ? `<div class="hint">+${it.length - 15} more – open “Daily action required”.</div>` : '') + '<button class="akb" data-go="actions">Open action list</button>');
+}
+async function askReadings(words) {
+  if (!words.length) return '';
+  const day = ymd(new Date()), tpl = await templates();
+  let rows = []; try { rows = await api(`checklist_entries?select=*&check_date=eq.${day}&order=created_at`); } catch (e) { if (!isNet(e)) throw e; }
+  const mine = ME && ME.areas && Array.isArray(ME.areas.checklist) ? ME.areas.checklist : [], all = isModAdmin('checklist');
+  const out = [];
+  dayMerge(rows).forEach(r => { const t = tpl.find(x => x.code === r.template_code); if (!t || !(all || mine.includes(t.area))) return;
+    t.sections.forEach((s, si) => s.items.forEach((it, ii) => it.cells.forEach((c, fi) => { if (!c) return;
+      const lbl = (s.fields[fi] || {}).l || '', hay = (t.name + ' ' + s.title + ' ' + it.name + ' ' + lbl + ' ' + clAreaName(t.area)).toLowerCase();
+      if (!words.every(w => hay.includes(w))) return; const v = (r.vals || {})[`${si}.${ii}.${fi}`]; if (!v) return;
+      out.push({ name: it.name, lbl: lbl || s.title, v, hot: v === 'NOT OK' || isHot(ftype(s, it, fi), v, limOf(t.code, si)), t: t.name }); }))); });
+  if (!out.length) return '';
+  return askCard(`Today's readings · ${out.length} found`, out.slice(0, 14).map(x => askRow(`${esc(x.name)} <small>${esc(x.lbl)}</small>`, `<span style="${x.hot ? 'color:var(--red)' : ''}">${esc(x.v)}</span>`)).join('') + (out.length > 14 ? '<div class="hint">Add more words to narrow down.</div>' : ''));
+}
+async function askSpares(t, words) {
+  const low = /\b(low|nil|out of|khatam|zero|kam|short)\b/.test(t);
+  let path = 'spares_v?select=id,area,material,model,make,qty,location,rack,cupboard,item_total&order=item_total,material&limit=8';
+  if (low && !words.length) path += `&item_total=lt.${LOWN}&low_hidden=eq.false`;
+  else if (words.length) path += '&' + words.map(w => { const e = encodeURIComponent(w); return `or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*)`; }).join('&');
+  else return '';
+  const rows = await api(path); if (!rows.length) return '';
+  return askCard(low && !words.length ? `Out of stock / low (below ${LOWN})` : `Spares · ${rows.length}${rows.length === 8 ? '+' : ''} found`, rows.map(r => { const n = r.item_total != null ? r.item_total : r.qty;
+    return `<button class="akb row" data-go="spare/${r.id}"><span>${esc(r.material)}<small>${esc([r.model, r.make].filter(Boolean).join(' · '))} · ${esc(r.location || 'location not set')}${r.rack ? ' · Rack ' + esc(r.rack) : ''}${r.cupboard ? ' · Cup. ' + esc(r.cupboard) : ''}</small></span><b style="color:${n <= 0 ? 'var(--red)' : n < LOWN ? 'var(--amber,#E69100)' : 'inherit'}">${n}</b></button>`; }).join(''));
+}
+const ASK_SOPS = {};
+async function askSops(words) {
+  if (!words.length) return '';
+  const areas = MILL_AREAS.filter(([f]) => canArea('mill', f)); const hits = [];
+  await Promise.all(areas.map(async ([f, l]) => { if (!ASK_SOPS[f]) { try { ASK_SOPS[f] = (await storageList(`${f}/`, MILL_PROCESS_BUCKET)).filter(o => o.id && o.name && /\.(docx?|pdf)$/i.test(o.name)); } catch (e) { ASK_SOPS[f] = []; } }
+    ASK_SOPS[f].forEach(o => { const n = (o.name.replace(/\.[^.]+$/, '') + ' ' + l).toLowerCase().replace(/[^a-z0-9]+/g, ' '); if (words.every(w => n.includes(w))) hits.push([f, l, o]); }); }));
+  if (!hits.length) return '';
+  return askCard(`SOPs · ${hits.length} found`, hits.slice(0, 8).map(([f, l, o]) => `<button class="akb row" data-f="${esc(f + '/' + o.name)}"><span>${esc(o.name.replace(/\.[^.]+$/, ''))}<small>${esc(l)}</small></span><b>Open</b></button>`).join(''));
+}
+async function askPending() {
+  await ncFetch(); const it = ncItems().filter(x => NC_LIVE.test(x.k));
+  if (!it.length) return askCard('Waiting for you', '<b style="color:var(--green)">Nothing pending.</b>');
+  return askCard(`${it.length} waiting for you`, it.map(x => askRow(esc(x.t), '', `<small>${esc(x.b)}</small>`)).join('') + '<button class="akb" data-go="notifs">Open notifications</button>');
+}
+async function askFault(t, words) {
+  const out = [], s = await askSops(words); if (s) out.push(s);
+  const from = new Date(); from.setDate(from.getDate() - 45);
+  try { const rows = await api(`checklist_entries?select=check_date,shift,template_code,remarks,inspected_name&remarks=not.is.null&check_date=gte.${ymd(from)}&order=check_date.desc&limit=200`);
+    const m = rows.filter(r => r.remarks && words.some(w => r.remarks.toLowerCase().includes(w))).slice(0, 5);
+    if (m.length) out.push(askCard('Same words in past remarks (45 days)', m.map(r => askRow(fmtDay(fromYmd(r.check_date)) + ' · ' + esc(r.shift || ''), '', `<small>${esc(r.remarks)} — ${esc(firstName(r.inspected_name))}</small>`)).join(''))); } catch (e) { if (!isNet(e)) throw e; }
+  const r = await askReadings(words); if (r) out.push(r);
+  const sp = await askSpares('', words); if (sp) out.push(sp);
+  return out.join('') || askCard('Nothing found', '<span class="hint">No SOP, remark, reading or spare matches these words. Try the equipment name only, e.g. “FM1 motor”.</span>');
+}
+async function askSummary() {
+  const today = new Date(), day = ymd(today), out = [];
+  const [ab, pend, low, ros] = await Promise.allSettled([abnormalFor(day), (async () => { await ncFetch(); return ncItems().filter(x => NC_LIVE.test(x.k)); })(), api(`spares_v?select=id&item_total=lt.${LOWN}&low_hidden=eq.false&limit=500`), api(`shift_roster?select=name,shift&day=eq.${day}&limit=300`)]);
+  const sh = curShift(today), crew = ros.status === 'fulfilled' ? ros.value.filter(r => r.shift === sh).map(r => firstName(r.name)) : [];
+  const rows = [askRow('Shift on duty', `${sh} · ${SHIFT_TIME[sh]}`, crew.length ? `<small>${esc(crew.join(', '))}</small>` : '')];
+  if (ab.status === 'fulfilled') rows.push(askRow('Abnormal readings today', `<span style="color:${ab.value.items.length ? 'var(--red)' : 'var(--green)'}">${ab.value.items.length}</span>`));
+  if (pend.status === 'fulfilled') rows.push(askRow('Waiting for approval', pend.value.length));
+  if (low.status === 'fulfilled') rows.push(askRow(`Spares low / nil (below ${LOWN})`, low.value.length));
+  return askCard('Summary · ' + fmtDay(today), rows.join('') + '<button class="akb" data-go="actions">Abnormal readings in detail</button>');
+}
+const ASK_HELP = askCard('Ask me like this', ['“aaj ki summary”', '“kal duty par kaun”', '“shift B me kaun”', '“abnormal readings”', '“FM1 motor temp”', '“bearing spare kahan hai”', '“low stock”', '“pending approvals”', '“RM motor trip hua – kya kare”'].map(x => `<div class="akn">${x}</div>`).join(''));
+async function askAnswer(text) {
+  const t = text.toLowerCase(), words = askWords(text);
+  if (/\b(summary|saransh|report|status|haal)\b/.test(t)) return askSummary();
+  if (/\b(pending|approval|approve|waiting|intezaar|intezar)\b/.test(t)) return askPending();
+  if (/\b(fault|trip|tripped|alarm|breakdown|problem|issue|error|band|kharab|nahi chal|not working|vibration)\b/.test(t) && words.length) return askFault(t, words);
+  if (/\b(abnormal|not ok|alert|danger|khatra|action|high|hot|garam)\b/.test(t) && !/\b(spare|stock)\b/.test(t)) return askAbnormal(t, words.filter(w => !/^(high|hot|garam|alert|danger|abnormal|action|not|ok)$/.test(w)));
+  if (/\b(duty|shift|roster|kaun|koun|who|off|weekly)\b/.test(t)) return askRoster(t, words);
+  if (/\b(spare|spares|stock|kahan|where|location|cupboard|rack|nil|khatam)\b/.test(t)) { const r = await askSpares(t, words); if (r) return r; }
+  if (/\bsop\b|procedure|process/.test(t)) { const r = await askSops(words); if (r) return r; }
+  // no clear intent – look everywhere
+  const parts = [await askReadings(words), await askSops(words), await askSpares(t, words)].filter(Boolean);
+  return parts.join('') || ASK_HELP;
+}
+function viewAsk() {
+  if (!ME || !ME.is_admin) { toast('Ask HSM is for the admin only'); return go('home'); }
+  const quick = ['Aaj ki summary', 'Abnormal readings', 'Aaj duty par kaun', 'Low stock', 'Pending approvals'];
+  $('#app').innerHTML = `${bar('Ask HSM', 'home', '<button class="ib" id="akclr" aria-label="Clear chat">' + ic('x', 24) + '</button>')}
+    <main class="scroll" id="akm"></main>
+    <div class="akq" id="akq">${quick.map(q => `<button type="button">${q}</button>`).join('')}</div>
+    <form class="akin" id="akf"><input id="aki" type="text" autocomplete="off" enterkeyhint="send" placeholder="Poochho… jaise “kal duty par kaun”" aria-label="Ask"><button class="btn pri" type="submit" aria-label="Send">${ic('chev', 22)}</button></form>`;
+  const box = $('#akm');
+  const bubble = (who, html) => `<div class="akb2 ${who}">${html}</div>`;
+  const draw = () => { box.innerHTML = ASK.msgs.length ? ASK.msgs.map(m => bubble(m.who, m.who === 'me' ? esc(m.t) : m.t)).join('') : bubble('bot', `<b>Namaste ${esc(firstName(ME.name))}.</b> Main app ke data se jawab deta hoon – duty, readings, spares, SOP, approvals. Neeche se chuniye ya likhiye.${ASK_HELP}`);
+    box.scrollTop = box.scrollHeight; };
+  const send = async text => { text = String(text || '').trim(); if (!text) return; $('#aki').value = ''; ASK.msgs.push({ who: 'me', t: text }); ASK.msgs.push({ who: 'bot', t: '<span class="hint">Dekh raha hoon…</span>' }); draw();
+    let html; try { html = await askAnswer(text); } catch (e) { html = isNet(e) ? askCard('No network', '<span class="hint">Network wapas aane par dobara poochhiye.</span>') : askCard('Could not answer', '<span class="hint">Kuch gadbad hui. Dusre shabdon mein poochhiye.</span>'); }
+    ASK.msgs[ASK.msgs.length - 1].t = html; if (ASK.msgs.length > 40) ASK.msgs = ASK.msgs.slice(-40); if ($('#akm')) draw(); };
+  draw();
+  $('#akf').onsubmit = e => { e.preventDefault(); send($('#aki').value); };
+  $('#akq').onclick = e => { const b = e.target.closest('button'); if (b) send(b.textContent); };
+  $('#akclr').onclick = () => { ASK.msgs = []; draw(); };
+  box.onclick = async e => { const f = e.target.closest('[data-f]'); if (!f) return; try { await openDoc(f.dataset.f, MILL_PROCESS_BUCKET); } catch (err) { netErr(err); } };
 }
 
 /* ================= ADMIN UPLOADS (Excel → cloud) ================= */

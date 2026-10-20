@@ -801,3 +801,25 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .cl2{padding:2px 12px 10px;border-top:0;background:#fff}
 .cl2 button{height:38px;border-radius:12px;font-size:14px;padding:0 14px}
 .cl2[hidden]{display:none}
+
+/* v3.20 Ask HSM */
+#akm{padding:12px 12px 8px;display:flex;flex-direction:column;gap:10px}
+.akb2{max-width:94%;padding:10px 12px;border-radius:16px;font-size:15.5px;line-height:1.4}
+.akb2.me{align-self:flex-end;background:var(--grad,#C8102E);color:#fff;border-bottom-right-radius:4px}
+.akb2.bot{align-self:flex-start;background:#fff;box-shadow:var(--shadow);border-bottom-left-radius:4px;width:94%}
+.akc{margin-top:8px}.akc:first-child{margin-top:0}
+.akt{font-weight:800;font-size:15px;margin-bottom:6px;color:var(--ink)}
+.akr{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.akr:first-of-type{border-top:0}.akr small,.akb small{display:block;color:var(--ink-2);font-size:12.5px;font-weight:500}
+.akr>small{flex-basis:100%}
+.aks{margin-top:8px;font-weight:800;color:var(--red)}.aks i{font-style:normal;background:var(--bg);color:var(--ink-2);padding:1px 8px;border-radius:9px;font-size:13px;margin-left:4px}
+.akn{padding:3px 0;color:var(--ink)}
+.akb{display:block;margin-top:8px;width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line-2);background:#fff;font-weight:700;font-size:14.5px;text-align:left}
+.akb.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px;font-weight:600}
+.akb.row b{flex-shrink:0;font-size:17px}
+.akq{display:flex;gap:8px;padding:6px 12px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;background:#fff}
+.akq::-webkit-scrollbar{display:none}
+.akq button{flex-shrink:0;height:36px;padding:0 14px;border-radius:18px;border:1.5px solid var(--line-2);background:#fff;font-size:14px;font-weight:600;color:var(--ink-2)}
+.akin{display:flex;gap:8px;padding:8px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);flex-shrink:0}
+.akin input{flex:1;min-width:0;height:48px;padding:0 14px;font-size:16px;border:1.5px solid var(--line-2);border-radius:14px}
+.akin .btn{width:52px;padding:0;flex-shrink:0}
