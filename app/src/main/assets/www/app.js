@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.26';
+const APP_VERSION = '3.27';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -3111,3 +3111,24 @@ document.addEventListener('visibilitychange', () => {
   if (newDay || away > 30000) { FRESH_UNTIL = Date.now() + 8000; if (newDay) { try { bustCache(); } catch (e) {} } softRerender(); }
   loadSettings().then(ch => { if (ch) softRerender(); });
 });
+
+/* Over-the-air updates are also looked for when the app comes back to the screen (not only on a fresh start),
+ * so a new version shows the green "App updated" bar without closing the app first. */
+let OTA_AT = 0;
+async function otaCheck() {
+  if (Date.now() - OTA_AT < 10 * 60000) return; OTA_AT = Date.now();
+  try {
+    const run = Number(window.HSM_APP_VERSION) || 0, v = await rpc('hsm_bundle_version'); if (!v || v <= run) return;
+    const old = store.get('hsm_bundle'); if (old && old.version === v) return showOtaBar();
+    const b = await rpc('hsm_bundle_get', { p_version: v }); if (!b || !b.js || !b.css || b.version !== v) return;
+    localStorage.setItem('hsm_bundle', JSON.stringify(b)); showOtaBar();
+  } catch (e) {}
+}
+function showOtaBar() {
+  if (document.getElementById('upd')) return;
+  const b = document.createElement('button'); b.id = 'upd'; b.type = 'button'; b.textContent = 'App updated – tap to restart';
+  b.style.cssText = 'position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);z-index:70;padding:12px 18px;border:0;border-radius:24px;background:#17803A;color:#fff;font-weight:700;font-size:15px;box-shadow:0 6px 18px rgba(0,0,0,.25)';
+  b.onclick = () => location.reload(); document.body.appendChild(b);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) otaCheck(); });
+setTimeout(otaCheck, 4000);
