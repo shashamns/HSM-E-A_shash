@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.28';
+const APP_VERSION = '3.29';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -281,7 +281,7 @@ let FRESH_UNTIL = Date.now() + 8000;
 async function api(path, opts = {}) {
   const get = !opts.method || opts.method === 'GET';
   if (get && !opts.prefer && !opts.fresh && Date.now() > FRESH_UNTIL && SWR_OK.test(path) && !/select=\*/.test(path)) {
-    const c = cacheGet(path); if (c != null) { revalidate(path, c); return c; }
+    const c = cacheGet(path); if (c != null && !(Array.isArray(c) && !c.length)) { revalidate(path, c); return c; }   // an empty list is always asked again (a schedule may have just been uploaded)
   }
   try {
     const d = await apiNet(path, opts);
@@ -1113,7 +1113,7 @@ async function viewMyMonth() {
   wireSeg();
   const mine = {}; let failed = false;
   try {
-    const q = f => api(`shift_roster?select=day,shift,name,sap_id&day=gte.${ymd(m)}&day=lte.${ymd(new Date(y, mo, nD))}&or=(${f})&limit=1000`);
+    const q = f => api(`shift_roster?select=day,shift,name,sap_id&day=gte.${ymd(m)}&day=lte.${ymd(new Date(y, mo, nD))}&or=(${f})&limit=1000`, { fresh: true });
     const nameF = 'name.ilike.' + encodeURIComponent('*' + String(ME.name).trim().split(/\s+/).pop().replace(/[,()*]/g, '') + '*');
     let rows = ME.sap_id ? await q('sap_id.eq.' + encodeURIComponent(ME.sap_id)) : [];
     if (!rows.length) rows = await q(nameF);
