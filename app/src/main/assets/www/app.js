@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.30';
+const APP_VERSION = '3.31';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -1985,7 +1985,7 @@ async function sopNumbers() {
     $('#sl').innerHTML = `<div class="pad"><div class="label">${f.length} of ${rows.length} SOPs</div>` + (f.length ? `<div class="list">${f.map(r => { const hs = hiracNos(r.hirac_no);
       return `<div class="lrow" style="flex-direction:column;align-items:stretch;gap:0"><div style="display:flex;gap:10px;align-items:flex-start"><span class="tag soft">${esc(r.sr_no)}</span><span class="a" style="flex:1;font-size:17px;font-weight:600;line-height:1.3">${esc(r.activity)}</span><span class="tag">${esc(r.area)}</span></div>
         <div class="refbox"><span><span class="k">SOP NO.</span><span class="v">${esc(r.sop_no || '—')}</span></span>
-        ${hs.length ? `<a class="v" style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:var(--red-50);border-radius:10px;text-decoration:none" data-go="hirac/${hs[0]}"><span class="k" style="font-size:11.5px;font-weight:700;color:var(--red-700);letter-spacing:.6px">HIRAC NO. ›</span><span style="font-size:14.5px;font-weight:700;color:var(--red-700)">${hs.map(n => 'ELEC/' + pad2(n)).join(', ')}</span>${title(hs[0]) ? `<span style="font-size:13px;color:var(--ink-2)">${esc(title(hs[0]))}</span>` : ''}</a>`
+        ${hs.length ? `<a class="v" style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:var(--red-50);border-radius:10px;text-decoration:none" data-go="hirac/${hs[0]}"><span class="k" style="font-size:11.5px;font-weight:700;color:var(--accent-700);letter-spacing:.6px">HIRAC NO. ›</span><span style="font-size:14.5px;font-weight:700;color:var(--accent-700)">${hs.map(n => 'ELEC/' + pad2(n)).join(', ')}</span>${title(hs[0]) ? `<span style="font-size:13px;color:var(--ink-2)">${esc(title(hs[0]))}</span>` : ''}</a>`
           : `<span><span class="k">HIRAC NO.</span><span class="v" style="color:var(--muted)">Not applicable</span></span>`}</div></div>`; }).join('')}</div>` : '<div class="empty"><b>No match found</b>Try another number or word.</div>') + '</div>';
   };
   draw();
@@ -2682,7 +2682,7 @@ async function viewTeam() {
   const photoOf = r => ((r.sap_id && pics.find(p => p.sap_id === r.sap_id)) || pics.find(p => sameName(p.full_name, r.name)) || {}).avatar_url;
   const shiftOf = n => (today.find(r => r.name === n) || today.find(r => sameName(r.name, n)) || {}).shift;
   const tagOf = s => !s ? '' : s === 'WO' ? '<span class="tag">Off</span>' : s === 'L' ? '<span class="tag amber">Leave</span>' : s === 'G' ? '<span class="tag">G</span>' : `<span class="tag red">${s}</span>`;
-  const link = (href, icon, txt) => `<a href="${href}" style="display:inline-flex;align-items:center;gap:6px;margin:4px 14px 0 0;color:var(--red, #C8102E);font-weight:600;text-decoration:none">${ic(icon, 18)}${esc(txt)}</a>`;
+  const link = (href, icon, txt) => `<a href="${href}" style="display:inline-flex;align-items:center;gap:6px;margin:4px 14px 0 0;color:var(--accent, #C8102E);font-weight:600;text-decoration:none">${ic(icon, 18)}${esc(txt)}</a>`;
   const canEdit = isModAdmin('team');
   const draw = () => {
     const q = S.teamQuery.toLowerCase();
