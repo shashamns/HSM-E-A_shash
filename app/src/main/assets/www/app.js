@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.29';
+const APP_VERSION = '3.30';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -169,6 +169,11 @@ const store = { get(k, d = null) { try { const v = localStorage.getItem(k); retu
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
                 del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
 applyTheme(store.get('hsm_theme', 'red'));
+// Light / Dark / Auto (follows the phone's dark-mode setting)
+function applyMode(m) { const h = document.documentElement, dark = m === 'dark' || (m === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  if (dark) h.dataset.mode = 'dark'; else delete h.dataset.mode; }
+applyMode(store.get('hsm_mode', 'light'));
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (store.get('hsm_mode', 'light') === 'auto') applyMode('auto'); }); } catch (e) {}
 const normName = n => String(n || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\b(mr|mrs|ms)\b/g, '').trim().split(/\s+/).filter(w => w.length > 1);
 function sameName(a, b) {
   const x = normName(a), y = normName(b); if (!x.length || !y.length) return false;
@@ -867,6 +872,9 @@ function viewProfile() {
       return `<div class="card" style="padding:14px 16px;margin-top:18px"><button type="button" class="thmrow" id="pthr" aria-expanded="false">${sw(cur)}<span class="nm"><b>App colour</b><span id="pthn">${esc(cur[1])}${cur[5] === 2 ? ' · dual shade' : ''}</span></span>${ic('chev', 20)}</button>
       <div class="thmbox" id="pthm" hidden><div class="label">Single colour</div>${grid(1)}<div class="label">Dual shade</div>${grid(2)}
       <p class="hint" style="margin:10px 0 0">Only on this phone. Alerts stay red and OK stays green in every colour.</p></div></div>`; })()}
+    <div class="card" style="padding:14px 16px;margin-top:12px"><div class="label" style="margin:0">Appearance</div>
+      <div class="modeseg" id="pmode">${[['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']].map(([k, l]) => `<button type="button" data-md="${k}" class="${store.get('hsm_mode', 'light') === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <p class="hint" style="margin:8px 0 0">Dark is easier on the eyes in night shifts. Auto follows your phone’s setting.</p></div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-top:18px">
       <button class="btn block" data-go="pin">${ic('key')} Change PIN</button>
       ${ME.is_admin ? `<button class="btn block" data-go="approvals">${ic('users')} App approvals &amp; sign-ins</button>` : ''}
@@ -878,6 +886,7 @@ function viewProfile() {
       <button class="btn block" data-go="about">${ic('info')} About this app</button>
       <button class="btn ghost block" id="pout">${ic('logout')} Sign out</button></div>
     <p class="hint" style="margin-top:22px;text-align:center">HSM E&amp;A App · version ${APP_VERSION} (build ${esc(window.HSM_APP_VERSION || 0)})</p></div></main>`;
+  $('#pmode').onclick = e => { const b = e.target.closest('[data-md]'); if (!b) return; store.set('hsm_mode', b.dataset.md); applyMode(b.dataset.md); $$('#pmode button').forEach(x => x.classList.toggle('on', x === b)); };
   $('#pthr').onclick = () => { const bx = $('#pthm'), op = bx.hidden; bx.hidden = !op; $('#pthr').classList.toggle('open', op); $('#pthr').setAttribute('aria-expanded', op); };
   $('#pthm').onclick = e => { const b = e.target.closest('[data-th]'); if (!b) return; const t = THEMES.find(x => x[0] === b.dataset.th); store.set('hsm_theme', t[0]); applyTheme(t[0]);
     $$('#pthm button').forEach(x => x.classList.toggle('on', x === b)); $('#pthr i').style.background = `linear-gradient(135deg,${t[2]},${t[3]})`; $('#pthn').textContent = t[1] + (t[5] === 2 ? ' · dual shade' : '');
