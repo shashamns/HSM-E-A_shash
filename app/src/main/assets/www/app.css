@@ -945,3 +945,5 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 [data-mode="dark"] .atile .ic,[data-mode="dark"] .tile .ic,[data-mode="dark"] .lrow .ic{background:color-mix(in srgb,var(--red) 30%,var(--card));color:var(--accent)}
 [data-mode="dark"] .atile.ap .ic{background:var(--grad);color:#fff}
 [data-mode="dark"] .atile .tt,[data-mode="dark"] .kpi .k,[data-mode="dark"] .sec-h{color:var(--ink)}
+.item .also{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:4px;font-size:13px;color:var(--info);font-weight:600}
+.item .also b{color:var(--ink)}

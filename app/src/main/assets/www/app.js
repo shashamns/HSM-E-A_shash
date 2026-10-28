@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.31';
+const APP_VERSION = '3.32';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -1774,7 +1774,7 @@ async function loadSpares(fromCache) {
   const list = $('#list'); if (!list) return;
   const q = S.spareQuery.replace(/[,()*"]/g, ' ').trim(); const e = encodeURIComponent(q);
   // plant-wide total per item (same item in many cupboards / areas is added up; low / nil is judged on that total)
-  let path = `spares_v?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden,item_total,places&order=${S.spareLow ? 'item_total' : 'qty'},material,id`;
+  let path = `spares_v?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden,item_total,places,others&order=${S.spareLow ? 'item_total' : 'qty'},material,id`;
   if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*,cupboard.ilike.*${e}*,cupboard_key.ilike.*${e}*)`;
   if (S.spareLow) path += `&item_total=lt.${LOWN}&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
   let notes = {}, lowRows = {};
@@ -1782,7 +1782,7 @@ async function loadSpares(fromCache) {
   const qtyBox = (r, big) => `<span class="qty ${tot(r) <= 0 ? 'nil' : tot(r) < LOWN ? 'low' : ''}"><b>${big ? tot(r) : r.qty}</b><span>${tot(r) <= 0 ? 'NIL' : big ? 'TOTAL' : 'QTY'}</span>${many(r) ? `<small class="ptot">${big ? `here ${r.qty}` : `Total ${tot(r)}`}</small>` : ''}</span>`;
   const item = (r, showArea) => `<button class="item" data-go="spare/${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
-      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span>${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
+      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span>${many(r) && r.others ? `<span class="also">${ic('box', 14)} Also in ${esc(r.others)} · <b>Total ${tot(r)}</b></span>` : ''}${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
       ${qtyBox(r)}</button>`;
   const planItem = r => `<button class="item" data-plan="${r.id}">
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
