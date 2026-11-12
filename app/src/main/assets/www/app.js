@@ -9,7 +9,7 @@ const ADMIN_NAME = 'Shashank Agrawal';
 const SOP_BUCKET = 'sop-docs';
 const MILL_PROCESS_BUCKET = 'mill-process-sops';
 
-const APP_VERSION = '3.32';
+const APP_VERSION = '3.33';
 const SPARE_AREAS = ['Automation (L1)','Instrument','RM','FM','DC','ABB MV Drive','ABB LV Drive','Motor','Power','Crane','Shift','RG','Planning'];
 const DOC_AREAS = ['CB','DC','FM','LEVEL1','RHF','RM'];
 const MODULES = [['schedule','Shift Schedule','cal','Monthly roster'],['checklist','Check List','check','Daily inspection'],['spares','Spares','box','Stock & location'],
@@ -1712,7 +1712,7 @@ function wireCombo(id, options, free) {
   inp.addEventListener('input', () => { all = false; show(); });
   $('.cbtn', box).addEventListener('click', () => { if (list.classList.contains('hidden')) { all = true; show(); inp.focus(); } else hide(); });
   list.addEventListener('mousedown', e => e.preventDefault());
-  list.addEventListener('click', e => { const o = e.target.closest('[data-v]'); if (!o) return; inp.value = o.dataset.v; inp.dispatchEvent(new Event('change', { bubbles: true })); hide(); inp.blur(); });
+  if (!list._hq) list._hq = 1, list.addEventListener('click', e => { const o = e.target.closest('[data-v]'); if (!o) return; inp.value = o.dataset.v; inp.dispatchEvent(new Event('change', { bubbles: true })); hide(); inp.blur(); });
   inp.addEventListener('blur', () => setTimeout(hide, 150));
 }
 // areas whose spares Excel this person may download: app/spares admin = all; area incharge = own areas only; others none
@@ -1749,7 +1749,7 @@ async function spareExport() {
   draw();
 }
 function viewSpares() {
-  $('#app').innerHTML = `${bar('Spares', 'home', `${logBtn('spares')}${ME.is_admin ? `<button class="ib" id="sset" aria-label="Spares settings">${ic('gear', 26)}</button>` : ''}${spareXlsAreas().length ? `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button>` : ''}<button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
+  $('#app').innerHTML = `${bar('Spares', 'home', `${logBtn('spares')}${ME.is_admin || isModAdmin('planning') ? `<button class="ib" id="sset" aria-label="Spares settings">${ic('gear', 26)}</button>` : ''}${spareXlsAreas().length ? `<button class="ib" id="sxls" aria-label="Download spares Excel">${ic('download', 26)}</button>` : ''}<button class="ib" id="rbtn" aria-label="Refresh">${ic('refresh', 26)}</button>`)}
   <div class="searchwrap"><div class="search">${ic('search', 22)}<input id="sq" type="search" placeholder="Search item, model, make, location, cupboard" value="${esc(S.spareQuery)}" aria-label="Search spares"></div></div>
   <div class="tabs" role="tablist" id="tabs"><button data-a="__low" class="${S.spareLow ? 'on' : ''}" style="${S.spareLow ? 'background:var(--red);border-color:var(--danger)' : ''}">Out / low stock</button>${SPARE_AREAS.map(a => `<button role="tab" data-a="${esc(a)}" class="${!S.spareLow && a === S.spareArea ? 'on' : ''}">${esc(a)}</button>`).join('')}</div>
   <main class="scroll" id="list" style="padding-bottom:90px"><div class="spin">Loading…</div></main>
@@ -1760,13 +1760,19 @@ function viewSpares() {
   $('#rbtn').onclick = loadSpares;
   if ($('#sxls')) $('#sxls').onclick = () => spareExport();
   if ($('#sset')) $('#sset').onclick = () => { const md = $('#modal');
-    md.innerHTML = `<div class="sheet"><h3>Spares settings</h3><div class="fld"><label for="lown">Low stock: quantity below</label><input id="lown" type="number" inputmode="numeric" min="1" max="1000" value="${LOWN}"></div>
-      <p class="hint" style="margin:6px 0 12px">Items with quantity 0 are “Out of stock”. Items below this number are “Low stock” (orange). Changes apply to everyone.</p>
+    const ph = !!(SET.planning_qty_hidden && SET.planning_qty_hidden.on);
+    md.innerHTML = `<div class="sheet"><h3>Spares settings</h3>
+      <label class="tgl"><input type="checkbox" id="phq" ${ph ? 'checked' : ''}><span><b>Hide Planning quantity</b><small>Others see that an item is kept in Planning, but not how many. Only the Planning team and the admin see the quantity and can change it.</small></span></label>
+      ${ME.is_admin ? `<div class="fld" style="margin-top:14px"><label for="lown">Low stock: quantity below</label><input id="lown" type="number" inputmode="numeric" min="1" max="1000" value="${LOWN}"></div>
+      <p class="hint" style="margin:6px 0 12px">Items with quantity 0 are “Out of stock”. Items below this number are “Low stock” (orange). Changes apply to everyone.</p>` : '<div style="height:12px"></div>'}
       <div class="two"><button class="btn ghost" id="lx">Cancel</button><button class="btn pri" id="ls">Save</button></div></div>`;
     md.classList.remove('hidden'); md.onclick = e => { if (e.target === md) md.classList.add('hidden'); };
     $('#lx').onclick = () => md.classList.add('hidden');
-    $('#ls').onclick = async () => { const n = Math.round(+$('#lown').value); if (!(n >= 1 && n <= 1000)) return toast('Enter a number from 1 to 1000');
-      $('#ls').disabled = true; try { await saveSetting('low_stock', { n }); logAct('spares', 'Low stock limit changed', `below ${n}`); md.classList.add('hidden'); S.lowCache = null; toast(`Low stock is now below ${n}`); viewSpares(); } catch (e) { $('#ls').disabled = false; netErr(e); } }; };
+    $('#ls').onclick = async () => { const n = $('#lown') ? Math.round(+$('#lown').value) : LOWN; if (!(n >= 1 && n <= 1000)) return toast('Enter a number from 1 to 1000');
+      const hq = $('#phq').checked; $('#ls').disabled = true;
+      try { if (hq !== ph) { await saveSetting('planning_qty_hidden', { on: hq }); logAct('spares', 'Planning quantity ' + (hq ? 'hidden' : 'shown'), hq ? 'Only Planning sees the quantity' : 'Everyone sees the quantity'); }
+        if ($('#lown') && n !== LOWN) { await saveSetting('low_stock', { n }); logAct('spares', 'Low stock limit changed', `below ${n}`); }
+        md.classList.add('hidden'); S.lowCache = null; toast('Saved'); viewSpares(); } catch (e) { $('#ls').disabled = false; netErr(e); } }; };
   let tm; $('#sq').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { if (!e.target.isConnected) return; S.spareQuery = e.target.value.trim(); loadSpares(); }, 300); };
   loadSpares();
 }
@@ -1774,17 +1780,20 @@ async function loadSpares(fromCache) {
   const list = $('#list'); if (!list) return;
   const q = S.spareQuery.replace(/[,()*"]/g, ' ').trim(); const e = encodeURIComponent(q);
   // plant-wide total per item (same item in many cupboards / areas is added up; low / nil is judged on that total)
-  let path = `spares_v?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden,item_total,places,others&order=${S.spareLow ? 'item_total' : 'qty'},material,id`;
+  let path = `spares_v?select=id,area,material,model,make,description,qty,location,rack,cupboard,cupboard_key,low_hidden,item_total,places,others,qty_hidden,in_planning_hidden&order=${S.spareLow ? 'item_total' : 'qty'},material,id`;
   if (q) path += `&or=(material.ilike.*${e}*,model.ilike.*${e}*,make.ilike.*${e}*,description.ilike.*${e}*,location.ilike.*${e}*,item_code.ilike.*${e}*,cupboard.ilike.*${e}*,cupboard_key.ilike.*${e}*)`;
   if (S.spareLow) path += `&item_total=lt.${LOWN}&low_hidden=eq.${!!S.spareHid}`; else if (!q) path += `&area=eq.${encodeURIComponent(S.spareArea)}`;
   let notes = {}, lowRows = {};
+  list.addEventListener('click', e => { if (e.target.closest('[data-hidq]')) { e.preventDefault(); e.stopPropagation(); toast('Kept by Planning as emergency stock – the quantity is shown only to the Planning team', 4500); } }, { capture: true });
   const tot = r => r.item_total != null ? r.item_total : r.qty, many = r => (r.places || 1) > 1;
-  const qtyBox = (r, big) => `<span class="qty ${tot(r) <= 0 ? 'nil' : tot(r) < LOWN ? 'low' : ''}"><b>${big ? tot(r) : r.qty}</b><span>${tot(r) <= 0 ? 'NIL' : big ? 'TOTAL' : 'QTY'}</span>${many(r) ? `<small class="ptot">${big ? `here ${r.qty}` : `Total ${tot(r)}`}</small>` : ''}</span>`;
-  const item = (r, showArea) => `<button class="item" data-go="spare/${r.id}">
+  // Planning emergency stock: when hidden, people outside Planning see that it is kept there, never how many
+  const qtyBox = (r, big) => r.qty_hidden ? `<span class="qty plan">${ic('key', 20)}<span>PLANNING</span><small class="ptot">qty hidden</small></span>`
+    : `<span class="qty ${tot(r) <= 0 ? 'nil' : tot(r) < LOWN ? 'low' : ''}"><b>${big ? tot(r) : r.qty}</b><span>${tot(r) <= 0 ? 'NIL' : big ? 'TOTAL' : 'QTY'}</span>${many(r) ? `<small class="ptot">${big ? `here ${r.qty}` : `Total ${tot(r)}`}${r.in_planning_hidden ? ' + Planning' : ''}</small>` : ''}</span>`;
+  const item = (r, showArea) => `<button class="item" ${r.qty_hidden ? `data-hidq="1"` : `data-go="spare/${r.id}"`}>
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
-      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span>${many(r) && r.others ? `<span class="also">${ic('box', 14)} Also in ${esc(r.others)} · <b>Total ${tot(r)}</b></span>` : ''}${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
+      <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}${showArea ? ` · ${esc(r.area)}` : ''}</span>${many(r) && r.others ? `<span class="also">${ic('box', 14)} Also in ${esc(r.others)}${r.qty_hidden ? '' : ` · <b>Total ${tot(r)}${r.in_planning_hidden ? ' + Planning' : ''}</b>`}</span>` : ''}${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
       ${qtyBox(r)}</button>`;
-  const planItem = r => `<button class="item" data-plan="${r.id}">
+  const planItem = r => `<button class="item" ${r.qty_hidden ? 'data-hidq="1"' : `data-plan="${r.id}"`}>
       <span class="tx"><span class="n">${esc(r.material)}</span><span class="m">${esc([r.model, r.make].filter(Boolean).join(' · ') || r.description || '')}</span>
       <span class="loc">${ic('pin', 15)} ${esc(r.location || 'Location not set')}${r.rack ? ` · Rack ${esc(r.rack)}` : ''}${r.cupboard ? ` · Cupboard ${esc(r.cupboard)}` : ''}${r.cupboard_key ? ` · Key ${esc(r.cupboard_key)}` : ''}</span>
       ${notes[r.id] ? `<span class="pnote">Planning: ${esc(notes[r.id].body)}</span>` : ''}</span>
